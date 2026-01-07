@@ -18,12 +18,12 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
         refetchInterval: 5000,
     });
 
-    // Check for high risers (>7%) and toast
+    // Check for high risers (>5%) and toast
     useEffect(() => {
         if (!movers) return;
 
         movers.forEach((m: any) => {
-            if (m.type === 'rise' && m.change_pct_window >= 7.0) {
+            if (m.type === 'rise' && m.change_pct_window >= 5.0) {
                 // Create a unique key for this event (symbol + time) to avoid repeating same event
                 // But for simplicity and UX, let's just alert once per symbol per session or short window?
                 // Actually, let's use the event time string as part of key
