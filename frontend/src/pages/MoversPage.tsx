@@ -1,17 +1,43 @@
+import { useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { fetchMovers } from '../api/client';
 import { TrendingUp, Zap } from 'lucide-react';
+import { useToast } from '../components/ToastContext';
 
 interface MoversPageProps {
     onSymbolSelect: (symbol: string) => void;
 }
 
 export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
+    const { addToast } = useToast();
+    const notifiedRef = useRef<Set<string>>(new Set());
+
     const { data: movers, isLoading } = useQuery({
         queryKey: ['movers'],
         queryFn: () => fetchMovers(),
         refetchInterval: 5000,
     });
+
+    // Check for high risers (>7%) and toast
+    useEffect(() => {
+        if (!movers) return;
+
+        movers.forEach((m: any) => {
+            if (m.type === 'rise' && m.change_pct_window >= 7.0) {
+                // Create a unique key for this event (symbol + time) to avoid repeating same event
+                // But for simplicity and UX, let's just alert once per symbol per session or short window?
+                // Actually, let's use the event time string as part of key
+                const key = `${m.symbol}-${m.event_time}`;
+
+                if (!notifiedRef.current.has(key)) {
+                    addToast(`${m.symbol} is pumping! (+${m.change_pct_window.toFixed(2)}%)`, 'rise', 5000);
+                    notifiedRef.current.add(key);
+
+                    // Cleanup old keys to prevent memory leak? (Optional)
+                }
+            }
+        });
+    }, [movers, addToast]);
 
     if (isLoading) {
         return (
@@ -131,8 +157,15 @@ function MoverColumn({ title, icon, items, onSelect, type }: any) {
                                         }}>
                                             {item.window || '5m'} · {new Date(item.event_time).toLocaleTimeString('ko-KR', {
                                                 hour: '2-digit',
-                                                minute: '2-digit'
+                                                minute: '2-digit',
+                                                second: '2-digit'
                                             })}
+                                            {/* Show lag if significant */}
+                                            {Math.abs(Date.now() - new Date(item.event_time).getTime()) > 60000 && (
+                                                <span style={{ color: 'var(--binance-red)', marginLeft: '4px' }}>
+                                                    (-{Math.floor((Date.now() - new Date(item.event_time).getTime()) / 60000)}m)
+                                                </span>
+                                            )}
                                         </span>
                                     </div>
                                 </div>

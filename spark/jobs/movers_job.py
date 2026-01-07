@@ -119,13 +119,13 @@ def run():
     # Start both streaming queries with Trigger
     query_5m = windowed_5m.writeStream \
         .outputMode("update") \
-        .trigger(processingTime='15 seconds') \
+        .trigger(processingTime='30 seconds') \
         .foreachBatch(process_5m_batch) \
         .start()
 
     query_2h = windowed_2h.writeStream \
         .outputMode("update") \
-        .trigger(processingTime='1 minute') \
+        .trigger(processingTime='2 minutes') \
         .foreachBatch(process_2h_batch) \
         .start()
     

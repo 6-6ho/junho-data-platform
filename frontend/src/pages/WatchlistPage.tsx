@@ -82,7 +82,11 @@ function WatchlistGroup({ group }: { group: any }) {
     const handleAddItem = (e: React.FormEvent) => {
         e.preventDefault();
         if (newItemSymbol.trim()) {
-            addItemMut.mutate({ groupId: group.group_id, symbol: newItemSymbol.trim() });
+            let symbol = newItemSymbol.trim().toUpperCase();
+            if (!symbol.endsWith('USDT')) {
+                symbol += 'USDT';
+            }
+            addItemMut.mutate({ groupId: group.group_id, symbol });
         }
     };
 
