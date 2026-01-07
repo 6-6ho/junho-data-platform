@@ -19,21 +19,29 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
     });
 
     // Check for high risers (>5%) and toast
+    // Logic: Only toast on NEW events that appear AFTER initial load
     useEffect(() => {
         if (!movers) return;
 
+        // On first load, just populate the set without alerting
+        if (notifiedRef.current.size === 0 && movers.length > 0) {
+            movers.forEach((m: any) => {
+                if (m.type === 'rise') {
+                    const key = `${m.symbol}-${m.event_time}`;
+                    notifiedRef.current.add(key);
+                }
+            });
+            return;
+        }
+
+        // Subsequent updates
         movers.forEach((m: any) => {
             if (m.type === 'rise' && m.change_pct_window >= 5.0) {
-                // Create a unique key for this event (symbol + time) to avoid repeating same event
-                // But for simplicity and UX, let's just alert once per symbol per session or short window?
-                // Actually, let's use the event time string as part of key
                 const key = `${m.symbol}-${m.event_time}`;
 
                 if (!notifiedRef.current.has(key)) {
                     addToast(`${m.symbol} is pumping! (+${m.change_pct_window.toFixed(2)}%)`, 'rise', 5000);
                     notifiedRef.current.add(key);
-
-                    // Cleanup old keys to prevent memory leak? (Optional)
                 }
             }
         });

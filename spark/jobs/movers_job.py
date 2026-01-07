@@ -28,7 +28,7 @@ def create_spark_session():
 
 # Threshold settings (Strict Spec)
 THRESHOLD_5M = 3.0  # 5-minute window threshold
-THRESHOLD_2H = 5.0  # 2-hour window threshold
+
 
 def classify_status(change_pct, window_type):
     """Classify mover status based on percentage change."""
@@ -36,10 +36,9 @@ def classify_status(change_pct, window_type):
         if change_pct >= 11: return "[High] Rise"
         elif change_pct >= 7: return "[Mid] Rise"
         else: return "[Small] Rise"
-    else:  # 2h
-        if change_pct >= 15: return "[High] Rise"
-        elif change_pct >= 10: return "[Mid] Rise"
-        else: return "[Small] Rise"
+    else:  # 10m (formerly 2h)
+        if change_pct >= 10: return "[High] Rise"
+        else: return "[Mid] Rise"
 
 def process_window(batch_df, batch_id, window_duration, window_label, threshold):
     """Process a specific window and save movers."""
@@ -98,11 +97,11 @@ def run():
         ) \
         .withColumn("change_pct_window", ((col("close_price") - col("open_price")) / col("open_price")) * 100)
 
-    # --- 2-HOUR WINDOW ---
-    # Slower updates: 2h window, sliding every 1 minute
-    windowed_2h = df \
-        .withWatermark("event_time", "10 minutes") \
-        .groupBy(window(col("event_time"), "2 hours", "1 minute"), col("symbol")) \
+    # --- 10-MINUTE WINDOW ---
+    # Medium updates: 10m window, sliding every 30 seconds
+    windowed_10m = df \
+        .withWatermark("event_time", "2 minutes") \
+        .groupBy(window(col("event_time"), "10 minutes", "30 seconds"), col("symbol")) \
         .agg(
             first("price").alias("open_price"),
             last("price").alias("close_price"),
@@ -113,8 +112,8 @@ def run():
     def process_5m_batch(batch_df, batch_id):
         process_window(batch_df, batch_id, "5 minutes", "5m", THRESHOLD_5M)
 
-    def process_2h_batch(batch_df, batch_id):
-        process_window(batch_df, batch_id, "2 hours", "2h", THRESHOLD_2H)
+    def process_10m_batch(batch_df, batch_id):
+        process_window(batch_df, batch_id, "10 minutes", "10m", 7.0)
 
     # Start both streaming queries with Trigger
     query_5m = windowed_5m.writeStream \
@@ -123,10 +122,10 @@ def run():
         .foreachBatch(process_5m_batch) \
         .start()
 
-    query_2h = windowed_2h.writeStream \
+    query_10m = windowed_10m.writeStream \
         .outputMode("update") \
-        .trigger(processingTime='2 minutes') \
-        .foreachBatch(process_2h_batch) \
+        .trigger(processingTime='30 seconds') \
+        .foreachBatch(process_10m_batch) \
         .start()
     
     # Wait for both queries

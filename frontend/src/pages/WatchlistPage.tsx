@@ -9,7 +9,7 @@ function WatchlistItem({ item, onDelete }: { item: any, onDelete: () => void }) 
     const { data: ticker, isLoading } = useQuery({
         queryKey: ['ticker', item.symbol],
         queryFn: () => fetchTicker(item.symbol),
-        refetchInterval: 5000 // Auto-refresh price every 5s
+        refetchInterval: 2000 // Auto-refresh price every 2s (Real-time feel)
     });
 
     const price = ticker ? parseFloat(ticker.lastPrice) : 0;

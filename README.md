@@ -9,7 +9,7 @@ Real-time crypto market monitoring dashboard powered by Spark Streaming.
 
 ### 1. Real-time Movers Detection 📈
 - **Engine**: Apache Spark Structured Streaming processes Binance WebSocket feed.
-- **Logic**: Aggregates price changes over sliding windows (5m, 2h).
+- **Logic**: Aggregates price changes over sliding windows (5m, 10m).
 - **Alerts**:
     - **UI**: Toast notifications for >5% rise in 5 minutes.
     - **Sound**: Audio alert ("Ding!") for high risers.
