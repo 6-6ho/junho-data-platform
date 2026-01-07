@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAnalysisInfo, fetchAnalysisOI, fetchTicker } from '../api/client';
 import ChartWrapper from '../components/ChartWrapper';
-import { ArrowLeft, Clock, TrendingUp, TrendingDown, Coins, Activity, DollarSign } from 'lucide-react';
+import { ArrowLeft, Clock, Coins, Activity, DollarSign } from 'lucide-react';
 
 export default function SymbolDetailsPage() {
     const { symbol } = useParams<{ symbol: string }>();

@@ -1,4 +1,5 @@
-import { createChart, ColorType, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 import { fetchKlines } from '../api/client';
 import { Loader2 } from 'lucide-react';
@@ -35,7 +36,7 @@ export default function ChartWrapper({ symbol }: ChartWrapperProps) {
             },
         });
 
-        const series = chart.addCandlestickSeries({
+        const series = chart.addSeries(CandlestickSeries, {
             upColor: '#0ecb81',
             downColor: '#f6465d',
             borderVisible: false,
