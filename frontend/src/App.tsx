@@ -15,15 +15,15 @@ function App() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'var(--bg-primary)',
+      background: 'var(--binance-bg-1)',
       color: 'var(--text-primary)',
       display: 'flex',
       flexDirection: 'column'
     }}>
-      {/* Header */}
+      {/* Header - Binance style */}
       <header style={{
         borderBottom: '1px solid var(--border-color)',
-        background: 'var(--bg-secondary)',
+        background: 'var(--binance-bg-2)',
         position: 'sticky',
         top: 0,
         zIndex: 50
@@ -31,8 +31,8 @@ function App() {
         <div style={{
           maxWidth: '1400px',
           margin: '0 auto',
-          padding: '0 24px',
-          height: '56px',
+          padding: '0 16px',
+          height: '48px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between'
@@ -41,29 +41,21 @@ function App() {
             {/* Logo */}
             <h1 className="logo">Trade Helper</h1>
 
-            {/* Navigation */}
+            {/* Navigation - Binance tab style */}
             <nav style={{
               display: 'flex',
-              gap: '4px',
-              background: 'var(--bg-tertiary)',
-              padding: '4px',
-              borderRadius: '10px'
+              gap: '0',
+              height: '48px',
+              alignItems: 'center'
             }}>
               <button
                 onClick={() => setActiveTab('movers')}
+                className={`nav-tab ${activeTab === 'movers' ? 'active' : ''}`}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  border: 'none',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.15s ease',
-                  background: activeTab === 'movers' ? 'var(--accent-blue-soft)' : 'transparent',
-                  color: activeTab === 'movers' ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                  gap: '6px',
+                  height: '100%'
                 }}
               >
                 <TrendingUp size={16} />
@@ -71,36 +63,30 @@ function App() {
               </button>
               <button
                 onClick={() => setActiveTab('chart')}
+                className={`nav-tab ${activeTab === 'chart' ? 'active' : ''}`}
                 style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  border: 'none',
-                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  transition: 'all 0.15s ease',
-                  background: activeTab === 'chart' ? 'var(--accent-blue-soft)' : 'transparent',
-                  color: activeTab === 'chart' ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                  gap: '6px',
+                  height: '100%'
                 }}
               >
                 <BarChart3 size={16} />
-                Chart & Alerts
+                Chart
               </button>
             </nav>
           </div>
 
-          {/* Active Symbol */}
+          {/* Active Symbol Badge */}
           {activeTab === 'chart' && (
             <div style={{
-              fontSize: '13px',
-              color: 'var(--text-muted)',
+              fontSize: '12px',
+              color: 'var(--binance-yellow)',
               fontFamily: 'monospace',
-              background: 'var(--bg-tertiary)',
-              padding: '6px 12px',
-              borderRadius: '6px'
+              background: 'rgba(240, 185, 11, 0.1)',
+              padding: '4px 12px',
+              borderRadius: '2px',
+              fontWeight: 500
             }}>
               {selectedSymbol}
             </div>
@@ -114,7 +100,7 @@ function App() {
         maxWidth: '1400px',
         margin: '0 auto',
         width: '100%',
-        padding: '24px'
+        padding: '16px'
       }}>
         {activeTab === 'movers' ? (
           <MoversPage onSymbolSelect={handleSymbolSelect} />

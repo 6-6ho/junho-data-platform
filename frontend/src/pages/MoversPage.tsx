@@ -18,9 +18,9 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
             <div style={{
                 padding: '60px',
                 textAlign: 'center',
-                color: 'var(--text-muted)'
+                color: 'var(--text-tertiary)'
             }} className="loading">
-                Loading market data...
+                Loading...
             </div>
         );
     }
@@ -31,74 +31,74 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
     return (
         <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-            gap: '24px'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+            gap: '16px'
         }}>
             <MoverColumn
-                title="Rising"
-                subtitle="Price momentum"
-                icon={<TrendingUp size={18} style={{ color: 'var(--accent-green)' }} />}
+                title="Risers"
+                icon={<TrendingUp size={16} style={{ color: 'var(--binance-green)' }} />}
                 items={riseList}
                 onSelect={onSymbolSelect}
-                accentColor="green"
+                type="rise"
             />
             <MoverColumn
                 title="High Volume"
-                subtitle="Volume spike"
-                icon={<Zap size={18} style={{ color: 'var(--accent-amber)' }} />}
+                icon={<Zap size={16} style={{ color: 'var(--binance-yellow)' }} />}
                 items={volList}
                 onSelect={onSymbolSelect}
-                accentColor="amber"
+                type="vol"
             />
         </div>
     );
 }
 
-function MoverColumn({ title, subtitle, icon, items, onSelect, accentColor }: any) {
+function MoverColumn({ title, icon, items, onSelect, type }: any) {
     return (
         <div className="card">
-            {/* Header */}
+            {/* Header - Binance table header style */}
             <div className="card-header" style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {icon}
-                    <div>
-                        <h2 style={{
-                            fontSize: '16px',
-                            fontWeight: 600,
-                            margin: 0,
-                            color: 'var(--text-primary)'
-                        }}>{title}</h2>
-                        <span style={{
-                            fontSize: '12px',
-                            color: 'var(--text-muted)'
-                        }}>{subtitle}</span>
-                    </div>
+                    <span style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)'
+                    }}>{title}</span>
                 </div>
                 <span style={{
                     fontSize: '12px',
-                    color: 'var(--text-muted)',
-                    background: 'var(--bg-primary)',
-                    padding: '4px 10px',
-                    borderRadius: '20px'
+                    color: 'var(--text-tertiary)',
                 }}>
-                    {items.length}
+                    {items.length} pairs
                 </span>
             </div>
 
+            {/* Column Headers - Binance style */}
+            <div style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr auto',
+                padding: '8px 16px',
+                borderBottom: '1px solid var(--border-color)',
+                background: 'var(--binance-bg-2)'
+            }}>
+                <span className="table-header">Pair</span>
+                <span className="table-header" style={{ textAlign: 'right' }}>Change</span>
+            </div>
+
             {/* Items */}
-            <div style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+            <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                 {items.length === 0 ? (
                     <div style={{
-                        padding: '60px 20px',
+                        padding: '40px 20px',
                         textAlign: 'center',
-                        color: 'var(--text-muted)',
-                        fontSize: '14px'
+                        color: 'var(--text-tertiary)',
+                        fontSize: '13px'
                     }}>
-                        No events yet
+                        No data
                     </div>
                 ) : (
                     items.map((item: any) => (
@@ -108,71 +108,47 @@ function MoverColumn({ title, subtitle, icon, items, onSelect, accentColor }: an
                             className="mover-item"
                         >
                             <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'flex-start',
-                                marginBottom: '8px'
+                                display: 'grid',
+                                gridTemplateColumns: '1fr auto',
+                                alignItems: 'center',
                             }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <span style={{
-                                        fontWeight: 600,
-                                        fontSize: '15px',
-                                        color: 'var(--text-primary)'
-                                    }}>
-                                        {item.symbol}
-                                    </span>
-                                    <span className="badge badge-perp">PERP</span>
+                                {/* Left: Symbol & Status */}
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                                        <span className="symbol-pair">
+                                            {item.symbol.replace('USDT', '')}
+                                            <span className="symbol-base">/USDT</span>
+                                        </span>
+                                        <span className="badge badge-perp">PERP</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span className={`badge badge-${type === 'rise' ? 'rise' : 'vol'}`}>
+                                            {item.status}
+                                        </span>
+                                        <span style={{
+                                            fontSize: '11px',
+                                            color: 'var(--text-tertiary)'
+                                        }}>
+                                            {item.window || '5m'} · {new Date(item.event_time).toLocaleTimeString('ko-KR', {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </span>
+                                    </div>
                                 </div>
 
+                                {/* Right: Percentage */}
                                 <div style={{ textAlign: 'right' }}>
                                     {item.type === 'rise' ? (
-                                        <div>
-                                            <span style={{
-                                                fontFamily: 'monospace',
-                                                fontWeight: 500,
-                                                fontSize: '15px',
-                                                color: item.change_pct_window >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
-                                            }}>
-                                                {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window?.toFixed(2)}%
-                                            </span>
-                                            <div style={{
-                                                fontSize: '11px',
-                                                color: 'var(--text-muted)',
-                                                marginTop: '2px'
-                                            }}>
-                                                {item.window || '5m'} change
-                                            </div>
-                                        </div>
+                                        <span className={`pct-change ${item.change_pct_window >= 0 ? 'pct-up' : 'pct-down'}`}>
+                                            {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window?.toFixed(2)}%
+                                        </span>
                                     ) : (
-                                        <span style={{
-                                            fontFamily: 'monospace',
-                                            fontWeight: 500,
-                                            color: item.change_pct_24h >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
-                                        }}>
+                                        <span className={`pct-change ${item.change_pct_24h >= 0 ? 'pct-up' : 'pct-down'}`}>
                                             {item.change_pct_24h > 0 ? '+' : ''}{item.change_pct_24h?.toFixed(2)}%
                                         </span>
                                     )}
                                 </div>
-                            </div>
-
-                            <div style={{
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                            }}>
-                                <span className={`badge badge-${accentColor === 'green' ? 'rise' : 'vol'}`}>
-                                    {item.status}
-                                </span>
-                                <span style={{
-                                    fontSize: '12px',
-                                    color: 'var(--text-muted)'
-                                }}>
-                                    {new Date(item.event_time).toLocaleTimeString('ko-KR', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        second: '2-digit'
-                                    })}
-                                </span>
                             </div>
                         </div>
                     ))
