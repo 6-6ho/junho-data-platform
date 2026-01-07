@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import MoversPage from './pages/MoversPage';
 import ChartPage from './pages/ChartPage';
-import { Activity, BarChart2 } from 'lucide-react';
-import clsx from 'clsx';
+import { TrendingUp, BarChart3 } from 'lucide-react';
 
 function App() {
   const [activeTab, setActiveTab] = useState<'movers' | 'chart'>('movers');
@@ -14,51 +13,109 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
-      {/* Header / Nav */}
-      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              TradeHelper
-            </h1>
+    <div style={{
+      minHeight: '100vh',
+      background: 'var(--bg-primary)',
+      color: 'var(--text-primary)',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      {/* Header */}
+      <header style={{
+        borderBottom: '1px solid var(--border-color)',
+        background: 'var(--bg-secondary)',
+        position: 'sticky',
+        top: 0,
+        zIndex: 50
+      }}>
+        <div style={{
+          maxWidth: '1400px',
+          margin: '0 auto',
+          padding: '0 24px',
+          height: '56px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+            {/* Logo */}
+            <h1 className="logo">Trade Helper</h1>
 
-            <nav className="flex gap-1 bg-slate-800/50 p-1 rounded-lg">
+            {/* Navigation */}
+            <nav style={{
+              display: 'flex',
+              gap: '4px',
+              background: 'var(--bg-tertiary)',
+              padding: '4px',
+              borderRadius: '10px'
+            }}>
               <button
                 onClick={() => setActiveTab('movers')}
-                className={clsx(
-                  "px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
-                  activeTab === 'movers'
-                    ? "bg-slate-700 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                )}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.15s ease',
+                  background: activeTab === 'movers' ? 'var(--accent-blue-soft)' : 'transparent',
+                  color: activeTab === 'movers' ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                }}
               >
-                <Activity size={16} />
+                <TrendingUp size={16} />
                 Top Movers
               </button>
               <button
                 onClick={() => setActiveTab('chart')}
-                className={clsx(
-                  "px-4 py-1.5 rounded-md text-sm font-medium transition-all flex items-center gap-2",
-                  activeTab === 'chart'
-                    ? "bg-slate-700 text-white shadow-sm"
-                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-                )}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  transition: 'all 0.15s ease',
+                  background: activeTab === 'chart' ? 'var(--accent-blue-soft)' : 'transparent',
+                  color: activeTab === 'chart' ? 'var(--accent-blue)' : 'var(--text-secondary)'
+                }}
               >
-                <BarChart2 size={16} />
+                <BarChart3 size={16} />
                 Chart & Alerts
               </button>
             </nav>
           </div>
 
-          <div className="text-xs text-slate-500 font-mono">
-            {activeTab === 'chart' && `Active: ${selectedSymbol}`}
-          </div>
+          {/* Active Symbol */}
+          {activeTab === 'chart' && (
+            <div style={{
+              fontSize: '13px',
+              color: 'var(--text-muted)',
+              fontFamily: 'monospace',
+              background: 'var(--bg-tertiary)',
+              padding: '6px 12px',
+              borderRadius: '6px'
+            }}>
+              {selectedSymbol}
+            </div>
+          )}
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 max-w-7xl mx-auto w-full p-4">
+      <main style={{
+        flex: 1,
+        maxWidth: '1400px',
+        margin: '0 auto',
+        width: '100%',
+        padding: '24px'
+      }}>
         {activeTab === 'movers' ? (
           <MoversPage onSymbolSelect={handleSymbolSelect} />
         ) : (

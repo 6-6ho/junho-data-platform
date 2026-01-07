@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchMovers } from '../api/client';
-import { ArrowUpRight, SignalHigh } from 'lucide-react';
-import clsx from 'clsx';
+import { TrendingUp, Zap } from 'lucide-react';
 
 interface MoversPageProps {
     onSymbolSelect: (symbol: string) => void;
@@ -11,94 +10,168 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
     const { data: movers, isLoading } = useQuery({
         queryKey: ['movers'],
         queryFn: () => fetchMovers(),
-        refetchInterval: 5000, // Auto refresh every 5s
+        refetchInterval: 5000,
     });
 
-    if (isLoading) return <div className="p-8 text-center text-slate-500 animate-pulse">Loading market data...</div>;
-
-    // Split into Rise and HighVolUp
-    // Note: Backend returns flat list mixed. We filter client side for better UI separation if needed 
-    // or just show mixed list sorted by time.
-    // Spec says: Left (Rise), Right (HighVolUp).
-    // But our backend currently just dumps everything into 'movers_latest'.
-    // Let's assume 'type' field exists in response.
+    if (isLoading) {
+        return (
+            <div style={{
+                padding: '60px',
+                textAlign: 'center',
+                color: 'var(--text-muted)'
+            }} className="loading">
+                Loading market data...
+            </div>
+        );
+    }
 
     const riseList = movers?.filter((m: any) => m.type === 'rise') || [];
     const volList = movers?.filter((m: any) => m.type === 'high_vol_up') || [];
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+            gap: '24px'
+        }}>
             <MoverColumn
-                title="Rise (Top 20)"
-                icon={<ArrowUpRight className="text-emerald-400" />}
+                title="Rising"
+                subtitle="Price momentum"
+                icon={<TrendingUp size={18} style={{ color: 'var(--accent-green)' }} />}
                 items={riseList}
                 onSelect={onSymbolSelect}
+                accentColor="green"
             />
             <MoverColumn
-                title="High Vol Up (Top 20)"
-                icon={<SignalHigh className="text-amber-400" />}
+                title="High Volume"
+                subtitle="Volume spike"
+                icon={<Zap size={18} style={{ color: 'var(--accent-amber)' }} />}
                 items={volList}
                 onSelect={onSymbolSelect}
+                accentColor="amber"
             />
         </div>
     );
 }
 
-function MoverColumn({ title, icon, items, onSelect }: any) {
+function MoverColumn({ title, subtitle, icon, items, onSelect, accentColor }: any) {
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-slate-800 bg-slate-900/80 backdrop-blur flex items-center gap-2 sticky top-0">
-                {icon}
-                <h2 className="font-semibold text-slate-200">{title}</h2>
-                <span className="ml-auto text-xs text-slate-500 bg-slate-800 px-2 py-0.5 rounded-full">
+        <div className="card">
+            {/* Header */}
+            <div className="card-header" style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    {icon}
+                    <div>
+                        <h2 style={{
+                            fontSize: '16px',
+                            fontWeight: 600,
+                            margin: 0,
+                            color: 'var(--text-primary)'
+                        }}>{title}</h2>
+                        <span style={{
+                            fontSize: '12px',
+                            color: 'var(--text-muted)'
+                        }}>{subtitle}</span>
+                    </div>
+                </div>
+                <span style={{
+                    fontSize: '12px',
+                    color: 'var(--text-muted)',
+                    background: 'var(--bg-primary)',
+                    padding: '4px 10px',
+                    borderRadius: '20px'
+                }}>
                     {items.length}
                 </span>
             </div>
 
-            <div className="divide-y divide-slate-800/50 overflow-y-auto max-h-[80vh]">
+            {/* Items */}
+            <div style={{ maxHeight: '75vh', overflowY: 'auto' }}>
                 {items.length === 0 ? (
-                    <div className="p-8 text-center text-slate-500 text-sm">No events yet</div>
+                    <div style={{
+                        padding: '60px 20px',
+                        textAlign: 'center',
+                        color: 'var(--text-muted)',
+                        fontSize: '14px'
+                    }}>
+                        No events yet
+                    </div>
                 ) : (
                     items.map((item: any) => (
                         <div
                             key={item.symbol + item.event_time}
                             onClick={() => onSelect(item.symbol)}
-                            className="p-4 hover:bg-slate-800/50 cursor-pointer transition-colors group"
+                            className="mover-item"
                         >
-                            <div className="flex justify-between items-start mb-1">
-                                <div className="flex items-center gap-2">
-                                    <span className="font-bold text-slate-200 group-hover:text-blue-400 transition-colors">
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'flex-start',
+                                marginBottom: '8px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{
+                                        fontWeight: 600,
+                                        fontSize: '15px',
+                                        color: 'var(--text-primary)'
+                                    }}>
                                         {item.symbol}
                                     </span>
-                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                                        PERP
-                                    </span>
+                                    <span className="badge badge-perp">PERP</span>
                                 </div>
-                                <div className="text-right">
+
+                                <div style={{ textAlign: 'right' }}>
                                     {item.type === 'rise' ? (
-                                        <div className="flex flex-col items-end">
-                                            <span className={clsx("font-mono font-medium", item.change_pct_window >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                                        <div>
+                                            <span style={{
+                                                fontFamily: 'monospace',
+                                                fontWeight: 500,
+                                                fontSize: '15px',
+                                                color: item.change_pct_window >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
+                                            }}>
                                                 {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window?.toFixed(2)}%
                                             </span>
-                                            <span className="text-[10px] text-slate-500">{item.window || '5m'} Chg</span>
+                                            <div style={{
+                                                fontSize: '11px',
+                                                color: 'var(--text-muted)',
+                                                marginTop: '2px'
+                                            }}>
+                                                {item.window || '5m'} change
+                                            </div>
                                         </div>
                                     ) : (
-                                        <span className={clsx("font-mono font-medium", item.change_pct_24h >= 0 ? "text-emerald-400" : "text-rose-400")}>
+                                        <span style={{
+                                            fontFamily: 'monospace',
+                                            fontWeight: 500,
+                                            color: item.change_pct_24h >= 0 ? 'var(--accent-green)' : 'var(--accent-red)'
+                                        }}>
                                             {item.change_pct_24h > 0 ? '+' : ''}{item.change_pct_24h?.toFixed(2)}%
                                         </span>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="flex justify-between items-center text-xs text-slate-500">
-                                <span className={clsx(
-                                    "px-1.5 py-0.5 rounded border",
-                                    item.type === 'rise' ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300" : "border-amber-500/20 bg-amber-500/10 text-amber-300"
-                                )}>
+                            <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center'
+                            }}>
+                                <span className={`badge badge-${accentColor === 'green' ? 'rise' : 'vol'}`}>
                                     {item.status}
                                 </span>
-                                <span>
-                                    {new Date(item.event_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                                <span style={{
+                                    fontSize: '12px',
+                                    color: 'var(--text-muted)'
+                                }}>
+                                    {new Date(item.event_time).toLocaleTimeString('ko-KR', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit'
+                                    })}
                                 </span>
                             </div>
                         </div>
