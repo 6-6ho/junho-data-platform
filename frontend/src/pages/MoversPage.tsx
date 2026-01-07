@@ -168,12 +168,6 @@ function MoverColumn({ title, icon, items, onSelect, type }: any) {
                                                 minute: '2-digit',
                                                 second: '2-digit'
                                             })}
-                                            {/* Show lag if significant */}
-                                            {Math.abs(Date.now() - new Date(item.event_time).getTime()) > 60000 && (
-                                                <span style={{ color: 'var(--binance-red)', marginLeft: '4px' }}>
-                                                    (-{Math.floor((Date.now() - new Date(item.event_time).getTime()) / 60000)}m)
-                                                </span>
-                                            )}
                                         </span>
                                     </div>
                                 </div>
