@@ -3,12 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchMovers } from '../api/client';
 import { TrendingUp, Zap } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
+import { useNavigate } from 'react-router-dom';
 
-interface MoversPageProps {
-    onSymbolSelect: (symbol: string) => void;
-}
-
-export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
+export default function MoversPage() {
+    const navigate = useNavigate();
     const { addToast } = useToast();
     const notifiedRef = useRef<Set<string>>(new Set());
 
@@ -19,7 +17,6 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
     });
 
     // Check for high risers (>5%) and toast
-    // Logic: Only toast on NEW events that appear AFTER initial load
     useEffect(() => {
         if (!movers) return;
 
@@ -62,6 +59,10 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
     const riseList = movers?.filter((m: any) => m.type === 'rise') || [];
     const volList = movers?.filter((m: any) => m.type === 'high_vol_up') || [];
 
+    const handleSelect = (symbol: string) => {
+        navigate(`/symbol/${symbol}`);
+    };
+
     return (
         <div style={{
             display: 'grid',
@@ -72,14 +73,14 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
                 title="Risers"
                 icon={<TrendingUp size={16} style={{ color: 'var(--binance-green)' }} />}
                 items={riseList}
-                onSelect={onSymbolSelect}
+                onSelect={handleSelect}
                 type="rise"
             />
             <MoverColumn
                 title="High Volume"
                 icon={<Zap size={16} style={{ color: 'var(--binance-yellow)' }} />}
                 items={volList}
-                onSelect={onSymbolSelect}
+                onSelect={handleSelect}
                 type="vol"
             />
         </div>
@@ -89,7 +90,7 @@ export default function MoversPage({ onSymbolSelect }: MoversPageProps) {
 function MoverColumn({ title, icon, items, onSelect, type }: any) {
     return (
         <div className="card">
-            {/* Header - Binance table header style */}
+            {/* Header */}
             <div className="card-header" style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -111,7 +112,7 @@ function MoverColumn({ title, icon, items, onSelect, type }: any) {
                 </span>
             </div>
 
-            {/* Column Headers - Binance style */}
+            {/* Column Headers */}
             <div style={{
                 display: 'grid',
                 gridTemplateColumns: '1fr auto',

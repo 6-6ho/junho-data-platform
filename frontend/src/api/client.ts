@@ -10,7 +10,11 @@ export const fetchMovers = async (limit = 20) => {
   return data;
 };
 
-// Chart methods removed
+// Chart methods
+export const fetchKlines = async (symbol: string, interval: string, limit = 1000) => {
+  const { data } = await api.get('/klines', { params: { symbol, interval, limit } });
+  return data;
+};
 
 // Favorites
 export const fetchFavorites = async () => {
@@ -35,6 +39,17 @@ export const addFavoriteItem = async (groupId: string, symbol: string) => {
 
 export const deleteFavoriteItem = async (itemId: string) => {
   const { data } = await api.delete(`/favorites/items/${itemId}`);
+  return data;
+};
+
+// Analysis
+export const fetchAnalysisOI = async (symbol: string) => {
+  const { data } = await api.get(`/analysis/oi/${symbol}`);
+  return data;
+};
+
+export const fetchAnalysisInfo = async (symbol: string) => {
+  const { data } = await api.get(`/analysis/info/${symbol}`);
   return data;
 };
 

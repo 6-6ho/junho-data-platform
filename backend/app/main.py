@@ -12,10 +12,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(data.router)
+app.include_router(movers.router)
 app.include_router(klines.router)
+app.include_router(alerts.router)
 app.include_router(favorites.router)
-app.include_router(favorites.router)
+app.include_router(analysis.router)
 
 @app.get("/")
 def read_root():
