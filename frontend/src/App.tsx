@@ -1,6 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import clsx from 'clsx';
-import { Toaster } from 'react-hot-toast';
 import { ToastProvider } from './components/ToastContext';
 import MoversPage from './pages/MoversPage';
 import WatchlistPage from './pages/WatchlistPage';
