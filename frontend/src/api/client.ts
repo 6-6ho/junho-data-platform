@@ -39,3 +39,35 @@ export const fetchAlerts = async (symbol?: string, limit = 50) => {
   const { data } = await api.get('/alerts/latest', { params: { symbol, limit } });
   return data;
 };
+
+// Favorites
+export const fetchFavorites = async () => {
+  const { data } = await api.get('/favorites');
+  return data;
+};
+
+export const createFavoriteGroup = async (name: string) => {
+  const { data } = await api.post('/favorites/groups', { name });
+  return data;
+};
+
+export const deleteFavoriteGroup = async (groupId: string) => {
+  const { data } = await api.delete(`/favorites/groups/${groupId}`);
+  return data;
+};
+
+export const addFavoriteItem = async (groupId: string, symbol: string) => {
+  const { data } = await api.post('/favorites/items', { group_id: groupId, symbol });
+  return data;
+};
+
+export const deleteFavoriteItem = async (itemId: string) => {
+  const { data } = await api.delete(`/favorites/items/${itemId}`);
+  return data;
+};
+
+// Ticker (for Watchlist)
+export const fetchTicker = async (symbol: string) => {
+  const { data } = await api.get('/klines/ticker', { params: { symbol } });
+  return data;
+};

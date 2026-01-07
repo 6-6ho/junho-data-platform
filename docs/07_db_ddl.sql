@@ -48,3 +48,21 @@ create table if not exists alerts_events (
 
 create index if not exists idx_alerts_events_symbol_time
   on alerts_events(symbol, event_time desc);
+
+-- Favorites (Watchlist) Config
+create table if not exists favorite_groups (
+  group_id uuid primary key,
+  name text not null,
+  "ordering" integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists favorite_items (
+  item_id uuid primary key,
+  group_id uuid not null references favorite_groups(group_id) on delete cascade,
+  symbol text not null,
+  "ordering" integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_fav_items_group on favorite_items(group_id);

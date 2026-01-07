@@ -1,16 +1,10 @@
 import { useState } from 'react';
 import MoversPage from './pages/MoversPage';
-import ChartPage from './pages/ChartPage';
-import { TrendingUp, BarChart3 } from 'lucide-react';
+import WatchlistPage from './pages/WatchlistPage';
+import { TrendingUp, Bookmark } from 'lucide-react';
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'movers' | 'chart'>('movers');
-  const [selectedSymbol, setSelectedSymbol] = useState<string>('BTCUSDT');
-
-  const handleSymbolSelect = (symbol: string) => {
-    setSelectedSymbol(symbol);
-    setActiveTab('chart');
-  };
+  const [activeTab, setActiveTab] = useState<'movers' | 'watchlist'>('movers');
 
   return (
     <div style={{
@@ -62,8 +56,8 @@ function App() {
                 Top Movers
               </button>
               <button
-                onClick={() => setActiveTab('chart')}
-                className={`nav-tab ${activeTab === 'chart' ? 'active' : ''}`}
+                onClick={() => setActiveTab('watchlist')}
+                className={`nav-tab ${activeTab === 'watchlist' ? 'active' : ''}`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -71,26 +65,11 @@ function App() {
                   height: '100%'
                 }}
               >
-                <BarChart3 size={16} />
-                Chart
+                <Bookmark size={16} />
+                Watchlist
               </button>
             </nav>
           </div>
-
-          {/* Active Symbol Badge */}
-          {activeTab === 'chart' && (
-            <div style={{
-              fontSize: '12px',
-              color: 'var(--binance-yellow)',
-              fontFamily: 'monospace',
-              background: 'rgba(240, 185, 11, 0.1)',
-              padding: '4px 12px',
-              borderRadius: '2px',
-              fontWeight: 500
-            }}>
-              {selectedSymbol}
-            </div>
-          )}
         </div>
       </header>
 
@@ -103,9 +82,9 @@ function App() {
         padding: '16px'
       }}>
         {activeTab === 'movers' ? (
-          <MoversPage onSymbolSelect={handleSymbolSelect} />
+          <MoversPage onSymbolSelect={() => setActiveTab('watchlist')} />
         ) : (
-          <ChartPage symbol={selectedSymbol} onSymbolSelect={handleSymbolSelect} />
+          <WatchlistPage />
         )}
       </main>
     </div>

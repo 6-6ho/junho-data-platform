@@ -27,3 +27,33 @@ class AlertResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+from typing import List
+
+class FavoriteItemBase(BaseModel):
+    symbol: str
+
+class FavoriteItemCreate(FavoriteItemBase):
+    group_id: UUID
+
+class FavoriteItemResponse(FavoriteItemBase):
+    item_id: UUID
+    group_id: UUID
+    ordering: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class FavoriteGroupBase(BaseModel):
+    name: str
+
+class FavoriteGroupCreate(FavoriteGroupBase):
+    pass
+
+class FavoriteGroupResponse(FavoriteGroupBase):
+    group_id: UUID
+    ordering: int
+    created_at: datetime
+    items: List[FavoriteItemResponse] = []
+    class Config:
+        from_attributes = True

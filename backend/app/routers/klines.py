@@ -34,3 +34,16 @@ async def get_klines(symbol: str, interval: str, limit: int = 1000):
         except httpx.HTTPError as e:
             print(f"Error fetching klines: {e}") 
             raise HTTPException(status_code=502, detail=f"Binance API Error: {str(e)}")
+
+@router.get("/ticker")
+async def get_ticker(symbol: str):
+    url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+    params = {"symbol": symbol}
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(url, params=params)
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Binance API Error: {str(e)}")

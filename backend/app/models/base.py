@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, UUID
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, UUID, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 import uuid
 from ..database import Base
 
@@ -49,3 +50,24 @@ class AlertEvent(Base):
     line_price = Column(Float)
     buffer_pct = Column(Float)
     created_at = Column(DateTime(timezone=True))
+
+class FavoriteGroup(Base):
+    __tablename__ = "favorite_groups"
+    
+    group_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    ordering = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    items = relationship("FavoriteItem", back_populates="group", order_by="FavoriteItem.ordering", cascade="all, delete-orphan")
+
+class FavoriteItem(Base):
+    __tablename__ = "favorite_items"
+    
+    item_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    group_id = Column(UUID(as_uuid=True), ForeignKey("favorite_groups.group_id"), nullable=False)
+    symbol = Column(String, nullable=False)
+    ordering = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    group = relationship("FavoriteGroup", back_populates="items")
