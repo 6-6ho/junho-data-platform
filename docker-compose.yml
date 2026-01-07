@@ -49,18 +49,67 @@ services:
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
     networks: [appnet]
 
-  # System Monitoring
-  glances:
-    image: nicolargo/glances:latest-alpine
-    container_name: trade-helper-monitor
-    restart: always
-    pid: host
-    ports:
-      - "61208:61208"
-    environment:
-      - GLANCES_OPT=-w
+  # --- Monitoring Stack ---
+  
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: trade-helper-prometheus
+    restart: unless-stopped
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=2d'  # Optimize: Keep only 2 days
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "9090:9090"
+    networks: [appnet]
+
+  grafana:
+    image: grafana/grafana:10.0.0
+    container_name: trade-helper-grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3001:3000"  # Expose on 3001
+    networks: [appnet]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: trade-helper-cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks: [appnet]
+    privileged: true
+    devices:
+      - /dev/kmsg
+
+  node-exporter:
+    image: prom/node-exporter:v1.6.0
+    container_name: trade-helper-node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks: [appnet]
 
   spark:
     build: ./spark
@@ -80,6 +129,8 @@ services:
 volumes:
   pgdata:
   miniodata:
+  prometheus_data:
+  grafana_data:
 
 networks:
   appnet:
