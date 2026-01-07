@@ -27,13 +27,7 @@ jobs:
             git fetch origin main
             git reset --hard origin/main
             
-            # Build frontend
-            cd frontend
-            npm install
-            npm run build
-            cd ..
-            
-            # Restart services
+            # Rebuild and restart services (frontend is built inside Docker)
             docker compose down
             docker compose up -d --build
             
