@@ -29,7 +29,6 @@ export default function SymbolDetailsPage() {
 
     const price = ticker ? parseFloat(ticker.lastPrice) : 0;
     const isUp = info?.price_change_percent >= 0;
-    const relStrength = info?.relative_strength;
 
     return (
         <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -73,24 +72,37 @@ export default function SymbolDetailsPage() {
                 </div>
 
                 {/* Sidebar Info */}
-                <div style={{ width: '320px', background: 'var(--binance-bg-card)', overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div style={{ width: '320px', background: 'var(--binance-bg-card)', overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
 
-                    {/* 1. Relative Strength */}
+                    {/* 1. Relative Strength vs BTC */}
                     <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <Activity size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Relative Strength (vs BTC)</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>RS vs BTC</span>
                         </div>
-                        <div style={{ fontSize: '24px', fontWeight: 600, color: (relStrength >= 0) ? 'var(--binance-green)' : 'var(--binance-red)' }}>
-                            {relStrength ? (relStrength > 0 ? '+' : '') + relStrength.toFixed(2) + '%' : '-'}
+                        <div style={{ fontSize: '24px', fontWeight: 600, color: (info?.relative_strength_vs_btc >= 0) ? 'var(--binance-green)' : 'var(--binance-red)' }}>
+                            {info?.relative_strength_vs_btc != null ? (info.relative_strength_vs_btc > 0 ? '+' : '') + info.relative_strength_vs_btc.toFixed(2) + '%' : '-'}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                            {safeSymbol}: {info?.price_change_percent.toFixed(2)}% <br />
-                            BTC: {info?.btc_change_percent.toFixed(2)}%
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                            {safeSymbol}: {info?.price_change_percent?.toFixed(2)}% | BTC: {info?.btc_change_percent?.toFixed(2)}%
                         </div>
                     </div>
 
-                    {/* 2. Listing Info */}
+                    {/* 2. Relative Strength vs Alts Average */}
+                    <div className="card" style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                            <Activity size={16} />
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>RS vs Alts Avg</span>
+                        </div>
+                        <div style={{ fontSize: '24px', fontWeight: 600, color: (info?.relative_strength_vs_alts >= 0) ? 'var(--binance-green)' : 'var(--binance-red)' }}>
+                            {info?.relative_strength_vs_alts != null ? (info.relative_strength_vs_alts > 0 ? '+' : '') + info.relative_strength_vs_alts.toFixed(2) + '%' : '-'}
+                        </div>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                            Alts Avg: {info?.alts_avg_percent?.toFixed(2)}% (15m cached)
+                        </div>
+                    </div>
+
+                    {/* 3. Listing Info */}
                     <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <Clock size={16} />
@@ -99,12 +111,12 @@ export default function SymbolDetailsPage() {
                         <div style={{ fontSize: '18px', fontWeight: 600 }}>
                             {info ? `${info.days_since_listing} Days` : '-'}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                             Listed: {info?.listing_date || '-'}
                         </div>
                     </div>
 
-                    {/* 3. Open Interest */}
+                    {/* 4. Open Interest */}
                     <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <DollarSign size={16} />
@@ -113,20 +125,44 @@ export default function SymbolDetailsPage() {
                         <div style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'monospace' }}>
                             {oi ? `${(oi.current_oi).toLocaleString()}` : '-'}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
                             Value: {oi ? `$${(oi.current_oi_value / 1000000).toFixed(2)}M` : '-'}
                         </div>
                     </div>
 
-                    {/* 4. Tokenomics (Placeholder) */}
-                    <div className="card" style={{ padding: '16px', opacity: 0.7 }}>
+                    {/* 5. Unlocked Supply (CoinGecko) */}
+                    <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <Coins size={16} />
                             <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Unlocked Supply</span>
                         </div>
-                        <div style={{ fontSize: '14px', color: 'var(--text-tertiary)' }}>
-                            Data not available via API
-                        </div>
+                        {info?.unlock_percent != null ? (
+                            <>
+                                <div style={{ fontSize: '18px', fontWeight: 600 }}>
+                                    {info.unlock_percent.toFixed(1)}%
+                                </div>
+                                <div style={{
+                                    marginTop: '8px',
+                                    height: '6px',
+                                    background: 'var(--binance-bg-3)',
+                                    borderRadius: '3px',
+                                    overflow: 'hidden'
+                                }}>
+                                    <div style={{
+                                        width: `${Math.min(info.unlock_percent, 100)}%`,
+                                        height: '100%',
+                                        background: 'var(--binance-yellow)'
+                                    }} />
+                                </div>
+                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                                    {info.circulating_supply?.toLocaleString()} / {info.total_supply?.toLocaleString()}
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                                Data not available
+                            </div>
+                        )}
                     </div>
 
                 </div>

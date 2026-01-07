@@ -68,7 +68,7 @@ export default function ChartWrapper({ symbol }: ChartWrapperProps) {
             setIsLoading(true);
             try {
                 // Fetch 1h candles for now, or make interval selectable later
-                const data = await fetchKlines(symbol, '15m', 1000);
+                const data = await fetchKlines(symbol, '1d', 365);
 
                 // Transform Binance [time, open, high, low, close, ...] to { time, open, high, low, close }
                 const candles = data.map((d: any) => ({
