@@ -1,4 +1,4 @@
-import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries, HistogramSeries } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 import { fetchKlines } from '../api/client';
@@ -11,7 +11,8 @@ interface ChartWrapperProps {
 export default function ChartWrapper({ symbol }: ChartWrapperProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
-    const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+    const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+    const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     // Initialize Chart
@@ -34,9 +35,13 @@ export default function ChartWrapper({ symbol }: ChartWrapperProps) {
                 secondsVisible: false,
                 borderColor: '#2b3139',
             },
+            rightPriceScale: {
+                borderColor: '#2b3139',
+            },
         });
 
-        const series = chart.addSeries(CandlestickSeries, {
+        // Candlestick series
+        const candleSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#0ecb81',
             downColor: '#f6465d',
             borderVisible: false,
@@ -44,8 +49,19 @@ export default function ChartWrapper({ symbol }: ChartWrapperProps) {
             wickDownColor: '#f6465d',
         });
 
+        // Volume histogram series (styled to sit at bottom)
+        const volumeSeries = chart.addSeries(HistogramSeries, {
+            color: '#26a69a',
+            priceFormat: { type: 'volume' },
+            priceScaleId: '', // Overlay on main pane
+        });
+        volumeSeries.priceScale().applyOptions({
+            scaleMargins: { top: 0.85, bottom: 0 }, // Push to bottom 15%
+        });
+
         chartRef.current = chart;
-        seriesRef.current = series;
+        candleSeriesRef.current = candleSeries;
+        volumeSeriesRef.current = volumeSeries;
 
         const handleResize = () => {
             if (chartContainerRef.current) {
@@ -64,13 +80,13 @@ export default function ChartWrapper({ symbol }: ChartWrapperProps) {
     // Load Data
     useEffect(() => {
         const loadData = async () => {
-            if (!symbol || !seriesRef.current) return;
+            if (!symbol || !candleSeriesRef.current || !volumeSeriesRef.current) return;
             setIsLoading(true);
             try {
-                // Fetch 1h candles for now, or make interval selectable later
-                const data = await fetchKlines(symbol, '1d', 365);
+                // Fetch 1500 daily candles (max allowed by Binance in one request)
+                const data = await fetchKlines(symbol, '1d', 1500);
 
-                // Transform Binance [time, open, high, low, close, ...] to { time, open, high, low, close }
+                // Transform Binance [time, open, high, low, close, volume, ...] format
                 const candles = data.map((d: any) => ({
                     time: d[0] / 1000,
                     open: parseFloat(d[1]),
@@ -79,7 +95,14 @@ export default function ChartWrapper({ symbol }: ChartWrapperProps) {
                     close: parseFloat(d[4]),
                 }));
 
-                seriesRef.current.setData(candles);
+                const volumes = data.map((d: any) => ({
+                    time: d[0] / 1000,
+                    value: parseFloat(d[5]), // volume field
+                    color: parseFloat(d[4]) >= parseFloat(d[1]) ? 'rgba(14, 203, 129, 0.5)' : 'rgba(246, 70, 93, 0.5)',
+                }));
+
+                candleSeriesRef.current.setData(candles);
+                volumeSeriesRef.current.setData(volumes);
             } catch (error) {
                 console.error("Failed to load chart data", error);
             } finally {

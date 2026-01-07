@@ -18,7 +18,7 @@ async def get_open_interest(symbol: str):
             curr_data = resp_curr.json()
             
             url_hist = "https://fapi.binance.com/futures/data/openInterestHist"
-            params_hist = {"symbol": symbol, "period": "15m", "limit": 50}
+            params_hist = {"symbol": symbol, "period": "1d", "limit": 30}
             resp_hist = await client.get(url_hist, params=params_hist)
             hist_data = resp_hist.json() if resp_hist.status_code == 200 else []
 

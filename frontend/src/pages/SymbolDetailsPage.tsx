@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { fetchAnalysisInfo, fetchAnalysisOI, fetchTicker } from '../api/client';
 import ChartWrapper from '../components/ChartWrapper';
+import OIMiniChart from '../components/OIMiniChart';
 import { ArrowLeft, Clock, Coins, Activity, DollarSign } from 'lucide-react';
 
 export default function SymbolDetailsPage() {
@@ -120,13 +121,13 @@ export default function SymbolDetailsPage() {
                     <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <DollarSign size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Open Interest</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Open Interest (30D)</span>
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'monospace' }}>
-                            {oi ? `${(oi.current_oi).toLocaleString()}` : '-'}
+                            {oi ? `$${(oi.current_oi_value / 1000000).toFixed(2)}M` : '-'}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                            Value: {oi ? `$${(oi.current_oi_value / 1000000).toFixed(2)}M` : '-'}
+                        <div style={{ marginTop: '12px' }}>
+                            {oi?.history && <OIMiniChart data={oi.history} />}
                         </div>
                     </div>
 
