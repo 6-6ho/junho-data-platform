@@ -84,7 +84,6 @@ export default function MoversPage() {
                 type="vol"
             />
         </div>
-        </div >
     );
 }
 
