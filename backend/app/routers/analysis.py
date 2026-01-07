@@ -95,6 +95,15 @@ async def get_symbol_info(symbol: str):
             unlock_pct = None
             if circulating and total and total > 0:
                 unlock_pct = (circulating / total) * 100
+            
+            # Check if spot market exists
+            has_spot = False
+            try:
+                spot_url = "https://api.binance.com/api/v3/ticker/price"
+                spot_resp = await client.get(spot_url, params={"symbol": symbol})
+                has_spot = spot_resp.status_code == 200
+            except:
+                pass
 
             return {
                 "symbol": symbol,
@@ -107,7 +116,8 @@ async def get_symbol_info(symbol: str):
                 "relative_strength_vs_alts": symbol_change - alts_avg,
                 "circulating_supply": circulating,
                 "total_supply": total,
-                "unlock_percent": unlock_pct
+                "unlock_percent": unlock_pct,
+                "has_spot_market": has_spot
             }
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail="Failed to fetch Symbol Info")

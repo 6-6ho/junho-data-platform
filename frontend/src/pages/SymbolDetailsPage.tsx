@@ -51,6 +51,27 @@ export default function SymbolDetailsPage() {
 
                 <h1 style={{ margin: 0, fontSize: '20px', color: 'var(--binance-yellow)' }}>{safeSymbol.replace('USDT', '')}</h1>
 
+                <div style={{ display: 'flex', gap: '6px' }}>
+                    <span style={{
+                        padding: '2px 6px',
+                        background: 'rgba(246, 70, 93, 0.2)',
+                        color: '#f6465d',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 600
+                    }}>PERP</span>
+                    {info?.has_spot_market && (
+                        <span style={{
+                            padding: '2px 6px',
+                            background: 'rgba(14, 203, 129, 0.2)',
+                            color: '#0ecb81',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: 600
+                        }}>SPOT</span>
+                    )}
+                </div>
+
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
                     <span style={{ fontSize: '24px', fontWeight: 600, fontFamily: 'monospace' }}>
                         ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
