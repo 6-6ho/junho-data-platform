@@ -4,7 +4,6 @@ import { fetchMovers } from '../api/client';
 import { TrendingUp, Zap } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { useNavigate } from 'react-router-dom';
-import MarketOverviewChart from '../components/MarketOverviewChart';
 
 export default function MoversPage() {
     const navigate = useNavigate();
@@ -65,32 +64,27 @@ export default function MoversPage() {
     };
 
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* Market Overview */}
-            <MarketOverviewChart />
-
-            {/* Movers Grid */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-                gap: '16px'
-            }}>
-                <MoverColumn
-                    title="Risers"
-                    icon={<TrendingUp size={16} style={{ color: 'var(--binance-green)' }} />}
-                    items={riseList}
-                    onSelect={handleSelect}
-                    type="rise"
-                />
-                <MoverColumn
-                    title="High Volume"
-                    icon={<Zap size={16} style={{ color: 'var(--binance-yellow)' }} />}
-                    items={volList}
-                    onSelect={handleSelect}
-                    type="vol"
-                />
-            </div>
+        <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+            gap: '16px'
+        }}>
+            <MoverColumn
+                title="Risers"
+                icon={<TrendingUp size={16} style={{ color: 'var(--binance-green)' }} />}
+                items={riseList}
+                onSelect={handleSelect}
+                type="rise"
+            />
+            <MoverColumn
+                title="High Volume"
+                icon={<Zap size={16} style={{ color: 'var(--binance-yellow)' }} />}
+                items={volList}
+                onSelect={handleSelect}
+                type="vol"
+            />
         </div>
+        </div >
     );
 }
 
