@@ -9,19 +9,50 @@ interface ChartPageProps {
 
 export default function ChartPage({ symbol, onSymbolSelect }: ChartPageProps) {
     return (
-        <div className="h-[calc(100vh-80px)] flex flex-col gap-4">
-            <div className="flex justify-between items-center px-4">
-                <h2 className="text-xl font-bold text-slate-200 flex items-center gap-3">
-                    {symbol}
-                    <span className="text-xs font-normal text-slate-500 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">PERP</span>
-                </h2>
+        <div style={{
+            height: 'calc(100vh - 80px)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px'
+        }}>
+            {/* Header */}
+            <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0 4px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <h2 style={{
+                        fontSize: '20px',
+                        fontWeight: 600,
+                        color: 'var(--text-primary)',
+                        margin: 0
+                    }}>
+                        {symbol.replace('USDT', '')}
+                        <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>/USDT</span>
+                    </h2>
+                    <span className="badge badge-perp">PERPETUAL</span>
+                </div>
                 <SymbolSearch currentSymbol={symbol} onSearch={onSymbolSelect} />
             </div>
-            <div className="flex-1 flex border border-slate-800 rounded-xl overflow-hidden shadow-2xl bg-slate-900">
-                <div className="flex-1 relative">
+
+            {/* Main Content */}
+            <div style={{
+                flex: 1,
+                display: 'flex',
+                gap: '12px',
+                minHeight: 0
+            }}>
+                {/* Chart */}
+                <div className="card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <ChartWrapper symbol={symbol} />
                 </div>
-                <AlertsSidebar symbol={symbol} />
+
+                {/* Alerts Sidebar */}
+                <div style={{ width: '280px', flexShrink: 0 }}>
+                    <AlertsSidebar symbol={symbol} />
+                </div>
             </div>
         </div>
     );

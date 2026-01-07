@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Search } from 'lucide-react';
-import clsx from 'clsx';
 
 interface SymbolSearchProps {
     onSearch: (symbol: string) => void;
@@ -18,28 +17,60 @@ export default function SymbolSearch({ onSearch, currentSymbol }: SymbolSearchPr
     };
 
     return (
-        <form onSubmit={handleSubmit} className="flex items-center gap-2">
-            <div className="relative">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ position: 'relative' }}>
                 <input
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Search Symbol (e.g. BTCUSDT)"
-                    className="pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors w-48 font-mono uppercase"
+                    placeholder="Search Symbol"
+                    style={{
+                        paddingLeft: '32px',
+                        paddingRight: '12px',
+                        paddingTop: '6px',
+                        paddingBottom: '6px',
+                        background: 'var(--binance-bg-3)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '4px',
+                        fontSize: '13px',
+                        color: 'var(--text-primary)',
+                        width: '160px',
+                        fontFamily: 'monospace',
+                        textTransform: 'uppercase',
+                        outline: 'none'
+                    }}
                 />
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <Search
+                    size={14}
+                    style={{
+                        position: 'absolute',
+                        left: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--text-tertiary)'
+                    }}
+                />
             </div>
             <button
                 type="submit"
                 disabled={!input.trim() || input.trim().toUpperCase() === currentSymbol}
-                className={clsx(
-                    "px-3 py-1.5 rounded-lg text-sm font-medium transition-colors",
-                    !input.trim() || input.trim().toUpperCase() === currentSymbol
-                        ? "bg-slate-800 text-slate-500 cursor-not-allowed"
-                        : "bg-blue-600 text-white hover:bg-blue-500"
-                )}
+                style={{
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    border: 'none',
+                    cursor: (!input.trim() || input.trim().toUpperCase() === currentSymbol) ? 'not-allowed' : 'pointer',
+                    background: (!input.trim() || input.trim().toUpperCase() === currentSymbol)
+                        ? 'var(--binance-bg-3)'
+                        : 'var(--binance-yellow)',
+                    color: (!input.trim() || input.trim().toUpperCase() === currentSymbol)
+                        ? 'var(--text-tertiary)'
+                        : '#0b0e11',
+                    transition: 'all 0.15s ease'
+                }}
             >
-                Load
+                Go
             </button>
         </form>
     );

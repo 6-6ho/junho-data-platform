@@ -5,7 +5,6 @@ import TrendlineOverlay from './TrendlineOverlay';
 import { fetchTrendlines } from '../api/client';
 import { useQuery } from '@tanstack/react-query';
 import { Loader2, PenTool } from 'lucide-react';
-import clsx from 'clsx';
 
 interface Props {
     symbol: string;
@@ -17,7 +16,7 @@ export default function ChartWrapper({ symbol }: Props) {
     const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
 
     const [isDrawing, setIsDrawing] = useState(false);
-    const { data: chartData, isLoading } = useChartData(symbol);
+    const { data: chartData, isLoading, error } = useChartData(symbol);
 
     // Fetch Trendlines
     const { data: trendlines, refetch: refetchLines } = useQuery({
@@ -31,23 +30,45 @@ export default function ChartWrapper({ symbol }: Props) {
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                background: { type: ColorType.Solid, color: '#0f172a' }, // Slate-900
-                textColor: '#94a3b8',
+                background: { type: ColorType.Solid, color: '#0b0e11' }, // Binance dark
+                textColor: '#848e9c',
             },
             grid: {
-                vertLines: { color: '#1e293b' },
-                horzLines: { color: '#1e293b' },
+                vertLines: { color: '#1e2026' },
+                horzLines: { color: '#1e2026' },
             },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
             timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
+                borderColor: '#2b2f36',
+            },
+            rightPriceScale: {
+                borderColor: '#2b2f36',
+            },
+            crosshair: {
+                vertLine: {
+                    color: '#848e9c',
+                    width: 1,
+                    style: 3,
+                    labelBackgroundColor: '#1e2026',
+                },
+                horzLine: {
+                    color: '#848e9c',
+                    width: 1,
+                    style: 3,
+                    labelBackgroundColor: '#1e2026',
+                },
             },
         });
 
         const candleSeries = (chart as any).addCandlestickSeries({
-            upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+            upColor: '#0ecb81',      // Binance green
+            downColor: '#f6465d',    // Binance red
+            borderVisible: false,
+            wickUpColor: '#0ecb81',
+            wickDownColor: '#f6465d',
         } as CandlestickSeriesPartialOptions);
 
         chartRef.current = chart;
@@ -55,7 +76,10 @@ export default function ChartWrapper({ symbol }: Props) {
 
         const handleResize = () => {
             if (chartContainerRef.current) {
-                chart.applyOptions({ width: chartContainerRef.current.clientWidth });
+                chart.applyOptions({
+                    width: chartContainerRef.current.clientWidth,
+                    height: chartContainerRef.current.clientHeight
+                });
             }
         };
         window.addEventListener('resize', handleResize);
@@ -70,31 +94,84 @@ export default function ChartWrapper({ symbol }: Props) {
     useEffect(() => {
         if (seriesRef.current && chartData) {
             seriesRef.current.setData(chartData.candles);
-            // Volume series could be added here similar to candleSeries
         }
     }, [chartData]);
 
-    if (isLoading) return <div className="h-full flex items-center justify-center text-slate-500"><Loader2 className="animate-spin" /></div>;
+    if (isLoading) {
+        return (
+            <div style={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--text-tertiary)'
+            }}>
+                <Loader2 className="loading" size={24} />
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div style={{
+                height: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--binance-red)',
+                flexDirection: 'column',
+                gap: '8px'
+            }}>
+                <span>Failed to load chart data</span>
+                <span style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
+                    Check if the API is running
+                </span>
+            </div>
+        );
+    }
 
     return (
-        <div className="relative w-full h-full flex flex-col">
+        <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
             {/* Toolbar */}
-            <div className="absolute top-4 left-4 z-20 flex gap-2">
+            <div style={{
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                zIndex: 20,
+                display: 'flex',
+                gap: '8px'
+            }}>
                 <button
                     onClick={() => setIsDrawing(!isDrawing)}
-                    className={clsx(
-                        "p-2 rounded shadow-lg border border-slate-700 transition-all",
-                        isDrawing ? "bg-amber-500 text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"
-                    )}
+                    style={{
+                        padding: '8px',
+                        borderRadius: '4px',
+                        border: '1px solid var(--border-color)',
+                        background: isDrawing ? 'var(--binance-yellow)' : 'var(--binance-bg-3)',
+                        color: isDrawing ? '#0b0e11' : 'var(--text-secondary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.15s ease'
+                    }}
                     title="Draw Trendline"
                 >
-                    <PenTool size={20} />
+                    <PenTool size={18} />
                 </button>
             </div>
 
             {/* Chart Container */}
-            <div ref={chartContainerRef} className="flex-1 w-full h-full relative cursor-crosshair">
-                {/* Helper SVG Overlay */}
+            <div
+                ref={chartContainerRef}
+                style={{
+                    flex: 1,
+                    width: '100%',
+                    height: '100%',
+                    cursor: isDrawing ? 'crosshair' : 'default'
+                }}
+            >
+                {/* Trendline Overlay */}
                 <TrendlineOverlay
                     chart={chartRef.current}
                     series={seriesRef.current}
