@@ -80,7 +80,7 @@ function MoverColumn({ title, icon, items, onSelect }: any) {
                                             <span className={clsx("font-mono font-medium", item.change_pct_window >= 0 ? "text-emerald-400" : "text-rose-400")}>
                                                 {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window?.toFixed(2)}%
                                             </span>
-                                            <span className="text-[10px] text-slate-500">5m Chg</span>
+                                            <span className="text-[10px] text-slate-500">{item.window || '5m'} Chg</span>
                                         </div>
                                     ) : (
                                         <span className={clsx("font-mono font-medium", item.change_pct_24h >= 0 ? "text-emerald-400" : "text-rose-400")}>
