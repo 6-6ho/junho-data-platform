@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "trade-helper-ingest"
+version = "0.1.0"
+description = ""
+authors = ["Junho"]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+websocket-client = "1.7.0"
+kafka-python-ng = "2.2.2"
+orjson = "3.9.10"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
