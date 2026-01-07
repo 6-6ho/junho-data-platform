@@ -1,31 +1,81 @@
-# Binance Movers + Trendline Alerts (USDT-M Perp)
+# Trade Helper (Binance USDT-M) 🚀
 
-## 개요
-- 단일 포트(3000)로 접속하는 웹앱
-  - Top Movers: Rise / HighVolUp 각각 Top 20
-  - Chart & Alerts: 트뷰급 추세선 드로잉 + 돌파/이탈 알럿(v1 close-only)
+Real-time crypto market monitoring dashboard powered by Spark Streaming.
 
-## 실행(예시)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Stack](https://img.shields.io/badge/stack-React_FastAPI_Spark_Kafka-orange)
+
+## 🌟 Key Features
+
+### 1. Real-time Movers Detection 📈
+- **Engine**: Apache Spark Structured Streaming processes Binance WebSocket feed.
+- **Logic**: Aggregates price changes over sliding windows (5m, 2h).
+- **Alerts**:
+    - **UI**: Toast notifications for >5% rise in 5 minutes.
+    - **Sound**: Audio alert ("Ding!") for high risers.
+    - **Display**: "Time Ago" indicator to verify data freshness.
+
+### 2. Favorites Watchlist ⭐
+- Custom watchlist for tracking specific symbols.
+- Real-time price updates.
+- Auto-symbol correction (e.g., input "BTC" -> converts to "BTCUSDT").
+
+### 3. Binance-Style UI 🎨
+- Dark theme (`#0b0e11`) with Binance typography and colors.
+- Responsive grid layout.
+- Custom Favicon.
+
+---
+
+## 🏗️ Architecture
+
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| **Frontend** | React + Vite + Tailwind | Responsive Dashboard with Toast/Sound Context |
+| **Backend** | FastAPI (Python) | REST API for Movers & Favorites |
+| **Ingest** | Python | Binance WS -> Kafka Producer |
+| **Processing** | Apache Spark | Real-time Window Aggregation (5m/15s trigger) |
+| **Message Queue** | Kafka | Decouples ingestion from processing |
+| **Database** | PostgreSQL | Persists Movers history & Favorites |
+| **Monitoring** | Prometheus + Grafana | System metrics & Historical data analysis |
+
+---
+
+## 🚀 Deployment
+
+### Prerequisites
+- Docker & Docker Compose
+- 4GB+ RAM recommended (for Spark + Kafka)
+
+### Run
 ```bash
-docker compose up -d
-# 브라우저: http://localhost:3000
+# 1. Update and Build
+git pull
+docker compose up -d --build
+
+# 2. Access
+# Frontend: http://localhost:3000
+# Grafana: http://localhost:3001 (admin/admin)
 ```
 
-## 데모 시나리오
-1) `/movers` 탭에서 Rise/HighVolUp Top20 확인
-2) 심볼 클릭 → `/chart?symbol=XXX` 이동
-3) 추세선 드래그로 생성 후 enabled
-4) 가격이 추세선을 돌파/이탈하면 alerts feed에 이벤트 생성 확인
+---
 
-## 완료 기준(DoD)
-- 외부 노출 포트는 3000 하나뿐
-- `/movers`에서 Rise/HighVolUp 각각 Top20이 자동 갱신
-- `/chart`에서 라인 드로잉/편집/삭제 가능 + 새로고침 후 유지
-- 알럿 이벤트가 생성되고 피드에 표시 + 저장됨
-- 1시간 이상 안정 실행
+## 📂 Project Structure
 
-## 백로그(v2)
-- wick(high/low) 기준 알럿
-- 스냅(OHLC/시간) 옵션
-- 텔레그램/디스코드 알림 채널
-- 일간 PDF 리포트 + Airflow DAG
+```
+trade-helper/
+├── frontend/           # React dashboard
+├── backend/            # FastAPI server
+├── spark/              # Spark Streaming Jobs
+│   ├── jobs/           # movers_job.py, alerts_job.py
+│   └── common/         # Shared DB logic
+├── ingest/             # Binance WebSocket ingest
+├── infra/              # Prometheus/Grafana config
+├── docs/               # Documentation & DDL
+└── docker-compose.yml  # Orchestration
+```
+
+## 📝 Recent Updates
+- **v1.2**: Added Sound Effects & Lowered Alert Threshold to 5%.
+- **v1.1**: Implemented Favorites Watchlist & Removed Legacy Chart.
+- **v1.0**: Initial Release with Spark Movers.
