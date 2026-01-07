@@ -1,5 +1,5 @@
 import { createChart, ColorType, LineSeries } from 'lightweight-charts';
-import type { IChartApi } from 'lightweight-charts';
+import type { IChartApi, UTCTimestamp } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
 
 interface OIMiniChartProps {
@@ -45,7 +45,7 @@ export default function OIMiniChart({ data }: OIMiniChartProps) {
         });
 
         const chartData = data.map((d) => ({
-            time: d.timestamp / 1000,
+            time: (d.timestamp / 1000) as UTCTimestamp,
             value: parseFloat(d.sumOpenInterestValue) / 1000000, // Convert to millions
         }));
 
