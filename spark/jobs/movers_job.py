@@ -26,22 +26,20 @@ def create_spark_session():
         .config("spark.jars", "/app/jars/spark-sql-kafka-0-10_2.12-3.5.0.jar,/app/jars/spark-token-provider-kafka-0-10_2.12-3.5.0.jar,/app/jars/kafka-clients-3.4.1.jar,/app/jars/commons-pool2-2.11.1.jar") \
         .getOrCreate()
 
-# Threshold settings (lowered for testing)
-THRESHOLD_5M = 0.1  # 5-minute window threshold
-THRESHOLD_2H = 0.5  # 2-hour window threshold
+# Threshold settings (Strict Spec)
+THRESHOLD_5M = 3.0  # 5-minute window threshold
+THRESHOLD_2H = 5.0  # 2-hour window threshold
 
 def classify_status(change_pct, window_type):
     """Classify mover status based on percentage change."""
     if window_type == "5m":
         if change_pct >= 11: return "[High] Rise"
         elif change_pct >= 7: return "[Mid] Rise"
-        elif change_pct >= 3: return "[Small] Rise"
-        else: return "[Minor] Rise"  # For testing with low threshold
+        else: return "[Small] Rise"
     else:  # 2h
         if change_pct >= 15: return "[High] Rise"
         elif change_pct >= 10: return "[Mid] Rise"
-        elif change_pct >= 5: return "[Small] Rise"
-        else: return "[Minor] Rise"
+        else: return "[Small] Rise"
 
 def process_window(batch_df, batch_id, window_duration, window_label, threshold):
     """Process a specific window and save movers."""
