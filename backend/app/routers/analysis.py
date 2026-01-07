@@ -111,3 +111,52 @@ async def get_symbol_info(symbol: str):
             }
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail="Failed to fetch Symbol Info")
+
+@router.get("/market-overview")
+async def get_market_overview():
+    """
+    Get daily returns for BTC and Alts average over the last 30 days.
+    Uses klines to calculate daily % change.
+    """
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            url_ticker = "https://fapi.binance.com/fapi/v1/ticker/24hr"
+            url_klines = "https://fapi.binance.com/fapi/v1/klines"
+            
+            # Get all tickers for alts average calculation
+            resp_tickers = await client.get(url_ticker)
+            resp_tickers.raise_for_status()
+            all_tickers = resp_tickers.json()
+            
+            # Get BTC klines for historical data (30 days)
+            btc_klines = await client.get(url_klines, params={
+                "symbol": "BTCUSDT",
+                "interval": "1d",
+                "limit": 30
+            })
+            btc_data = btc_klines.json() if btc_klines.status_code == 200 else []
+            
+            # Calculate BTC daily returns
+            btc_returns = []
+            for k in btc_data:
+                open_price = float(k[1])
+                close_price = float(k[4])
+                daily_return = ((close_price - open_price) / open_price) * 100
+                btc_returns.append({
+                    "time": k[0],
+                    "value": round(daily_return, 2)
+                })
+            
+            # Calculate current alts average
+            usdt_pairs = [t for t in all_tickers if t["symbol"].endswith("USDT") and t["symbol"] != "BTCUSDT"]
+            current_alts_avg = sum(float(t.get("priceChangePercent", 0)) for t in usdt_pairs) / len(usdt_pairs) if usdt_pairs else 0
+            current_btc = float(next((t for t in all_tickers if t["symbol"] == "BTCUSDT"), {}).get("priceChangePercent", 0))
+            
+            return {
+                "btc_returns": btc_returns,
+                "current_btc_24h": round(current_btc, 2),
+                "current_alts_avg_24h": round(current_alts_avg, 2),
+                "alts_count": len(usdt_pairs)
+            }
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail="Failed to fetch market overview")

@@ -1,7 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { ToastProvider } from './components/ToastContext';
 import MoversPage from './pages/MoversPage';
-import WatchlistPage from './pages/WatchlistPage';
 import SymbolDetailsPage from './pages/SymbolDetailsPage';
 
 function App() {
@@ -53,13 +52,6 @@ function App() {
                   >
                     Movers
                   </NavLink>
-                  <NavLink
-                    to="/watchlist"
-                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                    style={{ textDecoration: 'none', padding: '0 12px', height: '48px', display: 'flex', alignItems: 'center', fontSize: '14px', fontWeight: 500 }}
-                  >
-                    Watchlist
-                  </NavLink>
                 </nav>
               </div>
             </div>
@@ -76,7 +68,6 @@ function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/movers" replace />} />
               <Route path="/movers" element={<MoversPage />} />
-              <Route path="/watchlist" element={<WatchlistPage />} />
               <Route path="/symbol/:symbol" element={<SymbolDetailsPage />} />
             </Routes>
           </main>

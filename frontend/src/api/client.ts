@@ -53,6 +53,11 @@ export const fetchAnalysisInfo = async (symbol: string) => {
   return data;
 };
 
+export const fetchMarketOverview = async () => {
+  const { data } = await api.get('/analysis/market-overview');
+  return data;
+};
+
 // Ticker (for Watchlist)
 export const fetchTicker = async (symbol: string) => {
   const { data } = await api.get('/klines/ticker', { params: { symbol } });
