@@ -73,6 +73,10 @@ def run():
     spark = create_spark_session()
     spark.sparkContext.setLogLevel("WARN")
 
+    # Optimize for small data volume on laptop
+    spark.conf.set("spark.sql.shuffle.partitions", "5")
+    spark.conf.set("spark.default.parallelism", "5")
+
     df = spark.readStream \
         .format("kafka") \
         .option("kafka.bootstrap.servers", os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")) \
@@ -83,9 +87,10 @@ def run():
         .withColumn("event_time", (col("event_time_ms") / 1000).cast("timestamp"))
 
     # --- 5-MINUTE WINDOW ---
+    # Fast updates: 5m window, sliding every 15 seconds
     windowed_5m = df \
-        .withWatermark("event_time", "10 minutes") \
-        .groupBy(window(col("event_time"), "5 minutes", "1 minute"), col("symbol")) \
+        .withWatermark("event_time", "2 minutes") \
+        .groupBy(window(col("event_time"), "5 minutes", "15 seconds"), col("symbol")) \
         .agg(
             first("price").alias("open_price"),
             last("price").alias("close_price"),
@@ -94,9 +99,10 @@ def run():
         .withColumn("change_pct_window", ((col("close_price") - col("open_price")) / col("open_price")) * 100)
 
     # --- 2-HOUR WINDOW ---
+    # Slower updates: 2h window, sliding every 1 minute
     windowed_2h = df \
-        .withWatermark("event_time", "3 hours") \
-        .groupBy(window(col("event_time"), "2 hours", "10 minutes"), col("symbol")) \
+        .withWatermark("event_time", "10 minutes") \
+        .groupBy(window(col("event_time"), "2 hours", "1 minute"), col("symbol")) \
         .agg(
             first("price").alias("open_price"),
             last("price").alias("close_price"),
@@ -110,14 +116,16 @@ def run():
     def process_2h_batch(batch_df, batch_id):
         process_window(batch_df, batch_id, "2 hours", "2h", THRESHOLD_2H)
 
-    # Start both streaming queries
+    # Start both streaming queries with Trigger
     query_5m = windowed_5m.writeStream \
         .outputMode("update") \
+        .trigger(processingTime='15 seconds') \
         .foreachBatch(process_5m_batch) \
         .start()
 
     query_2h = windowed_2h.writeStream \
         .outputMode("update") \
+        .trigger(processingTime='1 minute') \
         .foreachBatch(process_2h_batch) \
         .start()
     

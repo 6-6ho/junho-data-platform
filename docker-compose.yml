@@ -49,6 +49,19 @@ services:
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
     networks: [appnet]
 
+  # System Monitoring
+  glances:
+    image: nicolargo/glances:latest-alpine
+    container_name: trade-helper-monitor
+    restart: always
+    pid: host
+    ports:
+      - "61208:61208"
+    environment:
+      - GLANCES_OPT=-w
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
   spark:
     build: ./spark
     networks: [appnet]
