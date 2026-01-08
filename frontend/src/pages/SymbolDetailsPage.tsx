@@ -47,26 +47,26 @@ export default function SymbolDetailsPage() {
     };
 
     return (
-        <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ height: 'calc(100vh - 88px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Header */}
             <div className="detail-header">
-                <button onClick={() => navigate(-1)} className="detail-back-btn">
+                <button onClick={() => navigate(-1)} className="back-btn">
                     <ArrowLeft size={18} />
                 </button>
 
-                <h1 className="detail-symbol">{safeSymbol.replace('USDT', '')}</h1>
+                <span className="detail-symbol">{safeSymbol.replace('USDT', '')}</span>
 
-                <div style={{ display: 'flex', gap: '6px' }}>
-                    <span className="badge-perp">PERP</span>
-                    {info?.has_spot_market && <span className="badge-success">SPOT</span>}
+                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    <span className="badge badge-perp">PERP</span>
+                    {info?.has_spot_market && <span className="badge badge-spot">SPOT</span>}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginLeft: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', marginLeft: 'auto' }}>
                     <span className="detail-price">
-                        ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                        ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
                     </span>
                     {info && (
-                        <span className={`detail-change ${isUp ? 'pct-up' : 'pct-down'}`}>
+                        <span className={`detail-change ${isUp ? 'text-success' : 'text-danger'}`}>
                             {info.price_change_percent > 0 ? '+' : ''}{info.price_change_percent.toFixed(2)}%
                         </span>
                     )}
@@ -75,7 +75,7 @@ export default function SymbolDetailsPage() {
 
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
                 {/* Chart */}
-                <div className="chart-container">
+                <div className="chart-area">
                     <ChartWrapper symbol={safeSymbol} />
                 </div>
 
@@ -84,98 +84,98 @@ export default function SymbolDetailsPage() {
 
                     {/* RS vs BTC */}
                     <div className="stat-card">
-                        <div className="stat-card-header">
-                            <Activity size={16} />
-                            <span className="stat-card-title">RS vs BTC</span>
+                        <div className="stat-label">
+                            <Activity size={14} />
+                            <span>RS vs BTC</span>
                         </div>
-                        <div className={`stat-card-value ${(info?.relative_strength_vs_btc >= 0) ? 'positive' : 'negative'}`}>
+                        <div className={`stat-value ${(info?.relative_strength_vs_btc >= 0) ? 'positive' : 'negative'}`}>
                             {info?.relative_strength_vs_btc != null
                                 ? (info.relative_strength_vs_btc > 0 ? '+' : '') + info.relative_strength_vs_btc.toFixed(2) + '%'
                                 : '-'}
                         </div>
-                        <div className="stat-card-sub">
-                            {safeSymbol}: {info?.price_change_percent?.toFixed(2)}% | BTC: {info?.btc_change_percent?.toFixed(2)}%
+                        <div className="stat-sub">
+                            {safeSymbol.replace('USDT', '')}: {info?.price_change_percent?.toFixed(2)}% | BTC: {info?.btc_change_percent?.toFixed(2)}%
                         </div>
                     </div>
 
                     {/* RS vs Alts */}
                     <div className="stat-card">
-                        <div className="stat-card-header">
-                            <Activity size={16} />
-                            <span className="stat-card-title">RS vs Alts Avg</span>
+                        <div className="stat-label">
+                            <Activity size={14} />
+                            <span>RS vs Alts</span>
                         </div>
-                        <div className={`stat-card-value ${(info?.relative_strength_vs_alts >= 0) ? 'positive' : 'negative'}`}>
+                        <div className={`stat-value ${(info?.relative_strength_vs_alts >= 0) ? 'positive' : 'negative'}`}>
                             {info?.relative_strength_vs_alts != null
                                 ? (info.relative_strength_vs_alts > 0 ? '+' : '') + info.relative_strength_vs_alts.toFixed(2) + '%'
                                 : '-'}
                         </div>
-                        <div className="stat-card-sub">
+                        <div className="stat-sub">
                             Alts Avg: {info?.alts_avg_percent?.toFixed(2)}%
                         </div>
                     </div>
 
                     {/* Listing Age */}
                     <div className="stat-card">
-                        <div className="stat-card-header">
-                            <Clock size={16} />
-                            <span className="stat-card-title">상장일</span>
+                        <div className="stat-label">
+                            <Clock size={14} />
+                            <span>상장일</span>
                         </div>
-                        <div className="stat-card-value">
+                        <div className="stat-value">
                             {info ? `${info.days_since_listing}일` : '-'}
                         </div>
-                        <div className="stat-card-sub">
+                        <div className="stat-sub">
                             {info?.listing_date || '-'} 상장
                         </div>
                     </div>
 
                     {/* Open Interest */}
                     <div className="stat-card">
-                        <div className="stat-card-header">
-                            <DollarSign size={16} />
-                            <span className="stat-card-title">OI 추이</span>
+                        <div className="stat-label">
+                            <DollarSign size={14} />
+                            <span>미결제약정 (OI)</span>
                         </div>
-                        <div style={{ height: '70px', marginBottom: '8px' }}>
+                        <div style={{ height: '60px', marginBottom: 'var(--space-2)' }}>
                             {oi?.history && <OIMiniChart data={oi.history} />}
                         </div>
-                        <div className="stat-card-value gold" style={{ fontSize: '16px' }}>
+                        <div className="stat-value accent" style={{ fontSize: 'var(--text-lg)' }}>
                             {oi ? formatKRW(oi.current_oi_value) : '-'}
                         </div>
                     </div>
 
                     {/* Market Cap */}
                     <div className="stat-card">
-                        <div className="stat-card-header">
-                            <BarChart3 size={16} />
-                            <span className="stat-card-title">시가총액</span>
+                        <div className="stat-label">
+                            <BarChart3 size={14} />
+                            <span>시가총액</span>
                         </div>
-                        <div className="stat-card-value gold">
+                        <div className="stat-value accent">
                             {info?.market_cap_usd != null ? formatKRW(info.market_cap_usd) : '-'}
                         </div>
                     </div>
 
                     {/* Unlocked Supply */}
                     <div className="stat-card">
-                        <div className="stat-card-header">
-                            <Coins size={16} />
-                            <span className="stat-card-title">유통량</span>
+                        <div className="stat-label">
+                            <Coins size={14} />
+                            <span>유통량</span>
                         </div>
                         {info?.unlock_percent != null ? (
                             <>
-                                <div className="stat-card-value gold">
+                                <div className="stat-value accent">
                                     {info.unlock_percent.toFixed(1)}%
                                 </div>
-                                <div className="progress-bar" style={{ marginTop: '10px' }}>
+                                <div className="progress">
                                     <div
-                                        className="progress-bar-fill"
+                                        className="progress-fill"
                                         style={{ width: `${Math.min(info.unlock_percent, 100)}%` }}
                                     />
                                 </div>
-                                <div className="stat-card-sub">
+                                <div className="stat-sub">
                                     {info.circulating_supply?.toLocaleString()} / {info.total_supply?.toLocaleString()}
                                 </div>
                             </>
                         ) : (
-                            <div className="stat-card-sub">데이터 없음</div>
+                            <div className="stat-sub">데이터 없음</div>
                         )}
                     </div>
 

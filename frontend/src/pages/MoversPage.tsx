@@ -5,7 +5,7 @@ import { TrendingUp, Zap } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { useNavigate } from 'react-router-dom';
 
-const MAX_NOTIFIED_CACHE = 100; // Limit to prevent memory leak
+const MAX_NOTIFIED_CACHE = 100;
 
 export default function MoversPage() {
     const navigate = useNavigate();
@@ -17,35 +17,28 @@ export default function MoversPage() {
         queryKey: ['movers'],
         queryFn: () => fetchMovers(),
         refetchInterval: 5000,
-        refetchIntervalInBackground: true, // Keep refetching even when tab is not active
+        refetchIntervalInBackground: true,
     });
 
-    // Check for high risers (>5%) and toast
     useEffect(() => {
         if (!movers || movers.length === 0) return;
 
-        // On first load, just populate the set without alerting
         if (isFirstLoadRef.current) {
             movers.forEach((m: any) => {
                 if (m.type === 'rise') {
-                    const key = `${m.symbol}-${m.event_time}`;
-                    notifiedRef.current.add(key);
+                    notifiedRef.current.add(`${m.symbol}-${m.event_time}`);
                 }
             });
             isFirstLoadRef.current = false;
             return;
         }
 
-        // Subsequent updates - check for new high risers
         movers.forEach((m: any) => {
             if (m.type === 'rise' && m.change_pct_window >= 5.0) {
                 const key = `${m.symbol}-${m.event_time}`;
-
                 if (!notifiedRef.current.has(key)) {
                     addToast(`${m.symbol} is pumping! (+${m.change_pct_window.toFixed(2)}%)`, 'rise', 5000);
                     notifiedRef.current.add(key);
-
-                    // Cleanup: keep only recent entries to prevent memory leak
                     if (notifiedRef.current.size > MAX_NOTIFIED_CACHE) {
                         const entries = Array.from(notifiedRef.current);
                         notifiedRef.current = new Set(entries.slice(-MAX_NOTIFIED_CACHE / 2));
@@ -53,16 +46,12 @@ export default function MoversPage() {
                 }
             }
         });
-    }, [movers, addToast, dataUpdatedAt]); // dataUpdatedAt ensures effect runs on every fetch
+    }, [movers, addToast, dataUpdatedAt]);
 
     if (isLoading) {
         return (
-            <div style={{
-                padding: '60px',
-                textAlign: 'center',
-                color: 'var(--text-tertiary)'
-            }} className="loading">
-                Loading...
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+                <div className="loading-spinner" />
             </div>
         );
     }
@@ -70,136 +59,106 @@ export default function MoversPage() {
     const riseList = movers?.filter((m: any) => m.type === 'rise') || [];
     const volList = movers?.filter((m: any) => m.type === 'high_vol_up') || [];
 
-    const handleSelect = (symbol: string) => {
-        navigate(`/symbol/${symbol}`);
-    };
+    const handleSelect = (symbol: string) => navigate(`/symbol/${symbol}`);
 
     return (
-        <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
-            gap: '16px'
-        }}>
-            <MoverColumn
-                title="Risers"
-                icon={<TrendingUp size={16} style={{ color: 'var(--binance-green)' }} />}
-                items={riseList}
-                onSelect={handleSelect}
-                type="rise"
-            />
-            <MoverColumn
-                title="High Volume"
-                icon={<Zap size={16} style={{ color: 'var(--binance-yellow)' }} />}
-                items={volList}
-                onSelect={handleSelect}
-                type="vol"
-            />
-        </div>
-    );
-}
-
-function MoverColumn({ title, icon, items, onSelect, type }: any) {
-    return (
-        <div className="card">
-            {/* Header */}
-            <div className="card-header" style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between'
-            }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    {icon}
-                    <span style={{
-                        fontSize: '14px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)'
-                    }}>{title}</span>
-                </div>
-                <span style={{
-                    fontSize: '12px',
-                    color: 'var(--text-tertiary)',
-                }}>
-                    {items.length} pairs
-                </span>
-            </div>
-
-            {/* Column Headers */}
-            <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr auto',
-                padding: '8px 16px',
-                borderBottom: '1px solid var(--border-color)',
-                background: 'var(--binance-bg-2)'
-            }}>
-                <span className="table-header">Pair</span>
-                <span className="table-header" style={{ textAlign: 'right' }}>Change</span>
-            </div>
-
-            {/* Items */}
-            <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-                {items.length === 0 ? (
-                    <div style={{
-                        padding: '40px 20px',
-                        textAlign: 'center',
-                        color: 'var(--text-tertiary)',
-                        fontSize: '13px'
-                    }}>
-                        No data
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)', height: 'calc(100vh - 120px)' }}>
+            {/* Risers Column */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <TrendingUp size={16} style={{ color: 'var(--color-success)' }} />
+                        <span className="card-title">Risers</span>
                     </div>
-                ) : (
-                    items.map((item: any) => (
-                        <div
-                            key={item.symbol + item.event_time}
-                            onClick={() => onSelect(item.symbol)}
-                            className="mover-item"
-                        >
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: '1fr auto',
-                                alignItems: 'center',
-                            }}>
-                                {/* Left: Symbol & Status */}
+                    <span className="card-count">{riseList.length} PAIRS</span>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                    {riseList.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">📈</div>
+                            <div className="empty-state-text">No risers detected</div>
+                        </div>
+                    ) : (
+                        riseList.map((item: any) => (
+                            <div
+                                key={item.symbol + item.event_time}
+                                className="mover-item"
+                                onClick={() => handleSelect(item.symbol)}
+                            >
                                 <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                                        <span className="symbol-pair">
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <span className="mover-symbol">
                                             {item.symbol.replace('USDT', '')}
-                                            <span className="symbol-base">/USDT</span>
+                                            <span className="mover-base">/USDT</span>
                                         </span>
                                         <span className="badge badge-perp">PERP</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span className={`badge badge-${type === 'rise' ? 'rise' : 'vol'}`}>
-                                            {item.status}
-                                        </span>
-                                        <span style={{
-                                            fontSize: '11px',
-                                            color: 'var(--text-tertiary)'
-                                        }}>
+                                    <div className="mover-meta">
+                                        <span className="badge badge-rise">{item.status}</span>
+                                        <span className="mover-time">
                                             {item.window || '5m'} · {new Date(item.event_time).toLocaleTimeString('ko-KR', {
                                                 hour: '2-digit',
-                                                minute: '2-digit',
-                                                second: '2-digit'
+                                                minute: '2-digit'
                                             })}
                                         </span>
                                     </div>
                                 </div>
-
-                                {/* Right: Percentage */}
-                                <div style={{ textAlign: 'right' }}>
-                                    {item.type === 'rise' ? (
-                                        <span className={`pct-change ${item.change_pct_window >= 0 ? 'pct-up' : 'pct-down'}`}>
-                                            {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window?.toFixed(2)}%
-                                        </span>
-                                    ) : (
-                                        <span className={`pct-change ${item.change_pct_24h >= 0 ? 'pct-up' : 'pct-down'}`}>
-                                            {item.change_pct_24h > 0 ? '+' : ''}{item.change_pct_24h?.toFixed(2)}%
-                                        </span>
-                                    )}
-                                </div>
+                                <span className={`mover-change ${item.change_pct_window >= 0 ? 'up' : 'down'}`}>
+                                    {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window.toFixed(2)}%
+                                </span>
                             </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* High Volume Column */}
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="card-header">
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                        <Zap size={16} style={{ color: 'var(--accent-primary)' }} />
+                        <span className="card-title">High Volume</span>
+                    </div>
+                    <span className="card-count">{volList.length} PAIRS</span>
+                </div>
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                    {volList.length === 0 ? (
+                        <div className="empty-state">
+                            <div className="empty-state-icon">⚡</div>
+                            <div className="empty-state-text">No volume spikes detected</div>
                         </div>
-                    ))
-                )}
+                    ) : (
+                        volList.map((item: any) => (
+                            <div
+                                key={item.symbol + item.event_time}
+                                className="mover-item"
+                                onClick={() => handleSelect(item.symbol)}
+                            >
+                                <div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                                        <span className="mover-symbol">
+                                            {item.symbol.replace('USDT', '')}
+                                            <span className="mover-base">/USDT</span>
+                                        </span>
+                                        <span className="badge badge-perp">PERP</span>
+                                    </div>
+                                    <div className="mover-meta">
+                                        <span className="badge badge-vol">{item.status}</span>
+                                        <span className="mover-time">
+                                            {new Date(item.event_time).toLocaleTimeString('ko-KR', {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })}
+                                        </span>
+                                    </div>
+                                </div>
+                                <span className={`mover-change ${item.change_pct_window >= 0 ? 'up' : 'down'}`}>
+                                    {item.change_pct_window > 0 ? '+' : ''}{item.change_pct_window.toFixed(2)}%
+                                </span>
+                            </div>
+                        ))
+                    )}
+                </div>
             </div>
         </div>
     );
