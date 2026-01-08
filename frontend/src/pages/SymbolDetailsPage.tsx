@@ -158,45 +158,29 @@ export default function SymbolDetailsPage() {
                         </div>
                     </div>
 
-                    {/* 4. Open Interest (1 min refresh, KRW) */}
+                    {/* 4. Open Interest (chart only) */}
                     <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-tertiary)' }}>
                             <DollarSign size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Open Interest</span>
-                            <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>1분 갱신</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>OI 추이 (30일)</span>
                         </div>
-                        <div style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'monospace' }}>
-                            {oi ? `$${(oi.current_oi_value / 1_000_000).toFixed(2)}M` : '-'}
-                        </div>
-                        <div style={{ fontSize: '13px', color: 'var(--binance-yellow)', marginTop: '4px' }}>
-                            {oi ? formatKRW(oi.current_oi_value) : '-'}
-                        </div>
-                        <div style={{ marginTop: '12px' }}>
+                        <div style={{ height: '80px' }}>
                             {oi?.history && <OIMiniChart data={oi.history} />}
+                        </div>
+                        <div style={{ fontSize: '12px', color: 'var(--binance-yellow)', textAlign: 'right', marginTop: '4px' }}>
+                            {oi ? formatKRW(oi.current_oi_value) : '-'}
                         </div>
                     </div>
 
-                    {/* 5. Market Cap (1 hour refresh, KRW) */}
+                    {/* 5. Market Cap (KRW only) */}
                     <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-tertiary)' }}>
                             <BarChart3 size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Market Cap</span>
-                            <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>1시간 갱신</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>시가총액</span>
                         </div>
-                        {info?.market_cap_usd != null ? (
-                            <>
-                                <div style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'monospace' }}>
-                                    ${(info.market_cap_usd / 1_000_000_000).toFixed(2)}B
-                                </div>
-                                <div style={{ fontSize: '13px', color: 'var(--binance-yellow)', marginTop: '4px' }}>
-                                    {formatKRW(info.market_cap_usd)}
-                                </div>
-                            </>
-                        ) : (
-                            <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-                                Data not available
-                            </div>
-                        )}
+                        <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--binance-yellow)' }}>
+                            {info?.market_cap_usd != null ? formatKRW(info.market_cap_usd) : '-'}
+                        </div>
                     </div>
 
                     {/* 6. Unlocked Supply (CoinGecko) */}
