@@ -1,9 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAnalysisInfo, fetchAnalysisOI, fetchTicker, fetchExchangeRate } from '../api/client';
+import { fetchAnalysisInfo, fetchTicker, fetchExchangeRate } from '../api/client';
 import ChartWrapper from '../components/ChartWrapper';
-import OIMiniChart from '../components/OIMiniChart';
-import { ArrowLeft, Clock, Coins, Activity, DollarSign, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Clock, Coins, Activity, BarChart3 } from 'lucide-react';
 
 export default function SymbolDetailsPage() {
     const { symbol } = useParams<{ symbol: string }>();
@@ -14,12 +13,6 @@ export default function SymbolDetailsPage() {
         queryKey: ['analysisInfo', safeSymbol],
         queryFn: () => fetchAnalysisInfo(safeSymbol),
         refetchInterval: 3600000
-    });
-
-    const { data: oi } = useQuery({
-        queryKey: ['analysisOI', safeSymbol],
-        queryFn: () => fetchAnalysisOI(safeSymbol),
-        refetchInterval: 60000
     });
 
     const { data: ticker } = useQuery({
@@ -47,20 +40,17 @@ export default function SymbolDetailsPage() {
     };
 
     return (
-        <div style={{ height: 'calc(100vh - 88px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: 'var(--space-4)', height: 'calc(100vh - 88px)', display: 'flex', flexDirection: 'column' }}>
             {/* Header */}
-            <div className="detail-header">
+            <div className="detail-header" style={{ marginBottom: 'var(--space-4)', borderRadius: 'var(--radius-lg)' }}>
                 <button onClick={() => navigate(-1)} className="back-btn">
                     <ArrowLeft size={18} />
                 </button>
-
                 <span className="detail-symbol">{safeSymbol.replace('USDT', '')}</span>
-
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                     <span className="badge badge-perp">PERP</span>
                     {info?.has_spot_market && <span className="badge badge-spot">SPOT</span>}
                 </div>
-
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-3)', marginLeft: 'auto' }}>
                     <span className="detail-price">
                         ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
@@ -73,16 +63,17 @@ export default function SymbolDetailsPage() {
                 </div>
             </div>
 
-            <div style={{ display: 'flex', height: '480px', margin: 'var(--space-4)' }}>
+            {/* Content: Chart + 5 Stats */}
+            <div style={{ display: 'flex', gap: 'var(--space-4)', flex: 1, minHeight: 0 }}>
                 {/* Chart */}
-                <div className="chart-area" style={{ flex: 1, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                <div style={{ flex: 1, background: 'var(--bg-surface)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                     <ChartWrapper symbol={safeSymbol} />
                 </div>
 
-                {/* Sidebar */}
-                <div className="detail-sidebar">
+                {/* 5 Stat Cards */}
+                <div style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
 
-                    {/* RS vs BTC */}
+                    {/* 1. RS vs BTC */}
                     <div className="stat-card">
                         <div className="stat-label">
                             <Activity size={14} />
@@ -98,7 +89,7 @@ export default function SymbolDetailsPage() {
                         </div>
                     </div>
 
-                    {/* RS vs Alts */}
+                    {/* 2. RS vs Alts */}
                     <div className="stat-card">
                         <div className="stat-label">
                             <Activity size={14} />
@@ -114,7 +105,7 @@ export default function SymbolDetailsPage() {
                         </div>
                     </div>
 
-                    {/* Listing Age */}
+                    {/* 3. Listing Age */}
                     <div className="stat-card">
                         <div className="stat-label">
                             <Clock size={14} />
@@ -124,25 +115,11 @@ export default function SymbolDetailsPage() {
                             {info ? `${info.days_since_listing}일` : '-'}
                         </div>
                         <div className="stat-sub">
-                            {info?.listing_date || '-'} 상장
+                            {info?.listing_date || '-'}
                         </div>
                     </div>
 
-                    {/* Open Interest */}
-                    <div className="stat-card">
-                        <div className="stat-label">
-                            <DollarSign size={14} />
-                            <span>미결제약정 (OI)</span>
-                        </div>
-                        <div style={{ height: '50px', marginBottom: 'var(--space-1)' }}>
-                            {oi?.history && <OIMiniChart data={oi.history} />}
-                        </div>
-                        <div className="stat-value accent" style={{ fontSize: 'var(--text-base)' }}>
-                            {oi ? formatKRW(oi.current_oi_value) : '-'}
-                        </div>
-                    </div>
-
-                    {/* Market Cap */}
+                    {/* 4. Market Cap */}
                     <div className="stat-card">
                         <div className="stat-label">
                             <BarChart3 size={14} />
@@ -153,7 +130,7 @@ export default function SymbolDetailsPage() {
                         </div>
                     </div>
 
-                    {/* Unlocked Supply */}
+                    {/* 5. Unlocked Supply */}
                     <div className="stat-card">
                         <div className="stat-label">
                             <Coins size={14} />
@@ -165,13 +142,7 @@ export default function SymbolDetailsPage() {
                                     {info.unlock_percent.toFixed(1)}%
                                 </div>
                                 <div className="progress">
-                                    <div
-                                        className="progress-fill"
-                                        style={{ width: `${Math.min(info.unlock_percent, 100)}%` }}
-                                    />
-                                </div>
-                                <div className="stat-sub">
-                                    {info.circulating_supply?.toLocaleString()} / {info.total_supply?.toLocaleString()}
+                                    <div className="progress-fill" style={{ width: `${Math.min(info.unlock_percent, 100)}%` }} />
                                 </div>
                             </>
                         ) : (
@@ -184,3 +155,4 @@ export default function SymbolDetailsPage() {
         </div>
     );
 }
+
