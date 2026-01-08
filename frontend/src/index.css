@@ -368,6 +368,127 @@ input::placeholder {
   text-align: right;
 }
 
+/* ================================
+   MOVER LIST STYLES
+   ================================ */
+
+/* Mover Item */
+.mover-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border-left: 3px solid transparent;
+}
+
+.mover-item:hover {
+  background: rgba(240, 185, 11, 0.06);
+  border-left-color: var(--accent-gold);
+}
+
+.mover-item:last-child {
+  border-bottom: none;
+}
+
+/* Symbol Pair */
+.symbol-pair {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+
+.symbol-base {
+  font-weight: 400;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+/* Badges */
+.badge-perp {
+  background: rgba(246, 70, 93, 0.15);
+  color: #F6465D;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.badge-rise {
+  background: rgba(14, 203, 129, 0.12);
+  color: var(--success);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.badge-vol {
+  background: rgba(240, 185, 11, 0.12);
+  color: var(--accent-gold);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Percentage Change */
+.pct-change {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: 'Inter', monospace;
+  letter-spacing: -0.3px;
+}
+
+.pct-up {
+  color: var(--success);
+}
+
+.pct-down {
+  color: var(--danger);
+}
+
+/* Table Header */
+.table-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Empty State */
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-text {
+  font-size: 14px;
+}
+
+/* Scrollbar - Thinner */
+.card ::-webkit-scrollbar {
+  width: 4px;
+}
+
+.card ::-webkit-scrollbar-thumb {
+  background: rgba(240, 185, 11, 0.4);
+  border-radius: 2px;
+}
+
+.card ::-webkit-scrollbar-thumb:hover {
+  background: rgba(240, 185, 11, 0.6);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .card {
@@ -376,5 +497,17 @@ input::placeholder {
 
   .brand-text {
     font-size: 16px;
+  }
+
+  .mover-item {
+    padding: 12px 14px;
+  }
+
+  .symbol-pair {
+    font-size: 14px;
+  }
+
+  .pct-change {
+    font-size: 14px;
   }
 }
