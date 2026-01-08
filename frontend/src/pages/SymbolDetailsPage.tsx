@@ -73,9 +73,9 @@ export default function SymbolDetailsPage() {
                 </div>
             </div>
 
-            <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+            <div style={{ display: 'flex', height: '480px', margin: 'var(--space-4)' }}>
                 {/* Chart */}
-                <div className="chart-area">
+                <div className="chart-area" style={{ flex: 1, borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
                     <ChartWrapper symbol={safeSymbol} />
                 </div>
 
