@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, NavLink } from 'react-router-dom';
 import { ToastProvider } from './components/ToastContext';
+import SymbolSearch from './components/SymbolSearch';
 import MoversPage from './pages/MoversPage';
 import SymbolDetailsPage from './pages/SymbolDetailsPage';
 
@@ -54,6 +55,9 @@ function App() {
                   </NavLink>
                 </nav>
               </div>
+
+              {/* Search */}
+              <SymbolSearch />
             </div>
           </header>
 

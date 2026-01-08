@@ -8,6 +8,31 @@ router = APIRouter(prefix="/api/analysis", tags=["analysis"])
 # Cache for all-alts average (15 min TTL)
 alts_avg_cache = TTLCache(maxsize=1, ttl=900)
 
+# Cache for USD/KRW rate (1 hour TTL)
+usd_krw_cache = TTLCache(maxsize=1, ttl=3600)
+
+# Cache for market cap (1 hour TTL)
+market_cap_cache = TTLCache(maxsize=100, ttl=3600)
+
+async def get_usd_krw_rate():
+    """Get USD to KRW exchange rate."""
+    if "rate" in usd_krw_cache:
+        return usd_krw_cache["rate"]
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            # Using exchangerate-api (free tier)
+            url = "https://api.exchangerate-api.com/v4/latest/USD"
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                rate = data.get("rates", {}).get("KRW", 1350)  # Default fallback
+                usd_krw_cache["rate"] = rate
+                return rate
+        except:
+            pass
+    return 1350  # Fallback KRW rate
+
 @router.get("/oi/{symbol}")
 async def get_open_interest(symbol: str):
     async with httpx.AsyncClient() as client:
@@ -77,18 +102,34 @@ async def get_symbol_info(symbol: str):
             btc_change = float(resp_btc.json().get("priceChangePercent", 0)) if resp_btc.status_code == 200 else 0
             alts_avg = await get_alts_average()
             
-            # CoinGecko for supply (best effort)
+            # CoinGecko for supply and market cap (best effort)
             circulating = None
             total = None
+            market_cap_usd = None
             try:
                 # Map Binance symbol to CoinGecko ID (simple approach: lowercase base)
                 base = symbol.replace("USDT", "").lower()
-                cg_url = f"https://api.coingecko.com/api/v3/coins/{base}"
-                cg_resp = await client.get(cg_url)
-                if cg_resp.status_code == 200:
-                    cg_data = cg_resp.json()
-                    circulating = cg_data.get("market_data", {}).get("circulating_supply")
-                    total = cg_data.get("market_data", {}).get("total_supply")
+                
+                # Check cache first
+                if base in market_cap_cache:
+                    cached = market_cap_cache[base]
+                    circulating = cached.get("circulating")
+                    total = cached.get("total")
+                    market_cap_usd = cached.get("market_cap")
+                else:
+                    cg_url = f"https://api.coingecko.com/api/v3/coins/{base}"
+                    cg_resp = await client.get(cg_url)
+                    if cg_resp.status_code == 200:
+                        cg_data = cg_resp.json()
+                        circulating = cg_data.get("market_data", {}).get("circulating_supply")
+                        total = cg_data.get("market_data", {}).get("total_supply")
+                        market_cap_usd = cg_data.get("market_data", {}).get("market_cap", {}).get("usd")
+                        # Cache for 1 hour
+                        market_cap_cache[base] = {
+                            "circulating": circulating,
+                            "total": total,
+                            "market_cap": market_cap_usd
+                        }
             except:
                 pass  # CoinGecko is best-effort
             
@@ -117,10 +158,17 @@ async def get_symbol_info(symbol: str):
                 "circulating_supply": circulating,
                 "total_supply": total,
                 "unlock_percent": unlock_pct,
+                "market_cap_usd": market_cap_usd,
                 "has_spot_market": has_spot
             }
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail="Failed to fetch Symbol Info")
+
+@router.get("/exchange-rate")
+async def get_exchange_rate():
+    """Get USD to KRW exchange rate (cached for 1 hour)."""
+    rate = await get_usd_krw_rate()
+    return {"usd_krw": rate}
 
 @router.get("/market-overview")
 async def get_market_overview():

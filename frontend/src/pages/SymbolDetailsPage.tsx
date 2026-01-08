@@ -1,9 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAnalysisInfo, fetchAnalysisOI, fetchTicker } from '../api/client';
+import { fetchAnalysisInfo, fetchAnalysisOI, fetchTicker, fetchExchangeRate } from '../api/client';
 import ChartWrapper from '../components/ChartWrapper';
 import OIMiniChart from '../components/OIMiniChart';
-import { ArrowLeft, Clock, Coins, Activity, DollarSign } from 'lucide-react';
+import { ArrowLeft, Clock, Coins, Activity, DollarSign, BarChart3 } from 'lucide-react';
 
 export default function SymbolDetailsPage() {
     const { symbol } = useParams<{ symbol: string }>();
@@ -13,13 +13,13 @@ export default function SymbolDetailsPage() {
     const { data: info } = useQuery({
         queryKey: ['analysisInfo', safeSymbol],
         queryFn: () => fetchAnalysisInfo(safeSymbol),
-        staleTime: 60000
+        refetchInterval: 3600000 // 1 hour for market cap refresh
     });
 
     const { data: oi } = useQuery({
         queryKey: ['analysisOI', safeSymbol],
         queryFn: () => fetchAnalysisOI(safeSymbol),
-        refetchInterval: 10000
+        refetchInterval: 60000 // 1 min for OI refresh
     });
 
     const { data: ticker } = useQuery({
@@ -28,8 +28,28 @@ export default function SymbolDetailsPage() {
         refetchInterval: 2000
     });
 
+    const { data: exchangeRate } = useQuery({
+        queryKey: ['exchangeRate'],
+        queryFn: fetchExchangeRate,
+        staleTime: 3600000 // 1 hour
+    });
+
     const price = ticker ? parseFloat(ticker.lastPrice) : 0;
     const isUp = info?.price_change_percent >= 0;
+    const krwRate = exchangeRate?.usd_krw || 1350;
+
+    // Format KRW
+    const formatKRW = (usd: number) => {
+        const krw = usd * krwRate;
+        if (krw >= 1_000_000_000_000) {
+            return `₩${(krw / 1_000_000_000_000).toFixed(1)}조`;
+        } else if (krw >= 100_000_000) {
+            return `₩${(krw / 100_000_000).toFixed(1)}억`;
+        } else if (krw >= 10_000) {
+            return `₩${(krw / 10_000).toFixed(0)}만`;
+        }
+        return `₩${krw.toLocaleString()}`;
+    };
 
     return (
         <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -138,21 +158,48 @@ export default function SymbolDetailsPage() {
                         </div>
                     </div>
 
-                    {/* 4. Open Interest */}
+                    {/* 4. Open Interest (1 min refresh, KRW) */}
                     <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <DollarSign size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Open Interest (30D)</span>
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Open Interest</span>
+                            <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>1분 갱신</span>
                         </div>
                         <div style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'monospace' }}>
-                            {oi ? `$${(oi.current_oi_value / 1000000).toFixed(2)}M` : '-'}
+                            {oi ? `$${(oi.current_oi_value / 1_000_000).toFixed(2)}M` : '-'}
+                        </div>
+                        <div style={{ fontSize: '13px', color: 'var(--binance-yellow)', marginTop: '4px' }}>
+                            {oi ? formatKRW(oi.current_oi_value) : '-'}
                         </div>
                         <div style={{ marginTop: '12px' }}>
                             {oi?.history && <OIMiniChart data={oi.history} />}
                         </div>
                     </div>
 
-                    {/* 5. Unlocked Supply (CoinGecko) */}
+                    {/* 5. Market Cap (1 hour refresh, KRW) */}
+                    <div className="card" style={{ padding: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                            <BarChart3 size={16} />
+                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Market Cap</span>
+                            <span style={{ fontSize: '9px', color: 'var(--text-tertiary)', marginLeft: 'auto' }}>1시간 갱신</span>
+                        </div>
+                        {info?.market_cap_usd != null ? (
+                            <>
+                                <div style={{ fontSize: '18px', fontWeight: 600, fontFamily: 'monospace' }}>
+                                    ${(info.market_cap_usd / 1_000_000_000).toFixed(2)}B
+                                </div>
+                                <div style={{ fontSize: '13px', color: 'var(--binance-yellow)', marginTop: '4px' }}>
+                                    {formatKRW(info.market_cap_usd)}
+                                </div>
+                            </>
+                        ) : (
+                            <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                                Data not available
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 6. Unlocked Supply (CoinGecko) */}
                     <div className="card" style={{ padding: '16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
                             <Coins size={16} />
