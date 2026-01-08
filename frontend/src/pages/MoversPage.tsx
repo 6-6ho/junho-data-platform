@@ -5,33 +5,38 @@ import { TrendingUp, Zap } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { useNavigate } from 'react-router-dom';
 
+const MAX_NOTIFIED_CACHE = 100; // Limit to prevent memory leak
+
 export default function MoversPage() {
     const navigate = useNavigate();
     const { addToast } = useToast();
     const notifiedRef = useRef<Set<string>>(new Set());
+    const isFirstLoadRef = useRef(true);
 
-    const { data: movers, isLoading } = useQuery({
+    const { data: movers, isLoading, dataUpdatedAt } = useQuery({
         queryKey: ['movers'],
         queryFn: () => fetchMovers(),
         refetchInterval: 5000,
+        refetchIntervalInBackground: true, // Keep refetching even when tab is not active
     });
 
     // Check for high risers (>5%) and toast
     useEffect(() => {
-        if (!movers) return;
+        if (!movers || movers.length === 0) return;
 
         // On first load, just populate the set without alerting
-        if (notifiedRef.current.size === 0 && movers.length > 0) {
+        if (isFirstLoadRef.current) {
             movers.forEach((m: any) => {
                 if (m.type === 'rise') {
                     const key = `${m.symbol}-${m.event_time}`;
                     notifiedRef.current.add(key);
                 }
             });
+            isFirstLoadRef.current = false;
             return;
         }
 
-        // Subsequent updates
+        // Subsequent updates - check for new high risers
         movers.forEach((m: any) => {
             if (m.type === 'rise' && m.change_pct_window >= 5.0) {
                 const key = `${m.symbol}-${m.event_time}`;
@@ -39,10 +44,16 @@ export default function MoversPage() {
                 if (!notifiedRef.current.has(key)) {
                     addToast(`${m.symbol} is pumping! (+${m.change_pct_window.toFixed(2)}%)`, 'rise', 5000);
                     notifiedRef.current.add(key);
+
+                    // Cleanup: keep only recent entries to prevent memory leak
+                    if (notifiedRef.current.size > MAX_NOTIFIED_CACHE) {
+                        const entries = Array.from(notifiedRef.current);
+                        notifiedRef.current = new Set(entries.slice(-MAX_NOTIFIED_CACHE / 2));
+                    }
                 }
             }
         });
-    }, [movers, addToast]);
+    }, [movers, addToast, dataUpdatedAt]); // dataUpdatedAt ensures effect runs on every fetch
 
     if (isLoading) {
         return (
