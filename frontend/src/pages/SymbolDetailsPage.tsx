@@ -134,10 +134,10 @@ export default function SymbolDetailsPage() {
                             <DollarSign size={14} />
                             <span>미결제약정 (OI)</span>
                         </div>
-                        <div style={{ height: '60px', marginBottom: 'var(--space-2)' }}>
+                        <div style={{ height: '50px', marginBottom: 'var(--space-1)' }}>
                             {oi?.history && <OIMiniChart data={oi.history} />}
                         </div>
-                        <div className="stat-value accent" style={{ fontSize: 'var(--text-lg)' }}>
+                        <div className="stat-value accent" style={{ fontSize: 'var(--text-base)' }}>
                             {oi ? formatKRW(oi.current_oi_value) : '-'}
                         </div>
                     </div>
