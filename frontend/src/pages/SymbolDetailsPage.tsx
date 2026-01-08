@@ -13,13 +13,13 @@ export default function SymbolDetailsPage() {
     const { data: info } = useQuery({
         queryKey: ['analysisInfo', safeSymbol],
         queryFn: () => fetchAnalysisInfo(safeSymbol),
-        refetchInterval: 3600000 // 1 hour for market cap refresh
+        refetchInterval: 3600000
     });
 
     const { data: oi } = useQuery({
         queryKey: ['analysisOI', safeSymbol],
         queryFn: () => fetchAnalysisOI(safeSymbol),
-        refetchInterval: 60000 // 1 min for OI refresh
+        refetchInterval: 60000
     });
 
     const { data: ticker } = useQuery({
@@ -31,76 +31,42 @@ export default function SymbolDetailsPage() {
     const { data: exchangeRate } = useQuery({
         queryKey: ['exchangeRate'],
         queryFn: fetchExchangeRate,
-        staleTime: 3600000 // 1 hour
+        staleTime: 3600000
     });
 
     const price = ticker ? parseFloat(ticker.lastPrice) : 0;
     const isUp = info?.price_change_percent >= 0;
     const krwRate = exchangeRate?.usd_krw || 1350;
 
-    // Format KRW
     const formatKRW = (usd: number) => {
         const krw = usd * krwRate;
-        if (krw >= 1_000_000_000_000) {
-            return `₩${(krw / 1_000_000_000_000).toFixed(1)}조`;
-        } else if (krw >= 100_000_000) {
-            return `₩${(krw / 100_000_000).toFixed(1)}억`;
-        } else if (krw >= 10_000) {
-            return `₩${(krw / 10_000).toFixed(0)}만`;
-        }
+        if (krw >= 1_000_000_000_000) return `₩${(krw / 1_000_000_000_000).toFixed(1)}조`;
+        if (krw >= 100_000_000) return `₩${(krw / 100_000_000).toFixed(1)}억`;
+        if (krw >= 10_000) return `₩${(krw / 10_000).toFixed(0)}만`;
         return `₩${krw.toLocaleString()}`;
     };
 
     return (
         <div style={{ height: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             {/* Header */}
-            <div style={{
-                padding: '16px 24px',
-                borderBottom: '1px solid var(--border-color)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '20px',
-                background: 'var(--binance-bg-2)'
-            }}>
-                <button
-                    onClick={() => navigate(-1)}
-                    style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer' }}
-                >
-                    <ArrowLeft size={20} />
+            <div className="detail-header">
+                <button onClick={() => navigate(-1)} className="detail-back-btn">
+                    <ArrowLeft size={18} />
                 </button>
 
-                <h1 style={{ margin: 0, fontSize: '20px', color: 'var(--binance-yellow)' }}>{safeSymbol.replace('USDT', '')}</h1>
+                <h1 className="detail-symbol">{safeSymbol.replace('USDT', '')}</h1>
 
                 <div style={{ display: 'flex', gap: '6px' }}>
-                    <span style={{
-                        padding: '2px 6px',
-                        background: 'rgba(246, 70, 93, 0.2)',
-                        color: '#f6465d',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        fontWeight: 600
-                    }}>PERP</span>
-                    {info?.has_spot_market && (
-                        <span style={{
-                            padding: '2px 6px',
-                            background: 'rgba(14, 203, 129, 0.2)',
-                            color: '#0ecb81',
-                            borderRadius: '4px',
-                            fontSize: '10px',
-                            fontWeight: 600
-                        }}>SPOT</span>
-                    )}
+                    <span className="badge-perp">PERP</span>
+                    {info?.has_spot_market && <span className="badge-success">SPOT</span>}
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-                    <span style={{ fontSize: '24px', fontWeight: 600, fontFamily: 'monospace' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', marginLeft: '8px' }}>
+                    <span className="detail-price">
                         ${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                     {info && (
-                        <span style={{
-                            color: isUp ? 'var(--binance-green)' : 'var(--binance-red)',
-                            fontWeight: 500
-                        }}>
+                        <span className={`detail-change ${isUp ? 'pct-up' : 'pct-down'}`}>
                             {info.price_change_percent > 0 ? '+' : ''}{info.price_change_percent.toFixed(2)}%
                         </span>
                     )}
@@ -108,113 +74,108 @@ export default function SymbolDetailsPage() {
             </div>
 
             <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-                {/* Visuals (Chart) */}
-                <div style={{ flex: 1, borderRight: '1px solid var(--border-color)', position: 'relative' }}>
+                {/* Chart */}
+                <div className="chart-container">
                     <ChartWrapper symbol={safeSymbol} />
                 </div>
 
-                {/* Sidebar Info */}
-                <div style={{ width: '320px', background: 'var(--binance-bg-card)', overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {/* Sidebar */}
+                <div className="detail-sidebar">
 
-                    {/* 1. Relative Strength vs BTC */}
-                    <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                    {/* RS vs BTC */}
+                    <div className="stat-card">
+                        <div className="stat-card-header">
                             <Activity size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>RS vs BTC</span>
+                            <span className="stat-card-title">RS vs BTC</span>
                         </div>
-                        <div style={{ fontSize: '24px', fontWeight: 600, color: (info?.relative_strength_vs_btc >= 0) ? 'var(--binance-green)' : 'var(--binance-red)' }}>
-                            {info?.relative_strength_vs_btc != null ? (info.relative_strength_vs_btc > 0 ? '+' : '') + info.relative_strength_vs_btc.toFixed(2) + '%' : '-'}
+                        <div className={`stat-card-value ${(info?.relative_strength_vs_btc >= 0) ? 'positive' : 'negative'}`}>
+                            {info?.relative_strength_vs_btc != null
+                                ? (info.relative_strength_vs_btc > 0 ? '+' : '') + info.relative_strength_vs_btc.toFixed(2) + '%'
+                                : '-'}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                        <div className="stat-card-sub">
                             {safeSymbol}: {info?.price_change_percent?.toFixed(2)}% | BTC: {info?.btc_change_percent?.toFixed(2)}%
                         </div>
                     </div>
 
-                    {/* 2. Relative Strength vs Alts Average */}
-                    <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                    {/* RS vs Alts */}
+                    <div className="stat-card">
+                        <div className="stat-card-header">
                             <Activity size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>RS vs Alts Avg</span>
+                            <span className="stat-card-title">RS vs Alts Avg</span>
                         </div>
-                        <div style={{ fontSize: '24px', fontWeight: 600, color: (info?.relative_strength_vs_alts >= 0) ? 'var(--binance-green)' : 'var(--binance-red)' }}>
-                            {info?.relative_strength_vs_alts != null ? (info.relative_strength_vs_alts > 0 ? '+' : '') + info.relative_strength_vs_alts.toFixed(2) + '%' : '-'}
+                        <div className={`stat-card-value ${(info?.relative_strength_vs_alts >= 0) ? 'positive' : 'negative'}`}>
+                            {info?.relative_strength_vs_alts != null
+                                ? (info.relative_strength_vs_alts > 0 ? '+' : '') + info.relative_strength_vs_alts.toFixed(2) + '%'
+                                : '-'}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                            Alts Avg: {info?.alts_avg_percent?.toFixed(2)}% (15m cached)
+                        <div className="stat-card-sub">
+                            Alts Avg: {info?.alts_avg_percent?.toFixed(2)}%
                         </div>
                     </div>
 
-                    {/* 3. Listing Info */}
-                    <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                    {/* Listing Age */}
+                    <div className="stat-card">
+                        <div className="stat-card-header">
                             <Clock size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Listing Age</span>
+                            <span className="stat-card-title">상장일</span>
                         </div>
-                        <div style={{ fontSize: '18px', fontWeight: 600 }}>
-                            {info ? `${info.days_since_listing} Days` : '-'}
+                        <div className="stat-card-value">
+                            {info ? `${info.days_since_listing}일` : '-'}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                            Listed: {info?.listing_date || '-'}
+                        <div className="stat-card-sub">
+                            {info?.listing_date || '-'} 상장
                         </div>
                     </div>
 
-                    {/* 4. Open Interest (chart only) */}
-                    <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-tertiary)' }}>
+                    {/* Open Interest */}
+                    <div className="stat-card">
+                        <div className="stat-card-header">
                             <DollarSign size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>OI 추이 (30일)</span>
+                            <span className="stat-card-title">OI 추이</span>
                         </div>
-                        <div style={{ height: '80px' }}>
+                        <div style={{ height: '70px', marginBottom: '8px' }}>
                             {oi?.history && <OIMiniChart data={oi.history} />}
                         </div>
-                        <div style={{ fontSize: '12px', color: 'var(--binance-yellow)', textAlign: 'right', marginTop: '4px' }}>
+                        <div className="stat-card-value gold" style={{ fontSize: '16px' }}>
                             {oi ? formatKRW(oi.current_oi_value) : '-'}
                         </div>
                     </div>
 
-                    {/* 5. Market Cap (KRW only) */}
-                    <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', color: 'var(--text-tertiary)' }}>
+                    {/* Market Cap */}
+                    <div className="stat-card">
+                        <div className="stat-card-header">
                             <BarChart3 size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>시가총액</span>
+                            <span className="stat-card-title">시가총액</span>
                         </div>
-                        <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--binance-yellow)' }}>
+                        <div className="stat-card-value gold">
                             {info?.market_cap_usd != null ? formatKRW(info.market_cap_usd) : '-'}
                         </div>
                     </div>
 
-                    {/* 6. Unlocked Supply (CoinGecko) */}
-                    <div className="card" style={{ padding: '16px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: 'var(--text-tertiary)' }}>
+                    {/* Unlocked Supply */}
+                    <div className="stat-card">
+                        <div className="stat-card-header">
                             <Coins size={16} />
-                            <span style={{ fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' }}>Unlocked Supply</span>
+                            <span className="stat-card-title">유통량</span>
                         </div>
                         {info?.unlock_percent != null ? (
                             <>
-                                <div style={{ fontSize: '18px', fontWeight: 600 }}>
+                                <div className="stat-card-value gold">
                                     {info.unlock_percent.toFixed(1)}%
                                 </div>
-                                <div style={{
-                                    marginTop: '8px',
-                                    height: '6px',
-                                    background: 'var(--binance-bg-3)',
-                                    borderRadius: '3px',
-                                    overflow: 'hidden'
-                                }}>
-                                    <div style={{
-                                        width: `${Math.min(info.unlock_percent, 100)}%`,
-                                        height: '100%',
-                                        background: 'var(--binance-yellow)'
-                                    }} />
+                                <div className="progress-bar" style={{ marginTop: '10px' }}>
+                                    <div
+                                        className="progress-bar-fill"
+                                        style={{ width: `${Math.min(info.unlock_percent, 100)}%` }}
+                                    />
                                 </div>
-                                <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                                <div className="stat-card-sub">
                                     {info.circulating_supply?.toLocaleString()} / {info.total_supply?.toLocaleString()}
                                 </div>
                             </>
                         ) : (
-                            <div style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
-                                Data not available
-                            </div>
+                            <div className="stat-card-sub">데이터 없음</div>
                         )}
                     </div>
 
