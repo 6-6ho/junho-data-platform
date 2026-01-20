@@ -130,6 +130,40 @@ export default function SymbolDetailsPage() {
                         </div>
                     </div>
 
+                    {/* 4.5 Open Interest & LS Ratio */}
+                    <div className="stat-card">
+                        <div className="stat-label">
+                            <Activity size={14} />
+                            <span>미체결약정 (OI)</span>
+                        </div>
+                        <div className="stat-value accent">
+                            {info?.open_interest_usd != null ? formatKRW(info.open_interest_usd) : '-'}
+                        </div>
+                        {/* L/S Ratio Bar */}
+                        {info?.long_short_ratio && (
+                            <div style={{ marginTop: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px', color: 'var(--text-secondary)' }}>
+                                    <span style={{ color: '#26a69a' }}>L: {((info.long_short_ratio / (1 + info.long_short_ratio)) * 100).toFixed(0)}%</span>
+                                    <span style={{ color: '#ef5350' }}>S: {(100 - (info.long_short_ratio / (1 + info.long_short_ratio)) * 100).toFixed(0)}%</span>
+                                </div>
+                                <div style={{ height: '4px', background: '#ef5350', borderRadius: '2px', overflow: 'hidden', display: 'flex' }}>
+                                    <div style={{ width: `${(info.long_short_ratio / (1 + info.long_short_ratio)) * 100}%`, background: '#26a69a', height: '100%' }}></div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 4.6 24h Volume */}
+                    <div className="stat-card">
+                        <div className="stat-label">
+                            <BarChart3 size={14} />
+                            <span>24h 거래대금</span>
+                        </div>
+                        <div className="stat-value accent">
+                            {info?.volume_24h_usd != null ? formatKRW(info.volume_24h_usd) : '-'}
+                        </div>
+                    </div>
+
                     {/* 5. Unlocked Supply */}
                     <div className="stat-card">
                         <div className="stat-label">

@@ -1,66 +1,76 @@
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Junho | Data Engineer Portfolio</title>
+    <title>Junho Song</title>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 
 <body>
-    <div class="background-animation"></div>
-
     <div class="container">
         <header>
-            <div class="logo">JUNHO.IN</div>
-            <nav>
-                <a href="#about">About</a>
-                <a href="#projects">Projects</a>
-                <a href="#contact">Contact</a>
-            </nav>
+            <h1>Hi, I'm Junho Song.</h1>
+            <p class="bio">
+                Data Engineer based in Seoul.<br>
+                I build scalable data foundations and real-time systems.<br>
+                Focused on turning raw data into actionable value.
+            </p>
+            <div class="socials">
+                <a href="https://github.com/6-6ho" target="_blank" class="btn">GITHUB</a>
+                <a href="mailto:sjh5650@gmail.com" class="btn">EMAIL</a>
+            </div>
         </header>
 
-        <section class="hero">
-            <p class="subtitle">DATA ARCHITECT & ENGINEER</p>
-            <h1>Building Scalable<br>Data Foundations.</h1>
-            <p class="bio">
-                데이터의 흐름을 설계하고 가치를 창출하는 엔지니어 송준호입니다.<br>
-                대용량 데이터 파이프라인 구축과 실시간 처리 시스템에 관심이 많습니다.
-            </p>
-        </section>
-
-        <section id="projects" class="projects">
-            <a href="https://trade.junho.in" class="project-card" target="_blank">
-                <div class="card-content">
-                    <div class="icon">📈</div>
-                    <h3>Crypto Trade Helper</h3>
-                    <p>Spark & Airflow 기반 실시간 코인 데이터 파이프라인 및 보조지표 분석 시스템</p>
-                    <div class="tags">
-                        <span>Spark</span><span>Airflow</span><span>Iceberg</span><span>FastAPI</span>
+        <section class="projects">
+            <!-- Project 1 -->
+            <a href="https://trade.junho.in" class="window-card" target="_blank">
+                <div class="window-header">
+                    <div class="dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
                     </div>
+                    <div class="title">trade.junho.in</div>
+                </div>
+                <div class="window-content">
+                    <h2>Crypto Trade Helper</h2>
+                    <p class="role">Solo Project · 2025.10 - Present</p>
+                    <p class="desc">
+                        End-to-end real-time cryptocurrency data pipeline.
+                        Ingests WebSocket feeds from Upbit, processes metrics with Spark Structured Streaming, and
+                        visualizes trends via Airflow-orchestrated workflows.
+                        Designed to handle high-throughput market data with low latency.
+                    </p>
                 </div>
             </a>
 
-            <a href="https://shop.junho.in" class="project-card disabled">
-                <div class="card-content">
-                    <div class="icon">🛍️</div>
-                    <h3>User Behavior Analytics</h3>
-                    <p>이커머스 사용자 행동 로그 분석 및 코호트 분석 대시보드 (Coming Soon)</p>
-                    <div class="tags">
-                        <span>Data Analysis</span><span>Streamlit</span><span>Python</span>
+            <!-- Project 2 -->
+            <div class="window-card disabled">
+                <div class="window-header">
+                    <div class="dots">
+                        <span class="dot red"></span>
+                        <span class="dot yellow"></span>
+                        <span class="dot green"></span>
                     </div>
+                    <div class="title">shop.junho.in (Coming Soon)</div>
                 </div>
-            </a>
-        </section>
-
-        <footer id="contact">
-            <div class="contact-methods">
-                <a href="mailto:sjh5650@gmail.com">Email</a>
-                <a href="https://github.com/6-6ho" target="_blank">GitHub</a>
+                <div class="window-content">
+                    <h2>User Behavior Analytics</h2>
+                    <p class="role">Data Analysis · In Progress</p>
+                    <p class="desc">
+                        Full-stack analytics dashboard for e-commerce insights.
+                        Implementing Cohort Analysis and Anomaly Detection algorithms to identify user retention
+                        patterns and purchasing irregularities.
+                    </p>
+                </div>
             </div>
-            <p class="copyright">© 2026 Junho Song. All rights reserved.</p>
+        </section>
+
+        <footer>
+            <p>© 2026 Junho Song.</p>
         </footer>
     </div>
 </body>

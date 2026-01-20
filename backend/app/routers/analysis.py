@@ -146,6 +146,37 @@ async def get_symbol_info(symbol: str):
             except:
                 pass
 
+            # Fetch Open Interest
+            open_interest_usd = None
+            try:
+                oi_url = "https://fapi.binance.com/fapi/v1/openInterest"
+                oi_resp = await client.get(oi_url, params={"symbol": symbol})
+                if oi_resp.status_code == 200:
+                    oi_data = oi_resp.json()
+                    # Use 'openInterest' (quantity) * current price or 'openInterestValue' directly if available?
+                    # The separate endpoint used: float(curr_data.get("openInterestValue", 0)) which is usually in USDT
+                    # NOTE: not all symbols might return openInterestValue in basic ticker calls, but this specific endpoint does.
+                    open_interest_usd = float(oi_data.get("openInterest", 0)) * float(resp_symbol.json().get("lastPrice", 0))
+            except:
+                pass
+
+            # Extract 24h Volume (Quote Volume in USDT)
+            volume_24h_usd = 0.0
+            if resp_symbol.status_code == 200:
+                volume_24h_usd = float(resp_symbol.json().get("quoteVolume", 0))
+
+            # Fetch Long/Short Ratio (Top Traders)
+            ls_ratio = None
+            try:
+                ls_url = "https://fapi.binance.com/fapi/v1/topLongShortAccountRatio"
+                ls_resp = await client.get(ls_url, params={"symbol": symbol, "period": "5m", "limit": 1})
+                if ls_resp.status_code == 200:
+                    ls_data = ls_resp.json()
+                    if ls_data:
+                        ls_ratio = float(ls_data[0].get("longShortRatio", 0))
+            except:
+                pass
+
             return {
                 "symbol": symbol,
                 "listing_date": listing_date,
@@ -159,7 +190,10 @@ async def get_symbol_info(symbol: str):
                 "total_supply": total,
                 "unlock_percent": unlock_pct,
                 "market_cap_usd": market_cap_usd,
-                "has_spot_market": has_spot
+                "has_spot_market": has_spot,
+                "open_interest_usd": open_interest_usd,
+                "volume_24h_usd": volume_24h_usd,
+                "long_short_ratio": ls_ratio
             }
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail="Failed to fetch Symbol Info")
