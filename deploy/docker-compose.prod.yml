@@ -28,14 +28,14 @@ services:
   spark:
     restart: unless-stopped
 
-  # Cloudflare Tunnel (configured via Dashboard, not local file)
+  # Cloudflare Tunnel (directory mount to prevent file/dir issues)
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: trade-helper-tunnel
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./deploy/cloudflared:/etc/cloudflared:ro
     networks: [appnet]
 
 
