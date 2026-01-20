@@ -157,7 +157,7 @@ export default function SymbolSearch() {
                             >
                                 <span style={{ fontWeight: 600 }}>{item.symbol.replace('USDT', '')}</span>
                                 <span style={{
-                                    color: item.change > 0 ? '#26a69a' : item.change < 0 ? '#ef5350' : 'inherit',
+                                    color: item.change > 0 ? 'var(--color-success)' : item.change < 0 ? 'var(--color-danger)' : 'inherit',
                                     fontWeight: 500
                                 }}>
                                     {item.change > 0 ? '+' : ''}{item.change.toFixed(2)}%
