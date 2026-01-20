@@ -107,17 +107,40 @@ async def get_symbol_info(symbol: str):
             total = None
             market_cap_usd = None
             try:
-                # Map Binance symbol to CoinGecko ID (simple approach: lowercase base)
+                # Map Binance symbol to CoinGecko ID
                 base = symbol.replace("USDT", "").lower()
                 
+                # Manual override for major coins where ID != symbol
+                # CoinGecko IDs: bitcoin, ethereum, solana, ripple, dogecoin, cardano, etc.
+                MAJOR_COIN_IDS = {
+                    "btc": "bitcoin",
+                    "eth": "ethereum",
+                    "sol": "solana",
+                    "xrp": "ripple",
+                    "doge": "dogecoin",
+                    "ada": "cardano",
+                    "bnb": "binancecoin",
+                    "dot": "polkadot",
+                    "trx": "tron",
+                    "link": "chainlink",
+                    "matic": "matic-network",
+                    "ltc": "litecoin",
+                    "bch": "bitcoin-cash",
+                    "uni": "uniswap",
+                    "xlm": "stellar",
+                    "etc": "ethereum-classic"
+                }
+                
+                cg_id = MAJOR_COIN_IDS.get(base, base)
+                
                 # Check cache first
-                if base in market_cap_cache:
-                    cached = market_cap_cache[base]
+                if cg_id in market_cap_cache:
+                    cached = market_cap_cache[cg_id]
                     circulating = cached.get("circulating")
                     total = cached.get("total")
                     market_cap_usd = cached.get("market_cap")
                 else:
-                    cg_url = f"https://api.coingecko.com/api/v3/coins/{base}"
+                    cg_url = f"https://api.coingecko.com/api/v3/coins/{cg_id}"
                     cg_resp = await client.get(cg_url)
                     if cg_resp.status_code == 200:
                         cg_data = cg_resp.json()
@@ -125,7 +148,7 @@ async def get_symbol_info(symbol: str):
                         total = cg_data.get("market_data", {}).get("total_supply")
                         market_cap_usd = cg_data.get("market_data", {}).get("market_cap", {}).get("usd")
                         # Cache for 1 hour
-                        market_cap_cache[base] = {
+                        market_cap_cache[cg_id] = {
                             "circulating": circulating,
                             "total": total,
                             "market_cap": market_cap_usd
@@ -255,16 +278,20 @@ async def get_market_overview():
 
 @router.get("/symbols")
 async def get_all_symbols():
-    """Get all available USDT trading pairs for search."""
+    """Get all available USDT trading pairs for search (with 24h change)."""
     async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            url = "https://fapi.binance.com/fapi/v1/ticker/price"
+            url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
             resp = await client.get(url)
             if resp.status_code == 200:
                 data = resp.json()
                 # Filter for USDT pairs
                 return [
-                    {"symbol": t["symbol"], "price": t["price"]}
+                    {
+                        "symbol": t["symbol"], 
+                        "price": t["lastPrice"],
+                        "change": float(t["priceChangePercent"])
+                    }
                     for t in data 
                     if t["symbol"].endswith("USDT")
                 ]

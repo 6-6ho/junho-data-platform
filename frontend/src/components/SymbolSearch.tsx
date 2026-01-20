@@ -5,8 +5,8 @@ import { Search } from 'lucide-react';
 export default function SymbolSearch() {
     const [query, setQuery] = useState('');
     const [isOpen, setIsOpen] = useState(false);
-    const [symbols, setSymbols] = useState<{ symbol: string, price: string }[]>([]);
-    const [filteredSymbols, setFilteredSymbols] = useState<{ symbol: string, price: string }[]>([]);
+    const [symbols, setSymbols] = useState<{ symbol: string, price: string, change: number }[]>([]);
+    const [filteredSymbols, setFilteredSymbols] = useState<{ symbol: string, price: string, change: number }[]>([]);
     const [activeIndex, setActiveIndex] = useState(-1);
 
     const inputRef = useRef<HTMLInputElement>(null);
@@ -156,7 +156,12 @@ export default function SymbolSearch() {
                                 }}
                             >
                                 <span style={{ fontWeight: 600 }}>{item.symbol.replace('USDT', '')}</span>
-                                <span style={{ opacity: 0.7 }}>${parseFloat(item.price).toLocaleString()}</span>
+                                <span style={{
+                                    color: item.change > 0 ? '#26a69a' : item.change < 0 ? '#ef5350' : 'inherit',
+                                    fontWeight: 500
+                                }}>
+                                    {item.change > 0 ? '+' : ''}{item.change.toFixed(2)}%
+                                </span>
                             </div>
                         ))}
                     </div>
