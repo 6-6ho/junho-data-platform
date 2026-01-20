@@ -1,4 +1,5 @@
-ingress:
   - hostname: junho.in
+    service: http://frontend:80
+  - hostname: www.junho.in
     service: http://frontend:80
   - service: http_status:404
