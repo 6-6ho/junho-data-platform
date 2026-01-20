@@ -252,3 +252,22 @@ async def get_market_overview():
             }
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail="Failed to fetch market overview")
+
+@router.get("/symbols")
+async def get_all_symbols():
+    """Get all available USDT trading pairs for search."""
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            url = "https://fapi.binance.com/fapi/v1/ticker/price"
+            resp = await client.get(url)
+            if resp.status_code == 200:
+                data = resp.json()
+                # Filter for USDT pairs
+                return [
+                    {"symbol": t["symbol"], "price": t["price"]}
+                    for t in data 
+                    if t["symbol"].endswith("USDT")
+                ]
+            return []
+        except:
+            return []
