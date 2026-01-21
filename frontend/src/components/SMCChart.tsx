@@ -62,16 +62,20 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
         return () => {
             window.removeEventListener('resize', handleResize);
             chart.remove();
+            seriesRef.current = null;
+            chartRef.current = null;
         };
     }, []);
 
     useEffect(() => {
         const loadData = async () => {
-            if (!symbol || !seriesRef.current) return;
+            if (!symbol) return;
             setIsLoading(true);
             try {
                 // Fetch basic candle data first (500 candles roughly matches backend)
                 const klines = await fetchKlines(symbol, interval, 500);
+
+                if (!seriesRef.current) return; // Check if component unmounted
 
                 // Format for chart
                 const candles = klines.map((d: any) => ({
@@ -87,6 +91,9 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
                 // Fetch SMC Analysis
                 const smcData = await fetchSMCAnalysis(symbol, interval);
                 console.log(`[SMC] Data for ${symbol}:`, smcData);
+
+                if (!seriesRef.current) return; // Check again
+
                 setAnalysis(smcData);
 
                 // Add Markers for SMC features
@@ -117,7 +124,11 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
                     });
                 });
 
-                seriesRef.current.setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
+                if (seriesRef.current.setMarkers) {
+                    seriesRef.current.setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
+                } else {
+                    console.error("[SMC Chart] setMarkers method missing on series object", seriesRef.current);
+                }
 
             } catch (error) {
                 console.error("Failed to load SMC data", error);
