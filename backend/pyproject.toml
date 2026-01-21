@@ -16,6 +16,8 @@ kafka-python-ng = "2.2.2"
 httpx = "0.26.0"
 cachetools = "5.3.2"
 psycopg2-binary = "^2.9.9"
+pandas = "^2.2.0"
+numpy = "^1.26.0"
 
 [build-system]
 requires = ["poetry-core"]

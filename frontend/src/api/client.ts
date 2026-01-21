@@ -68,3 +68,8 @@ export const fetchTicker = async (symbol: string) => {
   const { data } = await api.get('/klines/ticker', { params: { symbol } });
   return data;
 };
+
+export const fetchSMCAnalysis = async (symbol: string, interval: string = '1h') => {
+  const { data } = await api.get(`/smc/analysis/${symbol}`, { params: { interval } });
+  return data;
+};

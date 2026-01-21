@@ -3,6 +3,7 @@ import { ToastProvider } from './components/ToastContext';
 import SymbolSearch from './components/SymbolSearch';
 import MoversPage from './pages/MoversPage';
 import SymbolDetailsPage from './pages/SymbolDetailsPage';
+import SMCPage from './pages/SMCPage';
 
 function App() {
   return (
@@ -26,6 +27,9 @@ function App() {
               <NavLink to="/movers" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 Movers
               </NavLink>
+              <NavLink to="/smc" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                SMC
+              </NavLink>
             </nav>
 
             <SymbolSearch />
@@ -36,6 +40,7 @@ function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/movers" replace />} />
               <Route path="/movers" element={<MoversPage />} />
+              <Route path="/smc" element={<SMCPage />} />
               <Route path="/symbol/:symbol" element={<SymbolDetailsPage />} />
             </Routes>
           </main>
