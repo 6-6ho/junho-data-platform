@@ -12,7 +12,6 @@ interface SMCChartProps {
 export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<any>(null);
-    const seriesRef = useRef<any>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [analysis, setAnalysis] = useState<any>(null);
 
@@ -36,7 +35,7 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
         });
 
         // 2. Add Series (Directly, no useRef for series needed in this scope if we load here)
-        const candleSeries = chart.addCandlestickSeries({
+        const candleSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#0ecb81',
             downColor: '#f6465d',
             borderVisible: false,
