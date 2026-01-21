@@ -105,7 +105,7 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
                 }
 
                 // Set Markers
-                candleSeries.setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
+                (candleSeries as any).setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
                 console.log(`[SMC] Successfully set ${markers.length} markers.`);
 
             } catch (err) {
