@@ -1,4 +1,5 @@
-import { createChart, ColorType, CandlestickSeries, Time } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries } from 'lightweight-charts';
+import type { Time } from 'lightweight-charts';
 import { useEffect, useRef, useState } from 'react';
 import { fetchKlines, fetchSMCAnalysis } from '../api/client';
 import { Loader2 } from 'lucide-react';
