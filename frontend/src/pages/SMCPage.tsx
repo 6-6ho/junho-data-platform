@@ -11,7 +11,7 @@ export default function SMCPage() {
                 <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#eaecef', margin: 0 }}>Smart Money Concepts (SMC)</h1>
 
                 <div style={{ display: 'flex', gap: '8px', background: '#1e2329', padding: '4px', borderRadius: '4px' }}>
-                    {['15m', '1h', '4h'].map(tf => (
+                    {['15m', '1h', '4h', '1d'].map(tf => (
                         <button
                             key={tf}
                             onClick={() => setInterval(tf)}

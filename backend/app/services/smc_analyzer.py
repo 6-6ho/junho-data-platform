@@ -94,14 +94,14 @@ class SMCAnalyzer:
                     'type': 'high', 
                     'price': float(row['high']), 
                     'index': i, 
-                    'time': row['timestamp'].isoformat()
+                    'time': int(row['timestamp'].value // 10**6)  # ms timestamp
                 })
             if row['is_swing_low']:
                 swings.append({
                     'type': 'low', 
                     'price': float(row['low']), 
                     'index': i, 
-                    'time': row['timestamp'].isoformat()
+                    'time': int(row['timestamp'].value // 10**6)
                 })
                 
         # Return detected swing points for visualization
@@ -126,8 +126,8 @@ class SMCAnalyzer:
                         "type": "bullish",
                         "top": float(low[i]),
                         "bottom": float(high[i-2]),
-                        "start_time": times[i-2].isoformat(),
-                        "end_time": times[i].isoformat()
+                        "start_time": int(times[i-2].value // 10**6),
+                        "end_time": int(times[i].value // 10**6)
                     })
             
             # Bearish FVG
@@ -138,8 +138,8 @@ class SMCAnalyzer:
                         "type": "bearish",
                         "top": float(low[i-2]),
                         "bottom": float(high[i]),
-                        "start_time": times[i-2].isoformat(),
-                        "end_time": times[i].isoformat()
+                        "start_time": int(times[i-2].value // 10**6),
+                        "end_time": int(times[i].value // 10**6)
                     })
                     
         return fvgs
@@ -165,7 +165,7 @@ class SMCAnalyzer:
                     "type": "bullish",
                     "top": float(high[i-1]),
                     "bottom": float(low[i-1]),
-                    "time": times[i-1].isoformat()
+                    "time": int(times[i-1].value // 10**6)
                 })
 
             # Bearish OB Candidate
@@ -178,7 +178,7 @@ class SMCAnalyzer:
                     "type": "bearish",
                     "top": float(high[i-1]),
                     "bottom": float(low[i-1]),
-                    "time": times[i-1].isoformat()
+                    "time": int(times[i-1].value // 10**6)
                 })
 
         return obs[-20:]

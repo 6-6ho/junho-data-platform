@@ -94,26 +94,26 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
 
                 // 1. Swings (Market Structure)
                 smcData.swings.forEach((swing: any) => {
-                    // Only mark major swings to reduce clutter
+                    // swing.time is now ms timestamp (int)
                     markers.push({
-                        time: new Date(swing.time).getTime() / 1000 as Time,
+                        time: swing.time / 1000 as Time,
                         position: swing.type === 'high' ? 'aboveBar' : 'belowBar',
                         color: swing.type === 'high' ? '#f6465d' : '#0ecb81',
                         shape: swing.type === 'high' ? 'arrowDown' : 'arrowUp',
                         text: swing.type === 'high' ? 'H' : 'L',
-                        size: 0.5
+                        size: 1
                     });
                 });
 
                 // 2. Order Blocks
                 smcData.order_blocks.forEach((ob: any) => {
                     markers.push({
-                        time: new Date(ob.time).getTime() / 1000 as Time,
+                        time: ob.time / 1000 as Time,
                         position: ob.type === 'bullish' ? 'belowBar' : 'aboveBar',
                         color: ob.type === 'bullish' ? '#0ecb81' : '#f6465d',
                         shape: 'circle',
-                        text: ob.type === 'bullish' ? 'OB Buy' : 'OB Sell',
-                        size: 1
+                        text: ob.type === 'bullish' ? 'OB' : 'OB',
+                        size: 2
                     });
                 });
 
