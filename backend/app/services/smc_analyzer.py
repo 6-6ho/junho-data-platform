@@ -90,48 +90,44 @@ class SMCAnalyzer:
         swings = []
         for i, row in df_swings.iterrows():
             if row['is_swing_high']:
-                swings.append({'type': 'high', 'price': row['high'], 'index': i, 'time': row['timestamp']})
+                swings.append({
+                    'type': 'high', 
+                    'price': float(row['high']), 
+                    'index': i, 
+                    'time': row['timestamp'].isoformat()
+                })
             if row['is_swing_low']:
-                swings.append({'type': 'low', 'price': row['low'], 'index': i, 'time': row['timestamp']})
+                swings.append({
+                    'type': 'low', 
+                    'price': float(row['low']), 
+                    'index': i, 
+                    'time': row['timestamp'].isoformat()
+                })
                 
-        # To detect BOS, we need to see price action breaking strict swing points.
-        # This is complex to perfect. Simplified strategy:
-        # Compare current swing with previous MAJOR swing.
-        
         # Return detected swing points for visualization
         return {
             "swings": swings
-            # Real BOS/CHoCH logic is better done on client side or refined later 
-            # as it requires track of "valid" pullbacks.
-            # We will rely on Swing Points for now.
         }
 
     def detect_fvg(self, df: pd.DataFrame) -> List[Dict]:
         """Detect Fair Value Gaps (Bullish & Bearish)."""
         fvgs = []
         
-        # Bullish FVG: Low of candle[i] > High of candle[i-2]
-        # Bearish FVG: High of candle[i] < Low of candle[i-2]
-        
         high = df['high'].values
         low = df['low'].values
-        close = df['close'].values
-        times = df['timestamp'].values
+        times = df['timestamp'] # Series
         
         for i in range(2, len(df)):
             # Bullish FVG
             if low[i] > high[i-2]:
                 gap_size = low[i] - high[i-2]
-                if gap_size > 0: # minimal filter
-                    # Check if mitigated (filled) by subsequent candles
-                    # This requires looking ahead from i+1 to end.
-                    # Simple version: just return the gap zone.
+                if gap_size > 0:
                     fvgs.append({
                         "type": "bullish",
                         "top": float(low[i]),
                         "bottom": float(high[i-2]),
-                        "start_time": times[i-2], # Gap started forming here
-                        "end_time": times[i]      # Gap confirmed here
+                        "start_time": times[i-2].isoformat(),
+                        "end_time": times[i].isoformat()
                     })
             
             # Bearish FVG
@@ -142,32 +138,24 @@ class SMCAnalyzer:
                         "type": "bearish",
                         "top": float(low[i-2]),
                         "bottom": float(high[i]),
-                        "start_time": times[i-2],
-                        "end_time": times[i]
+                        "start_time": times[i-2].isoformat(),
+                        "end_time": times[i].isoformat()
                     })
                     
         return fvgs
 
     def detect_order_blocks(self, df: pd.DataFrame) -> List[Dict]:
         """Detect Order Blocks (simplified)."""
-        # Bullish OB: Last bearish candle before a strong move up (BOS).
-        # We need identifying "Strong Move".
-        # Simplification: Last bearish candle before a sequence of 3 bullish candles 
-        # OR before a candle that engulfs previous body.
-        
-        # We will use "Engulfing" logic for OB candidate detection.
         obs = []
         
         open_price = df['open'].values
         close_price = df['close'].values
         high = df['high'].values
         low = df['low'].values
-        times = df['timestamp'].values
+        times = df['timestamp']
         
         for i in range(1, len(df) - 1):
             # Bullish OB Candidate
-            # Current (i) explains strong move up. (i-1) is the OB.
-            # Condition: (i-1) was Red, (i) is Green and engulfs or breaks high of (i-1)
             is_prev_red = close_price[i-1] < open_price[i-1]
             is_curr_green = close_price[i] > open_price[i]
             engulfs = close_price[i] > high[i-1]
@@ -175,9 +163,9 @@ class SMCAnalyzer:
             if is_prev_red and is_curr_green and engulfs:
                 obs.append({
                     "type": "bullish",
-                    "top": float(high[i-1]), # Use high/low of the candle
+                    "top": float(high[i-1]),
                     "bottom": float(low[i-1]),
-                    "time": times[i-1]
+                    "time": times[i-1].isoformat()
                 })
 
             # Bearish OB Candidate
@@ -190,11 +178,9 @@ class SMCAnalyzer:
                     "type": "bearish",
                     "top": float(high[i-1]),
                     "bottom": float(low[i-1]),
-                    "time": times[i-1]
+                    "time": times[i-1].isoformat()
                 })
 
-        # Filter: keep only recent/unmitigated ones? 
-        # For optimization, return last 20.
         return obs[-20:]
 
 smc_service = SMCAnalyzer()

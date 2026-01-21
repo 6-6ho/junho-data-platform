@@ -86,6 +86,7 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
 
                 // Fetch SMC Analysis
                 const smcData = await fetchSMCAnalysis(symbol, interval);
+                console.log(`[SMC] Data for ${symbol}:`, smcData);
                 setAnalysis(smcData);
 
                 // Add Markers for SMC features
