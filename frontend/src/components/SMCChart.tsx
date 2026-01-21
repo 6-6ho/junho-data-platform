@@ -17,30 +17,26 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
     const [analysis, setAnalysis] = useState<any>(null);
 
     useEffect(() => {
-        if (!chartContainerRef.current) return;
+        if (!chartContainerRef.current || !symbol) return;
 
+        setIsLoading(true);
+
+        // 1. Initialize Chart
         const chart = createChart(chartContainerRef.current, {
-            layout: {
-                background: { type: ColorType.Solid, color: '#0b0e11' },
-                textColor: '#848e9c',
-            },
-            grid: {
-                vertLines: { color: '#1e2329' },
-                horzLines: { color: '#1e2329' },
-            },
+            layout: { background: { type: ColorType.Solid, color: '#0b0e11' }, textColor: '#848e9c' },
+            grid: { vertLines: { color: '#1e2329' }, horzLines: { color: '#1e2329' } },
             width: chartContainerRef.current.clientWidth,
-            height: chartContainerRef.current.clientHeight,
+            height: 400,
             timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
                 borderColor: '#2b3139',
             },
-            rightPriceScale: {
-                borderColor: '#2b3139',
-            },
+            rightPriceScale: { borderColor: '#2b3139' },
         });
 
-        const candleSeries = chart.addSeries(CandlestickSeries, {
+        // 2. Add Series (Directly, no useRef for series needed in this scope if we load here)
+        const candleSeries = chart.addCandlestickSeries({
             upColor: '#0ecb81',
             downColor: '#f6465d',
             borderVisible: false,
@@ -48,8 +44,8 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
             wickDownColor: '#f6465d',
         });
 
+        // Save refs for cleanup
         chartRef.current = chart;
-        seriesRef.current = candleSeries;
 
         const handleResize = () => {
             if (chartContainerRef.current) {
@@ -59,25 +55,11 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
 
         window.addEventListener('resize', handleResize);
 
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            chart.remove();
-            seriesRef.current = null;
-            chartRef.current = null;
-        };
-    }, []);
-
-    useEffect(() => {
-        const loadData = async () => {
-            if (!symbol) return;
-            setIsLoading(true);
+        // 3. Load & Render Data inside the same effect to guarantee series validity
+        const loadAndRender = async () => {
             try {
-                // Fetch basic candle data first (500 candles roughly matches backend)
+                // A. Klines
                 const klines = await fetchKlines(symbol, interval, 500);
-
-                if (!seriesRef.current) return; // Check if component unmounted
-
-                // Format for chart
                 const candles = klines.map((d: any) => ({
                     time: d[0] / 1000 as Time,
                     open: parseFloat(d[1]),
@@ -85,59 +67,64 @@ export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
                     low: parseFloat(d[3]),
                     close: parseFloat(d[4]),
                 }));
+                candleSeries.setData(candles);
 
-                seriesRef.current.setData(candles);
-
-                // Fetch SMC Analysis
+                // B. SMC Analysis
                 const smcData = await fetchSMCAnalysis(symbol, interval);
                 console.log(`[SMC] Data for ${symbol}:`, smcData);
-
-                if (!seriesRef.current) return; // Check again
-
                 setAnalysis(smcData);
 
-                // Add Markers for SMC features
+                // C. Markers
                 const markers: any[] = [];
 
-                // 1. Swings (Market Structure)
-                smcData.swings.forEach((swing: any) => {
-                    // swing.time is now ms timestamp (int)
-                    markers.push({
-                        time: swing.time / 1000 as Time,
-                        position: swing.type === 'high' ? 'aboveBar' : 'belowBar',
-                        color: swing.type === 'high' ? '#f6465d' : '#0ecb81',
-                        shape: swing.type === 'high' ? 'arrowDown' : 'arrowUp',
-                        text: swing.type === 'high' ? 'H' : 'L',
-                        size: 1
+                // Swings (Market Structure)
+                if (smcData.swings) {
+                    smcData.swings.forEach((swing: any) => {
+                        markers.push({
+                            time: swing.time / 1000 as Time,
+                            position: swing.type === 'high' ? 'aboveBar' : 'belowBar',
+                            color: swing.type === 'high' ? '#f6465d' : '#0ecb81',
+                            shape: swing.type === 'high' ? 'arrowDown' : 'arrowUp',
+                            text: swing.type === 'high' ? 'H' : 'L',
+                            size: 1
+                        });
                     });
-                });
-
-                // 2. Order Blocks
-                smcData.order_blocks.forEach((ob: any) => {
-                    markers.push({
-                        time: ob.time / 1000 as Time,
-                        position: ob.type === 'bullish' ? 'belowBar' : 'aboveBar',
-                        color: ob.type === 'bullish' ? '#0ecb81' : '#f6465d',
-                        shape: 'circle',
-                        text: ob.type === 'bullish' ? 'OB' : 'OB',
-                        size: 2
-                    });
-                });
-
-                if (seriesRef.current.setMarkers) {
-                    seriesRef.current.setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
-                } else {
-                    console.error("[SMC Chart] setMarkers method missing on series object", seriesRef.current);
                 }
 
-            } catch (error) {
-                console.error("Failed to load SMC data", error);
+                // Order Blocks
+                if (smcData.order_blocks) {
+                    smcData.order_blocks.forEach((ob: any) => {
+                        markers.push({
+                            time: ob.time / 1000 as Time,
+                            position: ob.type === 'bullish' ? 'belowBar' : 'aboveBar',
+                            color: ob.type === 'bullish' ? '#0ecb81' : '#f6465d',
+                            shape: 'circle',
+                            text: ob.type === 'bullish' ? 'OB' : 'OB',
+                            size: 2
+                        });
+                    });
+                }
+
+                // Set Markers
+                candleSeries.setMarkers(markers.sort((a, b) => (a.time as number) - (b.time as number)));
+                console.log(`[SMC] Successfully set ${markers.length} markers.`);
+
+            } catch (err) {
+                console.error("Error loading SMC chart data:", err);
             } finally {
                 setIsLoading(false);
             }
         };
 
-        loadData();
+        loadAndRender();
+
+        // Cleanup
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            chart.remove();
+            chartRef.current = null;
+        };
+
     }, [symbol, interval]);
 
     return (
