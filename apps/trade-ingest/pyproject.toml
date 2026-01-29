@@ -1,14 +1,14 @@
 [tool.poetry]
-name = "jdp-spark"
+name = "trade-ingest"
 version = "0.1.0"
 description = ""
 authors = ["Junho"]
 
 [tool.poetry.dependencies]
 python = "^3.11"
-pyspark = "3.5.0"
+websocket-client = "1.7.0"
 kafka-python-ng = "2.2.2"
-psycopg2-binary = "2.9.9"
+orjson = "3.9.10"
 
 [build-system]
 requires = ["poetry-core"]

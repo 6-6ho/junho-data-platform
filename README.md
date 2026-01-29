@@ -1,4 +1,4 @@
-# Trade Helper (Binance USDT-M) 🚀
+# Junho Data Platform 🚀
 
 Real-time crypto market monitoring dashboard powered by Spark Streaming.
 
@@ -63,13 +63,17 @@ docker compose up -d --build
 ## 📂 Project Structure
 
 ```
-trade-helper/
-├── frontend/           # React dashboard
-├── backend/            # FastAPI server
+junho-data-platform/
+├── apps/
+│   ├── trade-frontend/    # React dashboard
+│   ├── trade-backend/     # FastAPI server
+│   ├── trade-ingest/      # Binance WebSocket ingest
+│   ├── shop-dashboard/    # Shop analytics dashboard
+│   └── shop-generator/    # Shop data generator
 ├── spark/              # Spark Streaming Jobs
-│   ├── jobs/           # movers_job.py, alerts_job.py
+│   ├── jobs/           # movers_job.py, shop jobs
 │   └── common/         # Shared DB logic
-├── ingest/             # Binance WebSocket ingest
+├── airflow/            # DAG definitions
 ├── infra/              # Prometheus/Grafana config
 ├── docs/               # Documentation & DDL
 └── docker-compose.yml  # Orchestration

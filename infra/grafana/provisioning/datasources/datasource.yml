@@ -8,3 +8,17 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: true
+
+  - name: PostgreSQL
+    type: postgres
+    uid: postgres
+    url: postgres:5432
+    database: app
+    user: postgres
+    secureJsonData:
+      password: postgres
+    jsonData:
+      sslmode: "disable"
+      postgresVersion: 1000  # 10.x+
+    isDefault: false
+    editable: true

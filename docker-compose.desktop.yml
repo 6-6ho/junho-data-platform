@@ -1,0 +1,99 @@
+# Desktop Node (가끔 껐다 켜는 연산 노드)
+# 역할: Spark Cluster, Data Lake, Data Generation
+#
+# 사용법:
+#   1. 환경변수 설정: export LAPTOP_IP=192.168.x.x
+#   2. 실행: docker compose -f docker-compose.desktop.yml up -d
+
+services:
+  # === Spark Cluster ===
+  spark-master:
+    build: ./spark
+    hostname: spark-master
+    container_name: spark-master
+    ports:
+      - "8081:8080"
+      - "7077:7077"
+    networks: [appnet]
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
+
+  spark-worker-1:
+    build: ./spark
+    depends_on: [spark-master]
+    environment:
+      - SPARK_WORKER_CORES=4
+      - SPARK_WORKER_MEMORY=8G
+      - SPARK_MASTER_URL=spark://spark-master:7077
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 10G
+    networks: [appnet]
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
+
+  spark-job-runner:
+    build: ./spark
+    container_name: spark-shop-runner
+    depends_on: [spark-master, minio]
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+    environment:
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      # 노트북(Laptop)의 Kafka와 Postgres에 연결 (외부 포트 29092 사용)
+      - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:29092
+      - DB_HOST=${LAPTOP_IP}
+    networks: [appnet]
+    command: ./start_shop.sh
+
+  # === Data Lake ===
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=minio123
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks: [appnet]
+
+  minio-init:
+    image: minio/mc
+    container_name: jdp-minio-init
+    depends_on: [minio]
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set myminio http://minio:9000 minio minio123; do
+        echo 'Waiting for MinIO...'
+        sleep 5
+      done;
+      mc mb myminio/raw --ignore-existing;
+      mc mb myminio/processed --ignore-existing;
+      mc mb myminio/aggregated --ignore-existing;
+      mc mb myminio/iceberg-warehouse --ignore-existing;
+      echo 'Buckets created successfully';
+      exit 0;
+      "
+    networks: [appnet]
+
+  # === Data Generation ===
+  shop-generator:
+    build: ./apps/shop-generator
+    container_name: shop-generator
+    environment:
+      # 노트북의 Kafka에 연결
+      - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:9092
+      - MODE=normal
+    networks: [appnet]
+
+volumes:
+  miniodata:
+
+networks:
+  appnet:

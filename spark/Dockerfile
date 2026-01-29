@@ -1,37 +1,50 @@
-FROM python:3.11-slim
+FROM apache/spark:3.5.0
 
-# Install Java (required for Spark)
+USER root
+
+# Install Python & Pip & System Deps
 RUN apt-get update && \
-    apt-get install -y default-jre-headless && \
-    apt-get clean;
+    apt-get install -y python3 python3-pip wget curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-ARG POETRY_VERSION=1.7.1
-RUN pip install "poetry==$POETRY_VERSION"
+# Install Python Libs
+RUN pip3 install kafka-python-ng psycopg2-binary==2.9.9
+
+# Download Spark-Kafka & Iceberg Jars (Same as Shopping project)
+WORKDIR /opt/spark/jars
+
+# Kafka Connectors
+RUN curl -O https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.0/spark-sql-kafka-0-10_2.12-3.5.0.jar && \
+    curl -O https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.0/spark-token-provider-kafka-0-10_2.12-3.5.0.jar && \
+    curl -O https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.5.0/kafka-clients-3.5.0.jar && \
+    curl -O https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar
+
+# Postgres JDBC Driver
+RUN curl -O https://repo1.maven.org/maven2/org/postgresql/postgresql/42.6.0/postgresql-42.6.0.jar
+
+# Iceberg Spark Runtime
+RUN curl -O https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.4.3/iceberg-spark-runtime-3.5_2.12-1.4.3.jar
+
+# AWS SDK for S3 (MinIO)
+RUN curl -O https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
+    curl -O https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
 
 WORKDIR /app
-
-COPY pyproject.toml poetry.lock* ./
-
-RUN poetry config virtualenvs.create false \
-    && poetry install --no-interaction --no-ansi
-
-# Download Spark-Kafka & Iceberg Jars
-RUN mkdir -p /app/jars && \
-    apt-get install -y wget && \
-    # Kafka Connectors
-    wget -P /app/jars https://repo1.maven.org/maven2/org/apache/spark/spark-sql-kafka-0-10_2.12/3.5.0/spark-sql-kafka-0-10_2.12-3.5.0.jar && \
-    wget -P /app/jars https://repo1.maven.org/maven2/org/apache/spark/spark-token-provider-kafka-0-10_2.12/3.5.0/spark-token-provider-kafka-0-10_2.12-3.5.0.jar && \
-    wget -P /app/jars https://repo1.maven.org/maven2/org/apache/kafka/kafka-clients/3.4.1/kafka-clients-3.4.1.jar && \
-    wget -P /app/jars https://repo1.maven.org/maven2/org/apache/commons/commons-pool2/2.11.1/commons-pool2-2.11.1.jar && \
-    # Iceberg + S3 (MinIO)
-    wget -P /app/jars https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.4.3/iceberg-spark-runtime-3.5_2.12-1.4.3.jar && \
-    wget -P /app/jars https://repo1.maven.org/maven2/org/apache/hadoop/hadoop-aws/3.3.4/hadoop-aws-3.3.4.jar && \
-    wget -P /app/jars https://repo1.maven.org/maven2/com/amazonaws/aws-java-sdk-bundle/1.12.262/aws-java-sdk-bundle-1.12.262.jar
-
 COPY . .
 
-# Keep container running for now
-COPY start.sh .
-RUN chmod +x start.sh
+# Make shell scripts executable
+RUN chmod +x /app/*.sh
+
+# Grant permissions to spark user
+RUN chown -R 185:185 /app
+
+# Switch back to spark user for security (and compatibility with Spark images)
+# But for now, sticking to root might be safer for file permissions in mapped volumes?
+# apache/spark runs as 185 by default. Let's try to be correct.
+USER 185
+
+ENV PYTHONPATH=$PYTHONPATH:/opt/spark/python:/opt/spark/python/lib/py4j-0.10.9.7-src.zip:/app
+ENV PATH=$PATH:/opt/spark/bin
 
 CMD ["./start.sh"]

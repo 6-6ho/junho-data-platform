@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Junho Data Platform | Operations Center</title>
+    <link rel="stylesheet" href="style.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="background-animation"></div>
+
+    <div class="dashboard-container">
+        <!-- Status Bar (HUD Style) -->
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-dot green"></span>
+                <span class="status-text">SYSTEM OPERATIONAL</span>
+            </div>
+            <div class="status-item">
+                <span class="label">PIPELINE LAG</span>
+                <span class="value glitch" data-text="0.4s">0.4s</span>
+            </div>
+            <div class="status-item">
+                <span class="label">ACTIVE WORKERS</span>
+                <span class="value">4</span>
+            </div>
+        </div>
+
+        <header class="dashboard-header">
+            <div class="logo-section">
+                <h1>JUNHO DATA PLATFORM</h1>
+                <p class="subtitle">Personal Data Engineering Ecosystem</p>
+            </div>
+            <div class="clock" id="clock">00:00:00</div>
+        </header>
+
+        <!-- Main Operations Grid -->
+        <main class="ops-grid">
+            <!-- Card 1: Trade Engine -->
+            <a href="https://trade.6-6ho.com" class="ops-card trade" target="_blank">
+                <div class="card-header">
+                    <span class="service-tag">REAL-TIME</span>
+                    <div class="icon">📈</div>
+                </div>
+                <h2>Market Signal Core</h2>
+                <div class="card-stats">
+                    <div class="stat">
+                        <span class="label">SOURCE</span>
+                        <span class="val">Binance WS</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">LATENCY</span>
+                        <span class="val">&lt; 1s</span>
+                    </div>
+                </div>
+                <p class="card-desc">
+                    실시간 변동성을 감지하고, SMC 기법을 활용하여 기술적 분석을 자동으로 수행합니다.
+                </p>
+                <div class="action-btn">LAUNCH CONSOLE</div>
+            </a>
+
+            <!-- Card 2: Shop Analytics -->
+            <a href="https://shop.6-6ho.com" class="ops-card shop" target="_blank">
+                <div class="card-header">
+                    <span class="service-tag">BATCH / ML</span>
+                    <div class="icon">🛍️</div>
+                </div>
+                <h2>Shop Analytics</h2>
+                <div class="card-stats">
+                    <div class="stat">
+                        <span class="label">DATA</span>
+                        <span class="val">User Behavior</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">MODE</span>
+                        <span class="val">Interactive</span>
+                    </div>
+                </div>
+                <p class="card-desc">
+                    유저 행동 데이터를 직접 생성 및 수집하고 분석하여, 비즈니스 인사이트를 도출합니다.
+                </p>
+                <div class="action-btn">VIEW DASHBOARD</div>
+            </a>
+
+            <!-- Card 3: System Monitor -->
+            <a href="https://monitor.6-6ho.com" class="ops-card monitor" target="_blank">
+                <div class="card-header">
+                    <span class="service-tag">INFRASTRUCTURE</span>
+                    <div class="icon">🔍</div>
+                </div>
+                <h2>System Monitor</h2>
+                <div class="card-stats">
+                    <div class="stat">
+                        <span class="label">METRICS</span>
+                        <span class="val">Prometheus</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">VISUAL</span>
+                        <span class="val">Grafana</span>
+                    </div>
+                </div>
+                <p class="card-desc">
+                    파이프라인 지연과 클러스터 리소스를 실시간으로 관제하여 시스템 안정성을 유지합니다.
+                </p>
+                <div class="action-btn">CHECK STATUS</div>
+            </a>
+        </main>
+
+        <div class="scroll-indicator">
+            <span>SCROLL FOR ARCHITECTURE</span>
+            <div class="arrow">↓</div>
+        </div>
+    </div>
+
+    <!-- Engineering Blueprint Section -->
+    <section id="architecture" class="blueprint-section">
+        <div class="container">
+            <h2 class="section-title">SYSTEM BLUEPRINT</h2>
+
+            <div class="blueprint-container">
+                <!-- CSS-based Architecture Diagram -->
+                <div class="arch-diagram">
+                    <!-- Column 1: Source -->
+                    <div class="arch-col source">
+                        <div class="arch-header">SOURCE</div>
+                        <div class="arch-card-group">
+                            <div class="arch-card">
+                                <span class="arch-icon">🔶</span>
+                                <span class="arch-text">Binance WS</span>
+                                <span class="arch-sub">Real-time Trade/Order</span>
+                            </div>
+                            <div class="arch-card">
+                                <span class="arch-icon">👤</span>
+                                <span class="arch-text">User Logs</span>
+                                <span class="arch-sub">Mock (Random Gen)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="arch-flow-arrow">
+                        <div class="line"></div>
+                        <div class="arrow-head"></div>
+                    </div>
+
+                    <!-- Column 2: Ingestion -->
+                    <div class="arch-col ingest">
+                        <div class="arch-header">INGESTION</div>
+                        <div class="arch-card highlight">
+                            <span class="arch-icon">🔗</span>
+                            <span class="arch-text">Kafka</span>
+                            <span class="arch-sub">Stream Buffer / Decoupling</span>
+                        </div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="arch-flow-arrow">
+                        <div class="line"></div>
+                        <div class="arrow-head"></div>
+                    </div>
+
+                    <!-- Column 3: Processing -->
+                    <div class="arch-col process">
+                        <div class="arch-header">PROCESSING</div>
+                        <div class="arch-card spark lg">
+                            <div class="card-icon-row">
+                                <span class="arch-icon">⚡</span>
+                                <span class="arch-title">Spark</span>
+                            </div>
+                            <span class="arch-sub">Structured Streaming</span>
+                            <div class="arch-details">
+                                <span>• 1-min Window Agg</span>
+                                <span>• Technicals (SMC)</span>
+                            </div>
+                        </div>
+                        <div class="arch-card airflow">
+                            <div class="card-icon-row">
+                                <span class="arch-icon">🌪️</span>
+                                <span class="arch-title">Airflow</span>
+                            </div>
+                            <span class="arch-sub">Daily Batch ETL</span>
+                            <div class="arch-details">
+                                <span>• Shop User Stats</span>
+                                <span>• Behavior Funnel</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="arch-flow-arrow">
+                        <div class="line"></div>
+                        <div class="arrow-head"></div>
+                    </div>
+
+                    <!-- Column 4: Storage -->
+                    <div class="arch-col storage">
+                        <div class="arch-header">STORAGE</div>
+                        <div class="arch-card-group">
+                            <div class="arch-card">
+                                <span class="arch-icon">🐘</span>
+                                <span class="arch-text">PostgreSQL</span>
+                                <span class="arch-sub">Mart / User DB</span>
+                            </div>
+                            <div class="arch-card">
+                                <span class="arch-icon">📦</span>
+                                <span class="arch-text">MinIO</span>
+                                <span class="arch-sub">Data Lake (Iceberg)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Arrow -->
+                    <div class="arch-flow-arrow">
+                        <div class="line"></div>
+                        <div class="arrow-head"></div>
+                    </div>
+
+                    <!-- Column 5: Serving -->
+                    <div class="arch-col serve">
+                        <div class="arch-header">SERVING</div>
+                        <div class="arch-card react">
+                            <span class="arch-icon">⚛️</span>
+                            <span class="arch-text">React / API</span>
+                            <span class="arch-sub">Interactive Dashboard</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tech-grid">
+                <div class="tech-card">
+                    <h3>Ingestion & Orchestration</h3>
+                    <ul>
+                        <li>Apache Kafka</li>
+                        <li>Apache Airflow</li>
+                        <li>Binance WebSocket</li>
+                    </ul>
+                </div>
+                <div class="tech-card">
+                    <h3>Processing & Analytics</h3>
+                    <ul>
+                        <li>Spark Streaming</li>
+                        <li>PySpark</li>
+                    </ul>
+                </div>
+                <div class="tech-card">
+                    <h3>Storage</h3>
+                    <ul>
+                        <li>PostgreSQL</li>
+                        <li>MinIO (Iceberg)</li>
+                    </ul>
+                </div>
+                <div class="tech-card">
+                    <h3>Serving & Ops</h3>
+                    <ul>
+                        <li>FastAPI & React</li>
+                        <li>Nginx Proxy</li>
+                        <li>Grafana / Prometheus</li>
+                    </ul>
+                </div>
+            </div>
+
+            <footer class="blueprint-footer">
+                <p>ENGINEERED BY JUNHO SONG © 2026</p>
+                <div class="footer-links">
+                    <a href="https://github.com/6-6ho/junho-data-platform" target="_blank">GITHUB REPO</a>
+                    <a href="https://monitor.6-6ho.com" target="_blank">LIVE STATUS</a>
+                </div>
+            </footer>
+        </div>
+    </section>
+
+    <script>
+        // Simple Clock
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toLocaleTimeString('en-US', { hour12: false });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // Fetch Real Live Metrics from Backend API
+        async function updateMetrics() {
+            try {
+                // Use relative path for API (proxied by Nginx)
+                const response = await fetch('/api/system/status');
+                const data = await response.json();
+
+                // Update Lag
+                const lagElement = document.querySelector('.value.glitch');
+                lagElement.innerText = data.pipeline_lag;
+                lagElement.setAttribute('data-text', data.pipeline_lag);
+
+                // Update Workers
+                document.querySelectorAll('.value')[1].innerText = data.active_workers;
+            } catch (e) {
+                console.error("Failed to fetch metrics", e);
+            }
+        }
+        setInterval(updateMetrics, 3000);
+        updateMetrics();
+    </script>
+</body>
+
+</html>

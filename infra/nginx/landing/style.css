@@ -1,0 +1,559 @@
+:root {
+    --bg-color: #050507;
+    --card-bg: rgba(20, 20, 25, 0.6);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --accent-trade: #00E396;
+    --accent-shop: #775DD0;
+    --accent-monitor: #FEB019;
+    --text-primary: #ECECF1;
+    --text-secondary: #8E8E93;
+    --font-main: 'Inter', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-main);
+    overflow-x: hidden;
+}
+
+.background-animation {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background:
+        radial-gradient(circle at 10% 20%, rgba(0, 227, 150, 0.03) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(119, 93, 208, 0.03) 0%, transparent 40%);
+    z-index: -1;
+}
+
+/* --- Dashboard Layout (Above Fold) --- */
+.dashboard-container {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* Status Bar */
+.status-bar {
+    display: flex;
+    gap: 2rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--card-border);
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #333;
+}
+
+.status-dot.green {
+    background-color: #00E396;
+    box-shadow: 0 0 8px rgba(0, 227, 150, 0.5);
+}
+
+.status-text {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: #00E396;
+}
+
+.status-item .label {
+    color: var(--text-secondary);
+}
+
+.status-item .value {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+/* Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-top: 2rem;
+    margin-bottom: 3rem;
+}
+
+.logo-section h1 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 0.2rem;
+}
+
+.logo-section .subtitle {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.clock {
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+}
+
+/* Ops Grid */
+.ops-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    flex: 1;
+    align-content: center;
+    /* Center vertically if space allows */
+    margin-bottom: 4rem;
+}
+
+.ops-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 2rem;
+    text-decoration: none;
+    color: inherit;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+    min-height: 320px;
+    /* Changed from fixed height to min-height */
+    height: 100%;
+    /* Allow filling the grid cell */
+}
+
+.ops-card:hover {
+    transform: translateY(-4px);
+    background: rgba(30, 30, 35, 0.8);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ops-card.trade:hover {
+    border-color: var(--accent-trade);
+}
+
+.ops-card.shop:hover {
+    border-color: var(--accent-shop);
+}
+
+.ops-card.monitor:hover {
+    border-color: var(--accent-monitor);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5rem;
+}
+
+.service-tag {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    letter-spacing: 0.05em;
+}
+
+.ops-card.trade .service-tag {
+    color: var(--accent-trade);
+    background: rgba(0, 227, 150, 0.1);
+}
+
+.ops-card.shop .service-tag {
+    color: var(--accent-shop);
+    background: rgba(119, 93, 208, 0.1);
+}
+
+.ops-card.monitor .service-tag {
+    color: var(--accent-monitor);
+    background: rgba(254, 176, 25, 0.1);
+}
+
+.icon {
+    font-size: 2rem;
+}
+
+.ops-card h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+}
+
+.card-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 1rem 0;
+}
+
+.stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat .label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.2rem;
+}
+
+.stat .val {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.card-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    flex-grow: 1;
+}
+
+.action-btn {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    text-align: right;
+    font-weight: 700;
+    margin-top: auto;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+
+.ops-card:hover .action-btn {
+    opacity: 1;
+}
+
+.scroll-indicator {
+    text-align: center;
+    padding-bottom: 2rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    animation: bounce 2s infinite;
+}
+
+.scroll-indicator .arrow {
+    font-size: 1.2rem;
+    margin-top: 0.5rem;
+}
+
+@keyframes bounce {
+
+    0%,
+    20%,
+    50%,
+    80%,
+    100% {
+        transform: translateY(0);
+    }
+
+    40% {
+        transform: translateY(-5px);
+    }
+
+    60% {
+        transform: translateY(-3px);
+    }
+}
+
+/* --- Blueprint Section (Below Fold) --- */
+.blueprint-section {
+    background-color: #030304;
+    border-top: 1px solid var(--card-border);
+    padding: 5rem 0;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+}
+
+.section-title {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 3rem;
+    letter-spacing: 0.1em;
+}
+
+.blueprint-container {
+    margin-bottom: 4rem;
+    border: 1px dashed var(--card-border);
+    padding: 1rem;
+    position: relative;
+}
+
+.blueprint-container::before {
+    content: "FIG. 1.0 - SYSTEM ARCHITECTURE";
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: #030304;
+    padding: 0 10px;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+/* CSS Architecture Diagram */
+.arch-diagram {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3rem 1rem;
+    overflow-x: auto;
+    font-family: var(--font-main);
+}
+
+.arch-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+}
+
+.arch-header {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.1em;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+.arch-card-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.arch-card {
+    background: #121214;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 0.8rem 1rem;
+    min-width: 130px;
+    max-width: 160px;
+    text-align: left;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    flex-direction: column;
+}
+
+.arch-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.arch-card.lg {
+    min-width: 140px;
+    padding: 0.8rem 1rem;
+}
+
+.card-icon-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.8rem;
+    /* Further increased spacing */
+}
+
+.arch-icon {
+    font-size: 1rem;
+}
+
+.arch-title {
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: var(--text-primary);
+}
+
+.arch-sub {
+    font-size: 0.65rem;
+    color: #888;
+    margin-bottom: 0.3rem;
+    display: block;
+    line-height: 1.2;
+}
+
+.arch-details {
+    margin-top: 0.3rem;
+    padding-top: 0.3rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+}
+
+.arch-details span {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+}
+
+.arch-card.highlight {
+    border-color: var(--accent-trade);
+    background: rgba(0, 227, 150, 0.05);
+}
+
+.arch-card.spark {
+    border-color: #FFA500;
+    background: rgba(255, 165, 0, 0.05);
+}
+
+.arch-card.react {
+    border-color: #61DAFB;
+}
+
+/* Arrows */
+.arch-flow-arrow {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    position: relative;
+    opacity: 0.5;
+}
+
+.flow-label {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--accent-trade);
+    margin-bottom: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.arch-flow-arrow .line {
+    height: 2px;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.5) 50%, rgba(255, 255, 255, 0.1) 100%);
+    width: 100%;
+    position: relative;
+}
+
+.arch-flow-arrow .arrow-head {
+    width: 0;
+    height: 0;
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 8px solid rgba(255, 255, 255, 0.5);
+}
+
+@media (max-width: 900px) {
+    .arch-diagram {
+        flex-direction: column;
+        gap: 2rem;
+    }
+
+    .arch-flow-arrow {
+        transform: rotate(90deg);
+        height: 50px;
+    }
+
+    .flow-label {
+        transform: rotate(-90deg);
+        margin-bottom: 0;
+        margin-right: 10px;
+    }
+}
+
+.tech-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 2rem;
+    margin-bottom: 5rem;
+}
+
+.tech-card {
+    border-left: 2px solid var(--card-border);
+    padding-left: 1rem;
+}
+
+.tech-card h3 {
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    margin-bottom: 1rem;
+}
+
+.tech-card ul {
+    list-style: none;
+}
+
+.tech-card li {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+}
+
+.blueprint-footer {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid var(--card-border);
+    padding-top: 2rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+}
+
+.footer-links a {
+    color: var(--text-secondary);
+    margin-left: 1.5rem;
+    text-decoration: none;
+}
+
+.footer-links a:hover {
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
+@media (max-width: 768px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .ops-grid {
+        grid-template-columns: 1fr;
+    }
+}

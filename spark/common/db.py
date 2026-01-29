@@ -101,3 +101,36 @@ def get_active_trendlines():
         return []
     finally:
         conn.close()
+
+def get_last_alert_times(line_ids):
+    """
+    Get the last alert time for each line_id.
+    Returns: dict {line_id: datetime}
+    """
+    if not line_ids:
+        return {}
+    
+    conn = DBConnection().get_connection()
+    try:
+        cur = conn.cursor()
+        # Use ANY to handle list of UUIDs
+        placeholders = ','.join(['%s'] * len(line_ids))
+        query = f"""
+            SELECT line_id, MAX(event_time) as last_alert
+            FROM alerts_events
+            WHERE line_id IN ({placeholders})
+            GROUP BY line_id
+        """
+        cur.execute(query, list(line_ids))
+        rows = cur.fetchall()
+        cur.close()
+        
+        result = {}
+        for row in rows:
+            result[str(row[0])] = row[1]  # line_id -> last_alert datetime
+        return result
+    except Exception as e:
+        print(f"DB Read Error (get_last_alert_times): {e}")
+        return {}
+    finally:
+        conn.close()

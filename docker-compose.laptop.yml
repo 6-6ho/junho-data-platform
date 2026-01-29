@@ -1,4 +1,10 @@
+# Laptop Node (항상 켜짐 / 서버 역할)
+# 역할: Serving, Ingestion, Storage
+# 
+# 사용법: docker compose -f docker-compose.laptop.yml up -d
+
 services:
+  # === Frontend & Routing ===
   frontend:
     build: ./apps/trade-frontend
     ports:
@@ -10,13 +16,7 @@ services:
       - api
     networks: [appnet]
 
-  ingest:
-    build: ./apps/trade-ingest
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-    depends_on: [kafka]
-    networks: [appnet]
-
+  # === APIs ===
   api:
     build: ./apps/trade-backend
     environment:
@@ -24,6 +24,21 @@ services:
     networks: [appnet]
     depends_on: [postgres]
 
+  shop-analytics:
+    build: ./apps/shop-analytics
+    container_name: shop-analytics
+    depends_on: [api]
+    networks: [appnet]
+
+  # === Data Ingestion ===
+  ingest:
+    build: ./apps/trade-ingest
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on: [kafka]
+    networks: [appnet]
+
+  # === Storage ===
   postgres:
     image: postgres:16
     deploy:
@@ -43,6 +58,7 @@ services:
 
   kafka:
     image: confluentinc/cp-kafka:latest
+    hostname: kafka
     deploy:
       resources:
         limits:
@@ -53,113 +69,23 @@ services:
       - KAFKA_CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
       - KAFKA_NODE_ID=1
       - KAFKA_PROCESS_ROLES=broker,controller
-      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      # 내부(Docker) + 외부(LAN) 듀얼 리스너
+      - KAFKA_LISTENERS=INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://192.168.219.101:29092
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
       - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-    networks: [appnet]
-
-  # --- MinIO ---
-  minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
-    environment:
-      - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=minio123
-    volumes:
-      - miniodata:/data
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9092:9092"
+      - "29092:29092"
     networks: [appnet]
 
-  minio-init:
-    image: minio/mc
-    container_name: jdp-minio-init
-    depends_on: [minio]
-    entrypoint: >
-      /bin/sh -c "
-      until mc alias set myminio http://minio:9000 minio minio123; do
-        echo 'Waiting for MinIO...'
-        sleep 5
-      done;
-      mc mb myminio/raw --ignore-existing;
-      mc mb myminio/processed --ignore-existing;
-      mc mb myminio/aggregated --ignore-existing;
-      mc mb myminio/iceberg-warehouse --ignore-existing;
-      mc mb myminio/checklist-data || true;
-      echo 'Buckets created successfully';
-      exit 0;
-      "
-    networks: [appnet]
-
-  # --- Shop Services (Thin Client - now integrated) ---
-  shop-generator:
-    build: ./apps/shop-generator
-    container_name: shop-generator
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - MODE=normal
-    networks: [appnet]
-
-
-
-  shop-analytics:
-    build: ./apps/shop-analytics
-    container_name: shop-analytics
-    depends_on: [api]
-    networks: [appnet]
-
-
-
-  # --- Reddit Data Collector ---
-
-
-  # --- Spark Cluster ---
-  spark-master:
-    build: ./spark
-    hostname: spark-master
-    container_name: spark-master
-    ports:
-      - "8081:8080"
-      - "7077:7077"
-    networks: [appnet]
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
-
-  spark-worker-1:
-    build: ./spark
-    depends_on: [spark-master]
-    environment:
-      - SPARK_WORKER_CORES=2
-      - SPARK_WORKER_MEMORY=1500m
-      - SPARK_MASTER_URL=spark://spark-master:7077
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-    networks: [appnet]
-    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
-
-  spark-job-runner:
-    build: ./spark
-    depends_on: [spark-master, kafka, minio]
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1.5G
-    environment:
-      - SPARK_MASTER_URL=spark://spark-master:7077
-    networks: [appnet]
-    command: ./start.sh
-
-  # --- Monitoring ---
+  # === Monitoring ===
   node-exporter:
     image: prom/node-exporter:latest
     container_name: jdp-node-exporter
@@ -214,9 +140,7 @@ services:
       - ./infra/grafana/provisioning:/etc/grafana/provisioning
     networks: [appnet]
 
-
-
-  # --- Airflow (Batch Orchestration) ---
+  # === Orchestration ===
   airflow:
     build: ./airflow
     container_name: jdp-airflow
@@ -245,6 +169,7 @@ services:
     command: >
       bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver & airflow scheduler"
 
+  # === External Access ===
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: jdp-tunnel
@@ -254,13 +179,26 @@ services:
       - ./infra/tunnel:/etc/cloudflared:ro
     networks: [appnet]
 
+  # === Spark for Trade (Lightweight) ===
+  spark-trade-runner:
+    build: ./spark
+    container_name: spark-trade-runner
+    depends_on: [kafka]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - DB_HOST=postgres
+    networks: [appnet]
+    command: ./start_trade.sh
+
 volumes:
   pgdata:
-  miniodata:
-
   airflow_logs:
   grafana-data:
 
 networks:
   appnet:
-
