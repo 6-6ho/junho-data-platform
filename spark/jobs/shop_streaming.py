@@ -115,7 +115,7 @@ if __name__ == "__main__":
     
     # --- Iceberg DDL ---
     print("[Iceberg] Creating namespace and tables if not exist...")
-    spark.sql("CREATE NAMESPACE IF NOT EXISTS my_catalog.shop")
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS my_catalog.shop LOCATION 's3a://iceberg-warehouse/shop'")
     
     spark.sql("""
         CREATE TABLE IF NOT EXISTS my_catalog.shop.hourly_sales (
