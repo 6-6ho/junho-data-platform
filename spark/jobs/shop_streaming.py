@@ -114,48 +114,9 @@ if __name__ == "__main__":
     spark.sparkContext.setLogLevel("WARN")
     
     # --- Iceberg DDL ---
-    print("[Iceberg] Creating namespace and tables if not exist...")
-    spark.sql("CREATE NAMESPACE IF NOT EXISTS my_catalog.shop LOCATION 's3a://iceberg-warehouse/shop'")
-    
-    spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.hourly_sales (
-            window_start TIMESTAMP,
-            window_end TIMESTAMP,
-            category STRING,
-            total_revenue DOUBLE,
-            order_count LONG,
-            avg_order_value DOUBLE
-        ) USING iceberg
-    """)
-    
-    spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.brand_stats (
-            window_start TIMESTAMP,
-            brand_name STRING,
-            total_revenue DOUBLE,
-            order_count LONG
-        ) USING iceberg
-    """)
-    
-    spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.funnel_stats (
-            window_start TIMESTAMP,
-            total_sessions LONG,
-            view_count LONG,
-            cart_count LONG,
-            purchase_count LONG,
-            conversion_rate DOUBLE
-        ) USING iceberg
-    """)
-    
-    spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.realtime_metrics (
-            metric_name STRING,
-            metric_value DOUBLE,
-            last_updated TIMESTAMP
-        ) USING iceberg
-    """)
-    print("[Iceberg] Tables verified in my_catalog.shop")
+    # Note: Skipping DDL as tables are created on first write
+    # The namespace and tables will be auto-created by Iceberg
+    print("[Iceberg] Skipping DDL - tables will be created on first write")
     
     # --- Shop Raw Stream ---
     shop_raw = spark.readStream \
