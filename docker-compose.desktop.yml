@@ -87,8 +87,8 @@ services:
     build: ./apps/shop-generator
     container_name: shop-generator
     environment:
-      # 노트북의 Kafka에 연결
-      - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:9092
+      # 노트북의 Kafka에 연결 (외부 포트 29092 사용)
+      - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:29092
       - MODE=normal
     networks: [appnet]
 
