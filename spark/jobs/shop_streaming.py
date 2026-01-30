@@ -10,7 +10,7 @@ import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     col, from_json, window, sum as spark_sum,
-    count, avg, countDistinct, lit, current_timestamp
+    count, avg, approx_count_distinct, lit, current_timestamp
 )
 from pyspark.sql.types import (
     StructType, StructField, StringType, DoubleType, 
@@ -183,7 +183,7 @@ if __name__ == "__main__":
     funnel_df = shop_df \
         .groupBy(window(col("event_time"), "1 hour")) \
         .agg(
-            countDistinct("session_id").alias("total_sessions"),
+            approx_count_distinct("session_id").alias("total_sessions"),
             spark_sum((col("event_type") == "view").cast("long")).alias("view_count"),
             spark_sum((col("event_type") == "add_to_cart").cast("long")).alias("cart_count"),
             spark_sum((col("event_type") == "purchase").cast("long")).alias("purchase_count")
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         .agg(
             spark_sum("total_amount").alias("revenue_5m"),
             count("*").alias("events_5m"),
-            countDistinct("user_id").alias("users_5m")
+            approx_count_distinct("user_id").alias("users_5m")
         ) \
         .select(
             lit("revenue_5m").alias("metric_name"),
