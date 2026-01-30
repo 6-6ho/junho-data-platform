@@ -57,7 +57,7 @@ services:
       - MINIO_ROOT_USER=minio
       - MINIO_ROOT_PASSWORD=minio123
     volumes:
-      - miniodata:/data
+      - /mnt/d/minio-data:/data
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -91,9 +91,6 @@ services:
       - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:29092
       - MODE=normal
     networks: [appnet]
-
-volumes:
-  miniodata:
 
 networks:
   appnet:
