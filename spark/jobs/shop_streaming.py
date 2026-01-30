@@ -49,53 +49,30 @@ SHOP_SCHEMA = StructType([
 ])
 
 # =========================================================================
-# SHOP PROCESSING LOGIC
+# SHOP PROCESSING LOGIC (Postgres Only)
 # =========================================================================
 def upsert_hourly_sales(batch_df, batch_id):
     cnt = batch_df.count()
     print(f"[DEBUG] Sales Batch {batch_id}: {cnt} rows")
     if cnt == 0:
         return
-    # 1. Postgres (Interactive)
     batch_df.write.mode("append").jdbc(DB_URL, "shop_hourly_sales_log", properties=DB_PROPERTIES)
-    # 2. Iceberg (Data Lake)
-    batch_df.write \
-        .format("iceberg") \
-        .mode("append") \
-        .save("my_catalog.shop.hourly_sales")
 
 def upsert_brand_stats(batch_df, batch_id):
     if batch_df.isEmpty():
         return
-    # 1. Postgres
     batch_df.write.mode("append").jdbc(DB_URL, "shop_brand_stats_log", properties=DB_PROPERTIES)
-    # 2. Iceberg
-    batch_df.write \
-        .format("iceberg") \
-        .mode("append") \
-        .save("my_catalog.shop.brand_stats")
 
 def upsert_funnel_stats(batch_df, batch_id):
     if batch_df.isEmpty():
         return
-    # 1. Postgres
     batch_df.write.mode("append").jdbc(DB_URL, "shop_funnel_stats_log", properties=DB_PROPERTIES)
-    # 2. Iceberg
-    batch_df.write \
-        .format("iceberg") \
-        .mode("append") \
-        .save("my_catalog.shop.funnel_stats")
 
 def upsert_realtime_metrics(batch_df, batch_id):
     if batch_df.isEmpty():
         return
-    # 1. Postgres
     batch_df.write.mode("append").jdbc(DB_URL, "shop_realtime_metrics_log", properties=DB_PROPERTIES)
-    # 2. Iceberg
-    batch_df.write \
-        .format("iceberg") \
-        .mode("append") \
-        .save("my_catalog.shop.realtime_metrics")
+
 
 # =========================================================================
 # MAIN
