@@ -228,6 +228,7 @@ services:
       - SPARK_JOB_NAME=shop/analytics_streaming.py
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - SPARK_MASTER_URL=spark://spark-master:7077
+      - ENABLE_ICEBERG=true
       - DB_HOST=${LAPTOP_IP}
     networks: [appnet]
     command: ./start.sh
@@ -266,8 +267,6 @@ services:
       - '--collector.loadavg'
       - '--collector.stat'
     pid: host
-    ports:
-      - "9100:9100"
     ports:
       - "9100:9100"
     networks: [appnet]
