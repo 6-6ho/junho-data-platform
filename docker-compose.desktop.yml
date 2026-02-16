@@ -1,16 +1,67 @@
-# Desktop Node (가끔 껐다 켜는 연산 노드)
-# 역할: Spark Cluster, Data Lake, Data Generation
+# Desktop Node (데이터 처리 + Shop 전체)
+# 역할: Data Ingestion, Streaming, Batch, Shop Services
 #
 # 사용법:
-#   1. 환경변수 설정: export LAPTOP_IP=192.168.x.x
+#   1. 환경변수 설정: export LAPTOP_IP=192.168.219.101
 #   2. 실행: docker compose -f docker-compose.desktop.yml up -d
+#
+# 서비스 목록:
+#   kafka              - 메시지 브로커
+#   ingest             - Binance WebSocket → Kafka
+#   spark-master       - Spark 클러스터 마스터
+#   spark-worker-1     - Spark 워커 (고사양)
+#   trade-movers       - Trade 스트리밍 (Movers 감지)
+#   airflow            - 배치 오케스트레이션
+#   minio + minio-init - 오브젝트 스토리지
+#   shop-api           - Shop 백엔드 API
+#   shop-analytics     - Shop 프론트엔드
+#   shop-analytics-job - Shop Spark 스트리밍
+#   shop-generator     - Shop 데이터 생성
+#   prometheus         - 메트릭 수집
+#   cadvisor           - 컨테이너 모니터링
+#
+# 네트워크 연결:
+#   Spark/Airflow → 노트북 Postgres (${LAPTOP_IP}:5432)
+#   shop-api      → 노트북 Postgres (${LAPTOP_IP}:5432)
 
 services:
+  # === Messaging ===
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+    environment:
+      - KAFKA_HEAP_OPTS=-Xmx512m -Xms512m
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+      - KAFKA_CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+    networks: [appnet]
+
   # === Spark Cluster ===
   spark-master:
     build: ./spark
     hostname: spark-master
     container_name: spark-master
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     ports:
       - "8081:8080"
       - "7077:7077"
@@ -20,44 +71,87 @@ services:
   spark-worker-1:
     build: ./spark
     depends_on: [spark-master]
+    env_file: [.env]
     environment:
       - SPARK_WORKER_CORES=4
-      - SPARK_WORKER_MEMORY=8G
+      - SPARK_WORKER_MEMORY=4G
       - SPARK_MASTER_URL=spark://spark-master:7077
     deploy:
       resources:
         limits:
-          cpus: '4.0'
-          memory: 10G
+          cpus: '3.0'
+          memory: 4G
     networks: [appnet]
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
 
-  spark-job-runner:
+  spark-worker-2:
     build: ./spark
-    container_name: spark-shop-runner
-    depends_on: [spark-master, minio]
+    depends_on: [spark-master]
+    env_file: [.env]
+    environment:
+      - SPARK_WORKER_CORES=3
+      - SPARK_WORKER_MEMORY=3G
+      - SPARK_MASTER_URL=spark://spark-master:7077
     deploy:
       resources:
         limits:
-          cpus: '2.0'
+          cpus: '3.0'
           memory: 4G
-    environment:
-      - SPARK_MASTER_URL=spark://spark-master:7077
-      # 노트북(Laptop)의 Kafka와 Postgres에 연결 (외부 포트 29092 사용)
-      - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:29092
-      - DB_HOST=${LAPTOP_IP}
     networks: [appnet]
-    command: ./start_shop.sh
+    command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
 
-  # === Data Lake ===
+  # === Batch Orchestration ===
+  airflow:
+    build: ./airflow
+    container_name: jdp-airflow
+    restart: unless-stopped
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1.5G
+    environment:
+      - AIRFLOW__CORE__PARALLELISM=4
+      - AIRFLOW__CORE__DAG_CONCURRENCY=4
+      - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@${LAPTOP_IP}:5432/app
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-jdp-secret}
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+      - .:/opt/jdp
+    ports:
+      - "8080:8080"
+    networks: [appnet]
+    command: >
+      bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver & airflow scheduler"
+
+  # === Object Storage ===
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
     environment:
-      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123}
     volumes:
-      - /mnt/d/minio-data:/data
+      - miniodata:/data
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -66,10 +160,13 @@ services:
   minio-init:
     image: minio/mc
     container_name: jdp-minio-init
+    env_file: [.env]
     depends_on: [minio]
+    environment:
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123}
     entrypoint: >
       /bin/sh -c "
-      until mc alias set myminio http://minio:9000 minio $MINIO_ROOT_PASSWORD; do
+      until mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minio} $MINIO_ROOT_PASSWORD; do
         echo 'Waiting for MinIO...'
         sleep 5
       done;
@@ -77,20 +174,119 @@ services:
       mc mb myminio/processed --ignore-existing;
       mc mb myminio/aggregated --ignore-existing;
       mc mb myminio/iceberg-warehouse --ignore-existing;
+      mc mb myminio/checklist-data || true;
       echo 'Buckets created successfully';
       exit 0;
       "
     networks: [appnet]
 
-  # === Data Generation ===
+  # === Shop Services ===
+  shop-api:
+    build: ./apps/shop-backend
+    env_file: [.env]
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_HOST=${LAPTOP_IP}
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks: [appnet]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8000/').getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  shop-analytics:
+    build: ./apps/shop-analytics
+    ports:
+      - "3001:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    networks: [appnet]
+    depends_on:
+      - shop-api
+
+  shop-analytics-job:
+    build: ./spark
+    depends_on: [spark-master, kafka, minio]
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - SPARK_JOB_NAME=shop/analytics_streaming.py
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - DB_HOST=${LAPTOP_IP}
+    networks: [appnet]
+    command: ./start.sh
+
   shop-generator:
     build: ./apps/shop-generator
     container_name: shop-generator
     environment:
-      # 노트북의 Kafka에 연결 (외부 포트 29092 사용)
-      - KAFKA_BOOTSTRAP_SERVERS=${LAPTOP_IP}:29092
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - MODE=normal
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    depends_on: [kafka]
     networks: [appnet]
+
+  # === Monitoring ===
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: jdp-node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--no-collector.filesystem'
+      - '--collector.disable-defaults'
+      - '--collector.cpu'
+      - '--collector.meminfo'
+      - '--collector.diskstats'
+      - '--collector.loadavg'
+      - '--collector.stat'
+    pid: host
+    ports:
+      - "9100:9100"
+    ports:
+      - "9100:9100"
+    networks: [appnet]
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: jdp-cadvisor
+    ports:
+      - "8085:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [appnet]
+
+volumes:
+  miniodata:
+  airflow_logs:
 
 networks:
   appnet:

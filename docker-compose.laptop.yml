@@ -1,33 +1,45 @@
-# Laptop Node (항상 켜짐 / 서버 역할)
-# 역할: Serving, Ingestion, Storage
-# 
+# Laptop Node (항상 켜짐 / Trade 풀 파이프라인 + 웹 서빙)
+# 역할: Trade 데이터 수집 → 처리 → 저장 → 서빙 (독립 동작)
+#
 # 사용법: docker compose -f docker-compose.laptop.yml up -d
+#
+# 서비스 목록 (8개):
+#   kafka              - 9092 (메시지 브로커)
+#   ingest             - Binance WebSocket → Kafka
+#   trade-movers       - Spark local mode (Movers 감지)
+#   frontend (nginx)   - 3000
+#   api (trade-backend) - 8000 (internal)
+#   postgres           - 5432 (LAN 접근 허용)
+#   grafana            - 3002
+#   cloudflared        - Cloudflare Tunnel
+#
+# 메모리 예상: ~4G / 8G
 
 services:
-  # === Frontend & Routing ===
-  frontend:
-    build: ./apps/trade-frontend
-    ports:
-      - "3000:80"
-    volumes:
-      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./infra/nginx/landing:/usr/share/nginx/html/landing:ro
-    depends_on:
-      - api
-    networks: [appnet]
-
-  # === APIs ===
-  api:
-    build: ./apps/trade-backend
+  # === Messaging ===
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    hostname: kafka
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
     environment:
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app
-    networks: [appnet]
-    depends_on: [postgres]
-
-  shop-analytics:
-    build: ./apps/shop-analytics
-    container_name: shop-analytics
-    depends_on: [api]
+      - KAFKA_HEAP_OPTS=-Xmx384m -Xms384m
+      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+      - KAFKA_CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
+      - KAFKA_NODE_ID=1
+      - KAFKA_PROCESS_ROLES=broker,controller
+      - KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
     networks: [appnet]
 
   # === Data Ingestion ===
@@ -35,54 +47,119 @@ services:
     build: ./apps/trade-ingest
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-    depends_on: [kafka]
-    networks: [appnet]
-
-  # === Storage ===
-  postgres:
-    image: postgres:16
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 1.5G
-    environment:
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=app
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-      - ./infra/postgres-init:/docker-entrypoint-initdb.d:ro
+          cpus: '0.3'
+          memory: 256M
+    depends_on: [kafka]
     networks: [appnet]
-    ports:
-      - "5432:5432"
 
-  kafka:
-    image: confluentinc/cp-kafka:latest
-    hostname: kafka
+  # === Trade Streaming (Spark Local Mode) ===
+  trade-movers:
+    build: ./spark
+    depends_on: [kafka, postgres]
+    env_file: [.env]
     deploy:
       resources:
         limits:
           cpus: '1.0'
           memory: 1G
     environment:
-      - CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
-      - KAFKA_CLUSTER_ID=MkU3OEVBNTcwNTJENDM2Qk
-      - KAFKA_NODE_ID=1
-      - KAFKA_PROCESS_ROLES=broker,controller
-      # 내부(Docker) + 외부(LAN) 듀얼 리스너
-      - KAFKA_LISTENERS=INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
-      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://192.168.219.101:29092
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
-      - KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
-      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
-      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - SPARK_JOB_NAME=trade/movers_streaming.py
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - DB_HOST=postgres
+      # No SPARK_MASTER_URL → defaults to local[*]
+    networks: [appnet]
+    volumes:
+      - ./spark/jobs:/app/jobs
+      - ./spark/common:/app/common
+      - ./checkpoints:/app/checkpoints
+    command: ./start.sh
+
+  # === Frontend & Routing ===
+  frontend:
+    build: ./apps/trade-frontend
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "3000:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/nginx/landing:/usr/share/nginx/html/landing:ro
+    depends_on:
+      - api
+    networks: [appnet]
+
+  # === Trade API ===
+  api:
+    build: ./apps/trade-backend
+    env_file: [.env]
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
+    volumes:
+      - ./apps/trade-backend/app:/app/app
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    networks: [appnet]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8000/').getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # === Database ===
+  postgres:
+    image: postgres:16
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks: [appnet]
+    ports:
+      - "5432:5432"   # LAN 접근 허용 (데스크탑 → 노트북 Postgres)
+
+  # === Monitoring UI ===
+  grafana:
+    image: grafana/grafana:latest
+    container_name: jdp-grafana
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "3002:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning
     networks: [appnet]
 
   # === Monitoring ===
@@ -109,6 +186,18 @@ services:
       - "9100:9100"
     networks: [appnet]
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: jdp-cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [appnet]
+
   prometheus:
     image: prom/prometheus:latest
     container_name: jdp-prometheus
@@ -117,57 +206,6 @@ services:
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks: [appnet]
-
-  cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
-    container_name: jdp-cadvisor
-    ports:
-      - "8085:8080"
-    volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-    networks: [appnet]
-
-  grafana:
-    image: grafana/grafana:latest
-    container_name: jdp-grafana
-    ports:
-      - "3002:3000"
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning
-    networks: [appnet]
-
-  # === Orchestration ===
-  airflow:
-    build: ./airflow
-    container_name: jdp-airflow
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1.5G
-    environment:
-      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:postgres@postgres:5432/app
-      - AIRFLOW__CORE__FERNET_KEY=46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=
-      - AIRFLOW__WEBSERVER__SECRET_KEY=jdp-secret
-      - _AIRFLOW_DB_MIGRATE=true
-      - _AIRFLOW_WWW_USER_CREATE=true
-      - _AIRFLOW_WWW_USER_USERNAME=admin
-      - _AIRFLOW_WWW_USER_PASSWORD=admin
-    volumes:
-      - ./airflow/dags:/opt/airflow/dags:ro
-      - airflow_logs:/opt/airflow/logs
-    ports:
-      - "8080:8080"
-    depends_on: [postgres]
-    networks: [appnet]
-    command: >
-      bash -c "airflow db migrate && airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver & airflow scheduler"
 
   # === External Access ===
   cloudflared:
@@ -179,25 +217,8 @@ services:
       - ./infra/tunnel:/etc/cloudflared:ro
     networks: [appnet]
 
-  # === Spark for Trade (Lightweight) ===
-  spark-trade-runner:
-    build: ./spark
-    container_name: spark-trade-runner
-    depends_on: [kafka]
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-      - DB_HOST=postgres
-    networks: [appnet]
-    command: ./start_trade.sh
-
 volumes:
   pgdata:
-  airflow_logs:
   grafana-data:
 
 networks:
