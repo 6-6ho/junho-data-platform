@@ -6,7 +6,7 @@ COPY package*.json ./
 RUN npm install
 COPY . .
 # Execute typescript and vite directly via node
-RUN node ./node_modules/typescript/bin/tsc -b && node ./node_modules/vite/bin/vite.js build
+RUN npm run build
 
 # Production stage
 FROM nginx:alpine

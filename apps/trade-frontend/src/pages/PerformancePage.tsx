@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchSystemPerformance } from '../api/client';
-import { TrendingUp, TrendingDown, Target, Activity, BarChart3, Trophy } from 'lucide-react';
+import { ChevronDown, ChevronUp, BarChart3, PieChart, Activity } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
 
 interface PerformanceSummary {
