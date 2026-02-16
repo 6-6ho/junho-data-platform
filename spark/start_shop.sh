@@ -22,7 +22,7 @@ spark-submit \
   --conf spark.sql.catalog.my_catalog.warehouse=s3a://iceberg-warehouse/ \
   --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
   --conf spark.hadoop.fs.s3a.access.key=minio \
-  --conf spark.hadoop.fs.s3a.secret.key=minio123 \
+  --conf spark.hadoop.fs.s3a.secret.key=${MINIO_SECRET_KEY:-minio123} \
   --conf spark.hadoop.fs.s3a.path.style.access=true \
   --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
   --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false \

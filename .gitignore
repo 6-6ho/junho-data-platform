@@ -40,3 +40,14 @@ spark/checkpoints/
 # Temporary files
 *.tmp
 *.temp
+
+# SSH Keys & Secrets
+*.key
+*.pem
+*.secret
+
+# Personal / Portfolio docs (not for public repo)
+DE_Portfolio/
+1.txt
+current.txt
+valid.txt

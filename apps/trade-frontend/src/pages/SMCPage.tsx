@@ -2,7 +2,7 @@ import { useState } from 'react';
 import SMCChart from '../components/SMCChart';
 
 export default function SMCPage() {
-    const [interval, setInterval] = useState('1h');
+    const [interval, setInterval] = useState('4h');
 
     return (
         <div style={{ height: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -11,7 +11,7 @@ export default function SMCPage() {
                 <h1 style={{ fontSize: '20px', fontWeight: 'bold', color: '#eaecef', margin: 0 }}>Smart Money Concepts (SMC)</h1>
 
                 <div style={{ display: 'flex', gap: '8px', background: '#1e2329', padding: '4px', borderRadius: '4px' }}>
-                    {['15m', '1h', '4h', '1d'].map(tf => (
+                    {['4h', '1d'].map(tf => (
                         <button
                             key={tf}
                             onClick={() => setInterval(tf)}

@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     MODE: str = "normal"  # normal, sale, test
     LOG_LEVEL: str = "INFO"
     BASE_TPS: int = 100  # Base transactions per second
+    
+    # DQ Testing: Chaos Mode (장애 시뮬레이션)
+    CHAOS_MODE: bool = False
 
     # Host Info (injected from docker-compose)
     HOST_IP: str = "localhost"

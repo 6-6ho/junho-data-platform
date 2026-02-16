@@ -1,10 +1,12 @@
 # Build stage
-FROM node:20-alpine AS builder
+FROM node:20 AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+# Use npm install instead of npm ci to handle lockfile mismatch
+RUN npm install
 COPY . .
-RUN npm run build
+# Execute typescript and vite directly via node
+RUN node ./node_modules/typescript/bin/tsc -b && node ./node_modules/vite/bin/vite.js build
 
 # Production stage
 FROM nginx:alpine

@@ -1,41 +1,57 @@
-import psycopg2
 import os
+import time
+import psycopg2
+from psycopg2 import pool, extras
+from datetime import datetime
+import json
 
 class DBConnection:
-    def __init__(self):
-        self.host = "postgres"
-        self.port = 5432
-        self.dbname = os.getenv("POSTGRES_DB", "app")
-        self.user = os.getenv("POSTGRES_USER", "postgres")
-        self.password = os.getenv("POSTGRES_PASSWORD", "postgres")
-    
-    def get_connection(self):
-        return psycopg2.connect(
-            host=self.host,
-            port=self.port,
-            dbname=self.dbname,
-            user=self.user,
-            password=self.password
-        )
+    _pool = None
+
+    @classmethod
+    def initialize(cls):
+        if cls._pool is None:
+            cls._pool = psycopg2.pool.SimpleConnectionPool(
+                1, 10,
+                host=os.getenv("DB_HOST", "postgres"),
+                port=5432,
+                dbname="app",
+                user="postgres",
+                password=os.getenv("POSTGRES_PASSWORD", "postgres")
+            )
+
+    @classmethod
+    def get_connection(cls):
+        if cls._pool is None:
+            cls.initialize()
+        return cls._pool.getconn()
+
+    @classmethod
+    def return_connection(cls, conn):
+        if cls._pool and conn:
+            cls._pool.putconn(conn)
+
+    @classmethod
+    def close_all(cls):
+        if cls._pool:
+            cls._pool.closeall()
+
 
 def save_movers_batch(movers_data):
     """
     movers_data: list of dicts {type, symbol, status, window, event_time, ...}
+    Implements upsert to avoid duplicate alerts for the same event time.
     """
     if not movers_data:
         return
 
-    conn = DBConnection().get_connection()
+    conn = DBConnection.get_connection()
     try:
-        cur = conn.cursor()
         query = """
             INSERT INTO movers_latest (
                 type, symbol, status, "window", event_time, 
-                change_pct_window, change_pct_24h, vol_ratio
-            ) VALUES (
-                %(type)s, %(symbol)s, %(status)s, %(window)s, %(event_time)s,
-                %(change_pct_window)s, %(change_pct_24h)s, %(vol_ratio)s
-            )
+                change_pct_window, change_pct_24h, vol_ratio, updated_at
+            ) VALUES %s
             ON CONFLICT (type, symbol, status, event_time) 
             DO UPDATE SET
                 change_pct_window = EXCLUDED.change_pct_window,
@@ -43,94 +59,64 @@ def save_movers_batch(movers_data):
                 vol_ratio = EXCLUDED.vol_ratio,
                 updated_at = NOW();
         """
-        cur.executemany(query, movers_data)
+        data = [
+            (
+                m['type'], m['symbol'], m['status'], m['window'], m['event_time'],
+                m['change_pct_window'], m.get('change_pct_24h', 0.0), m.get('vol_ratio'), datetime.now()
+            ) for m in movers_data
+        ]
+        
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, query, data)
         conn.commit()
-        cur.close()
     except Exception as e:
-        print(f"DB Error: {e}")
+        print(f"[DB] Error saving movers: {e}")
         conn.rollback()
     finally:
-        conn.close()
+        DBConnection.return_connection(conn)
 
-def save_alerts_batch(alerts_data):
-    if not alerts_data:
+
+
+
+def save_market_snapshot(data):
+    """
+    data: list of dicts {symbol, price, change_pct_24h, volume_24h, change_pct_window, vol_ratio, event_time}
+    """
+    if not data:
         return
 
-    conn = DBConnection().get_connection()
+    conn = DBConnection.get_connection()
     try:
-        cur = conn.cursor()
         query = """
-            INSERT INTO alerts_events (
-                event_time, symbol, line_id, direction, 
-                price, line_price, buffer_pct
-            ) VALUES (
-                %(event_time)s, %(symbol)s, %(line_id)s, %(direction)s, 
-                %(price)s, %(line_price)s, %(buffer_pct)s
-            )
+            INSERT INTO market_snapshot (
+                symbol, price, change_pct_24h, volume_24h, change_pct_window, vol_ratio, event_time, updated_at
+            ) VALUES %s
+            ON CONFLICT (symbol) 
+            DO UPDATE SET
+                price = EXCLUDED.price,
+                change_pct_24h = EXCLUDED.change_pct_24h,
+                volume_24h = EXCLUDED.volume_24h,
+                change_pct_window = EXCLUDED.change_pct_window,
+                vol_ratio = EXCLUDED.vol_ratio,
+                event_time = EXCLUDED.event_time,
+                updated_at = NOW();
         """
-        cur.executemany(query, alerts_data)
+        rows = [
+            (
+                d['symbol'], d['price'], d['change_pct_24h'], d['volume_24h'],
+                d['change_pct_window'], d.get('vol_ratio', 0.0), d['event_time'], datetime.now()
+            ) for d in data
+        ]
+        
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, query, rows)
         conn.commit()
-        cur.close()
     except Exception as e:
-        print(f"DB Error: {e}")
+        print(f"[DB] Error saving market snapshot: {e}")
         conn.rollback()
     finally:
-        conn.close()
+        DBConnection.return_connection(conn)
 
-def get_active_trendlines():
-    conn = DBConnection().get_connection()
-    try:
-        cur = conn.cursor()
-        cur.execute("SELECT line_id, symbol, p1, t1_ms, p2, t2_ms, buffer_pct, cooldown_sec FROM trendlines WHERE enabled = true")
-        rows = cur.fetchall()
-        # Convert to list of dicts
-        result = []
-        for r in rows:
-            result.append({
-                "line_id": str(r[0]),
-                "symbol": r[1],
-                "p1": r[2], "t1_ms": r[3],
-                "p2": r[4], "t2_ms": r[5],
-                "buffer_pct": r[6],
-                "cooldown_sec": r[7]
-            })
-        cur.close()
-        return result
-    except Exception as e:
-        print(f"DB Read Error: {e}")
-        return []
-    finally:
-        conn.close()
 
-def get_last_alert_times(line_ids):
-    """
-    Get the last alert time for each line_id.
-    Returns: dict {line_id: datetime}
-    """
-    if not line_ids:
-        return {}
-    
-    conn = DBConnection().get_connection()
-    try:
-        cur = conn.cursor()
-        # Use ANY to handle list of UUIDs
-        placeholders = ','.join(['%s'] * len(line_ids))
-        query = f"""
-            SELECT line_id, MAX(event_time) as last_alert
-            FROM alerts_events
-            WHERE line_id IN ({placeholders})
-            GROUP BY line_id
-        """
-        cur.execute(query, list(line_ids))
-        rows = cur.fetchall()
-        cur.close()
-        
-        result = {}
-        for row in rows:
-            result[str(row[0])] = row[1]  # line_id -> last_alert datetime
-        return result
-    except Exception as e:
-        print(f"DB Read Error (get_last_alert_times): {e}")
-        return {}
-    finally:
-        conn.close()
+# Initialize pool on module load if appropriate, or let explicit call handle it
+# DBConnection.initialize()

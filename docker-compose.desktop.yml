@@ -55,7 +55,7 @@ services:
     command: server /data --console-address ":9001"
     environment:
       - MINIO_ROOT_USER=minio
-      - MINIO_ROOT_PASSWORD=minio123
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123}
     volumes:
       - /mnt/d/minio-data:/data
     ports:
@@ -69,7 +69,7 @@ services:
     depends_on: [minio]
     entrypoint: >
       /bin/sh -c "
-      until mc alias set myminio http://minio:9000 minio minio123; do
+      until mc alias set myminio http://minio:9000 minio $MINIO_ROOT_PASSWORD; do
         echo 'Waiting for MinIO...'
         sleep 5
       done;

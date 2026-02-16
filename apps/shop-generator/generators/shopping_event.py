@@ -63,9 +63,15 @@ class ShoppingEventGenerator:
 
     REFERRERS = ['direct', 'google_search', 'instagram', 'facebook', 'youtube', 'blog', 'email']
 
-    def __init__(self):
+    def __init__(self, chaos_mode: bool = False):
+        self.chaos_mode = chaos_mode
         self.product_cache = self._generate_product_catalog()
         self.user_pool = [f"u_{uuid.uuid4().hex[:8]}" for _ in range(10000)]
+        
+        # Chaos Mode: 장애 상태 관리
+        self.failed_categories = set()      # 장애 난 카테고리
+        self.failed_payments = set()        # 장애 난 결제수단
+        self._chaos_check_counter = 0       # 장애 상태 변경 주기 관리
 
     def _generate_product_catalog(self, num_products=1000):
         """Pre-generate product catalog for consistency."""
@@ -89,14 +95,56 @@ class ShoppingEventGenerator:
 
         return products
 
-    def generate(self) -> dict:
-        """Generate a single shopping event."""
+    def _simulate_failures(self):
+        """장애 상황 시뮬레이션 (매 100 이벤트마다 상태 변경 검토)"""
+        self._chaos_check_counter += 1
+        if self._chaos_check_counter < 100:
+            return
+        self._chaos_check_counter = 0
+        
+        # 3% 확률로 카테고리 장애 발생
+        if random.random() < 0.03:
+            available_categories = set(self.CATEGORIES.keys()) - self.failed_categories
+            if available_categories:
+                category = random.choice(list(available_categories))
+                self.failed_categories.add(category)
+                print(f"[CHAOS] 🔴 Category failure: {category}")
+        
+        # 5% 확률로 카테고리 복구
+        if self.failed_categories and random.random() < 0.05:
+            recovered = self.failed_categories.pop()
+            print(f"[CHAOS] 🟢 Category recovered: {recovered}")
+        
+        # 2% 확률로 결제수단 장애
+        if random.random() < 0.02:
+            payments = ['kakao_pay', 'naver_pay', 'toss']
+            available_payments = set(payments) - self.failed_payments
+            if available_payments:
+                payment = random.choice(list(available_payments))
+                self.failed_payments.add(payment)
+                print(f"[CHAOS] 🔴 Payment failure: {payment}")
+        
+        # 7% 확률로 결제수단 복구
+        if self.failed_payments and random.random() < 0.07:
+            recovered = self.failed_payments.pop()
+            print(f"[CHAOS] 🟢 Payment recovered: {recovered}")
+
+    def generate(self) -> dict | None:
+        """Generate a single shopping event. Returns None if dropped by chaos mode."""
+        
+        # Chaos Mode: 장애 상태 업데이트
+        if self.chaos_mode:
+            self._simulate_failures()
 
         # Select event type based on weights
         event_type = random.choices(self.EVENT_TYPES, weights=self.EVENT_WEIGHTS)[0]
 
         # Select product
         product = random.choice(self.product_cache)
+        
+        # Chaos Mode: 장애 난 카테고리면 데이터 누락!
+        if self.chaos_mode and product['category'] in self.failed_categories:
+            return None
 
         # Select user
         user_id = random.choice(self.user_pool)
@@ -104,6 +152,13 @@ class ShoppingEventGenerator:
         # Generate device info
         device_type = random.choices(self.DEVICE_TYPES, weights=self.DEVICE_WEIGHTS)[0]
         os = random.choice(self.OS_BY_DEVICE[device_type])
+        
+        # Get price (with possible chaos corruption)
+        price = product['price']
+        
+        # Chaos Mode: 1% 확률로 이상 가격 생성 (버그 시뮬레이션)
+        if self.chaos_mode and random.random() < 0.01:
+            price = random.choice([-100, 0, 99999999])  # 비정상 가격
 
         # Generate event
         event = {
@@ -114,7 +169,7 @@ class ShoppingEventGenerator:
             'product_name': product['name'],
             'category': product['category'],
             'brand': product['brand'],
-            'price': product['price'],
+            'price': price,
             'timestamp': datetime.now().isoformat(),
             'session_id': f"sess_{uuid.uuid4().hex[:12]}",
             'device': {
@@ -131,8 +186,14 @@ class ShoppingEventGenerator:
         # Add event-specific fields
         if event_type == 'purchase':
             event['quantity'] = random.randint(1, 3)
-            event['total_amount'] = event['price'] * event['quantity']
-            event['payment_method'] = random.choice(['card', 'kakao_pay', 'naver_pay', 'toss'])
+            event['total_amount'] = price * event['quantity']
+            payment_method = random.choice(['card', 'kakao_pay', 'naver_pay', 'toss'])
+            
+            # Chaos Mode: 장애 난 결제수단이면 purchase 누락!
+            if self.chaos_mode and payment_method in self.failed_payments:
+                return None
+            
+            event['payment_method'] = payment_method
         elif event_type == 'add_cart':
             event['quantity'] = random.randint(1, 5)
 

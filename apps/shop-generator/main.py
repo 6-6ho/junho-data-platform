@@ -106,6 +106,8 @@ def generate_and_send(producer, generators, traffic_controller, mode, metrics):
 
                     if event_type == 'shopping':
                         event = shopping_gen.generate()
+                        if event is None:  # Chaos Mode: 데이터 누락 시뮬레이션
+                            continue
                         topic = TOPIC_SHOPPING_EVENTS
                         key = event['user_id']
                     elif event_type == 'review':
@@ -170,11 +172,14 @@ def main():
 
     # Initialize generators
     generators = {
-        'shopping': ShoppingEventGenerator(),
+        'shopping': ShoppingEventGenerator(chaos_mode=settings.CHAOS_MODE),
         'review': ReviewGenerator(),
         'search': SearchQueryGenerator(),
         'session': SessionEventGenerator()
     }
+    
+    if settings.CHAOS_MODE:
+        logger.warning("🚨 CHAOS MODE ENABLED - Failures will be simulated!")
 
     traffic_controller = TrafficPatternController()
 

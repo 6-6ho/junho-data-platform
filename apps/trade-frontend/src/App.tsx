@@ -4,6 +4,9 @@ import SymbolSearch from './components/SymbolSearch';
 import MoversPage from './pages/MoversPage';
 import SymbolDetailsPage from './pages/SymbolDetailsPage';
 import SMCPage from './pages/SMCPage';
+import PerformancePage from './pages/PerformancePage';
+import ThemePage from './pages/ThemePage';
+
 
 function App() {
   return (
@@ -30,6 +33,12 @@ function App() {
               <NavLink to="/smc" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
                 SMC
               </NavLink>
+              <NavLink to="/performance" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                Performance
+              </NavLink>
+              <NavLink to="/theme" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+                Theme
+              </NavLink>
             </nav>
 
             <SymbolSearch />
@@ -41,6 +50,8 @@ function App() {
               <Route path="/" element={<Navigate to="/movers" replace />} />
               <Route path="/movers" element={<MoversPage />} />
               <Route path="/smc" element={<SMCPage />} />
+              <Route path="/performance" element={<PerformancePage />} />
+              <Route path="/theme" element={<ThemePage />} />
               <Route path="/symbol/:symbol" element={<SymbolDetailsPage />} />
             </Routes>
           </main>

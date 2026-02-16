@@ -16,8 +16,9 @@ datasources:
     database: app
     user: postgres
     secureJsonData:
-      password: postgres
+      password: $POSTGRES_PASSWORD
     jsonData:
+      database: "app"
       sslmode: "disable"
       postgresVersion: 1000  # 10.x+
     isDefault: false

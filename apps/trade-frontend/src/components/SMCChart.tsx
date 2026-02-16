@@ -10,7 +10,7 @@ interface SMCChartProps {
 }
 
 
-export default function SMCChart({ symbol, interval = '1h' }: SMCChartProps) {
+export default function SMCChart({ symbol, interval = '4h' }: SMCChartProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<any>(null);
     const seriesRef = useRef<any>(null);

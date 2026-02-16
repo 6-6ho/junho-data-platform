@@ -69,7 +69,20 @@ export const fetchTicker = async (symbol: string) => {
   return data;
 };
 
+
 export const fetchSMCAnalysis = async (symbol: string, interval: string = '1h') => {
   const { data } = await api.get(`/smc/analysis/${symbol}`, { params: { interval } });
+  return data;
+};
+
+// Analytics / Reports
+export const fetchLatestReport = async (date?: string) => {
+  const params = date ? { date } : {};
+  const { data } = await api.get('/analytics/reports/latest', { params });
+  return data;
+};
+
+export const fetchSystemPerformance = async () => {
+  const { data } = await api.get('/system/performance');
   return data;
 };

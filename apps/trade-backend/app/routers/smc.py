@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api/smc", tags=["smc"])
 @router.get("/analysis/{symbol}")
 async def get_smc_analysis(
     symbol: str, 
-    interval: str = Query("1h", pattern="^(15m|1h|4h|1d)$")
+    interval: str = Query("4h", pattern="^(4h|1d)$")
 ):
     """
     Get full SMC analysis for a symbol.

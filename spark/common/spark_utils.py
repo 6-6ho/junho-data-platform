@@ -14,10 +14,9 @@ class SparkConfig:
     """Configuration for Spark and storage connections."""
 
     # MinIO / S3 Configuration
-    # Use shared credentials 'minio'/'minio123'
     S3_ENDPOINT: str = os.getenv("S3_ENDPOINT", "http://minio:9000")
     S3_ACCESS_KEY: str = os.getenv("AWS_ACCESS_KEY_ID", "minio")
-    S3_SECRET_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "minio123")
+    S3_SECRET_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
 
     # Iceberg Configuration
     # Force trailing slash to avoid endpoint issues

@@ -221,7 +221,7 @@ def write_to_postgres(df, table_name):
     jdbc_url = "jdbc:postgresql://postgres:5432/shop_analytics"
     props = {
         "user": "postgres",
-        "password": "postgres",
+        "password": os.getenv("POSTGRES_PASSWORD", ""),
         "driver": "org.postgresql.Driver"
     }
     try:
