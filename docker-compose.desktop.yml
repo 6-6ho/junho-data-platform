@@ -125,6 +125,7 @@ services:
       - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - AIRFLOW_CONN_POSTGRES_DEFAULT=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@${LAPTOP_IP}:5432/app
     volumes:
       - ./airflow/dags:/opt/airflow/dags:ro
       - airflow_logs:/opt/airflow/logs

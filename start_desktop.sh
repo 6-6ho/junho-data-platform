@@ -11,8 +11,14 @@ fi
 
 # Check LAPTOP_IP
 if [ -z "$LAPTOP_IP" ]; then
-  echo "⚠️  LAPTOP_IP is not set. Using default: 192.168.219.101"
-  export LAPTOP_IP=192.168.219.101
+  echo "⚠️  LAPTOP_IP is not set."
+  echo "   (노트북에서 'ipconfig' 또는 'ip a'로 확인된 WSL IP 또는 LAN IP를 입력하세요)"
+  read -p "Enter Laptop IP (Default: 192.168.219.101): " INPUT_IP
+  if [ ! -z "$INPUT_IP" ]; then
+    export LAPTOP_IP=$INPUT_IP
+  else
+    export LAPTOP_IP=192.168.219.101
+  fi
 fi
 
 echo "📡 Laptop Postgres: ${LAPTOP_IP}:5432"
