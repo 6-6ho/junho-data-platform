@@ -1,3 +1,4 @@
+name: jdp
 services:
   frontend:
     build: ./apps/trade-frontend

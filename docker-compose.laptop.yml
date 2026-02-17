@@ -15,6 +15,9 @@
 #
 # 메모리 예상: ~4G / 8G
 
+# 메모리 예상: ~4G / 8G
+name: jdp
+
 services:
   # === Messaging ===
   kafka:

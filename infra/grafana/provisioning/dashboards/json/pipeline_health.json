@@ -247,17 +247,17 @@
             },
             "targets": [
                 {
-                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-shop-analytics-job.*\"}[1m])",
+                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"jdp-shop-analytics-job.*\"}[1m])",
                     "legendFormat": "Shop Job",
                     "refId": "A"
                 },
                 {
-                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-spark-worker.*\"}[1m])",
+                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"jdp-spark-worker.*\"}[1m])",
                     "legendFormat": "Worker",
                     "refId": "B"
                 },
                 {
-                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-trade-movers.*\"}[1m])",
+                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"jdp-trade-movers.*\"}[1m])",
                     "legendFormat": "Trade Job",
                     "refId": "C"
                 }

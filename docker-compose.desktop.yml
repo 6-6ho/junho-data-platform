@@ -24,6 +24,9 @@
 #   Spark/Airflow → 노트북 Postgres (${LAPTOP_IP}:5432)
 #   shop-api      → 노트북 Postgres (${LAPTOP_IP}:5432)
 
+#   shop-api      → 노트북 Postgres (${LAPTOP_IP}:5432)
+
+name: jdp
 services:
   # === Messaging ===
   kafka:
