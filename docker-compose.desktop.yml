@@ -31,6 +31,7 @@ services:
   # === Messaging ===
   kafka:
     image: confluentinc/cp-kafka:latest
+    container_name: jdp-kafka
     hostname: kafka
     deploy:
       resources:
@@ -73,6 +74,7 @@ services:
 
   spark-worker-1:
     build: ./spark
+    container_name: jdp-spark-worker-1
     depends_on: [spark-master]
     env_file: [.env]
     environment:
@@ -89,6 +91,7 @@ services:
 
   spark-worker-2:
     build: ./spark
+    container_name: jdp-spark-worker-2
     depends_on: [spark-master]
     env_file: [.env]
     environment:
@@ -145,6 +148,7 @@ services:
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
+    container_name: jdp-minio
     env_file: [.env]
     deploy:
       resources:
@@ -187,6 +191,7 @@ services:
   # === Shop Services ===
   shop-api:
     build: ./apps/shop-backend
+    container_name: jdp-shop-api
     env_file: [.env]
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -208,6 +213,7 @@ services:
 
   shop-analytics:
     build: ./apps/shop-analytics
+    container_name: jdp-shop-analytics
     ports:
       - "3001:80"
     deploy:
@@ -218,9 +224,11 @@ services:
     networks: [appnet]
     depends_on:
       - shop-api
+    restart: always
 
   shop-analytics-job:
     build: ./spark
+    container_name: jdp-shop-analytics-job
     depends_on: [spark-master, kafka, minio]
     env_file: [.env]
     deploy:
@@ -235,6 +243,7 @@ services:
       - ENABLE_ICEBERG=true
       - DB_HOST=${LAPTOP_IP}
     networks: [appnet]
+    restart: always
     command: ./start.sh
 
   shop-generator:
@@ -249,6 +258,7 @@ services:
           cpus: '0.5'
           memory: 256M
     depends_on: [kafka]
+    restart: always
     networks: [appnet]
 
   # === Monitoring ===
