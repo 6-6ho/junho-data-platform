@@ -145,7 +145,60 @@
                     "refId": "A"
                 }
             ],
-            "title": "Today's Records",
+            "title": "Today's Shop Stats",
+            "type": "stat"
+        },
+        {
+            "datasource": "PostgreSQL",
+            "fieldConfig": {
+                "defaults": {
+                    "color": {
+                        "mode": "thresholds"
+                    },
+                    "mappings": [],
+                    "thresholds": {
+                        "mode": "absolute",
+                        "steps": [
+                            {
+                                "color": "green",
+                                "value": null
+                            }
+                        ]
+                    },
+                    "unit": "short"
+                },
+                "overrides": []
+            },
+            "gridPos": {
+                "h": 6,
+                "w": 6,
+                "x": 6,
+                "y": 6
+            },
+            "id": 9,
+            "options": {
+                "colorMode": "background",
+                "graphMode": "area",
+                "justifyMode": "auto",
+                "orientation": "auto",
+                "reduceOptions": {
+                    "calcs": [
+                        "lastNotNull"
+                    ],
+                    "fields": "",
+                    "values": false
+                },
+                "textMode": "auto"
+            },
+            "targets": [
+                {
+                    "format": "table",
+                    "rawQuery": true,
+                    "rawSql": "SELECT COUNT(*) as cnt FROM movers_latest WHERE event_time >= CURRENT_DATE AND type = 'rise';",
+                    "refId": "A"
+                }
+            ],
+            "title": "Today's Trade Signals",
             "type": "stat"
         },
         {
@@ -295,7 +348,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 0,
-                "y": 6
+                "y": 12
             },
             "id": 7,
             "options": {
@@ -359,7 +412,7 @@
                 "h": 8,
                 "w": 12,
                 "x": 12,
-                "y": 6
+                "y": 12
             },
             "id": 8,
             "options": {
