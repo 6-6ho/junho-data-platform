@@ -23,9 +23,14 @@ fi
 
 echo "📡 Laptop Postgres: ${LAPTOP_IP}:5432"
 
+# Load .env if exists (to get POSTGRES_PASSWORD)
+if [ -f .env ]; then
+  export $(grep -v '^#' .env | xargs)
+fi
+
 # Test Postgres connectivity
 echo "🔍 Testing Postgres connection..."
-if docker run --rm postgres:16 psql -h $LAPTOP_IP -U postgres -d app -c "SELECT 1" > /dev/null 2>&1; then
+if docker run --rm -e PGPASSWORD=${POSTGRES_PASSWORD:-postgres} postgres:16 psql -h $LAPTOP_IP -U postgres -d app -c "SELECT 1" > /dev/null 2>&1; then
   echo "✅ Postgres connection OK"
 else
   echo "⚠️  Cannot reach Postgres at ${LAPTOP_IP}:5432"
