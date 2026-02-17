@@ -27,16 +27,18 @@ def read_root():
 @app.get("/api/system/status")
 async def system_status():
     import httpx
+    import os
     
     status = "OPERATIONAL"
     active_workers = 0
     pipeline_lag = "N/A"
-    kafka_throughput = "N/A"
     
-    # Spark Master API 호출
+    # Spark Master API (Default to env or internal hostname)
+    spark_api = os.getenv("SPARK_MASTER_API", "http://spark-master:8080")
+    
     try:
         async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
-            spark_resp = await client.get("http://spark-master:8080/json/")
+            spark_resp = await client.get(f"{spark_api}/json/")
             if spark_resp.status_code == 200:
                 data = spark_resp.json()
                 active_workers = data.get("aliveworkers", 0)

@@ -36,6 +36,7 @@ services:
       - DB_HOST=postgres
       - POSTGRES_DB=app
       - POSTGRES_USER=postgres
+      - SPARK_MASTER_API=http://192.168.219.108:8081
     deploy:
       resources:
         limits:
