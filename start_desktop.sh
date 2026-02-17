@@ -28,9 +28,12 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
+export PGPASSWORD=${POSTGRES_PASSWORD:-postgres}
+
 # Test Postgres connectivity
 echo "🔍 Testing Postgres connection..."
-if docker run --rm -e PGPASSWORD=${POSTGRES_PASSWORD:-postgres} postgres:16 psql -h $LAPTOP_IP -U postgres -d app -c "SELECT 1" > /dev/null 2>&1; then
+# Use -e PGPASSWORD without value to inherit from shell environment (secure)
+if docker run --rm -e PGPASSWORD postgres:16 psql -h $LAPTOP_IP -U postgres -d app -c "SELECT 1" > /dev/null 2>&1; then
   echo "✅ Postgres connection OK"
 else
   echo "⚠️  Cannot reach Postgres at ${LAPTOP_IP}:5432"
