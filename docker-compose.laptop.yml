@@ -58,6 +58,7 @@ services:
   # === Trade Streaming (Spark Local Mode) ===
   trade-movers:
     build: ./spark
+    user: root  # Fix checkpoint permission on WSL
     depends_on: [kafka, postgres]
     env_file: [.env]
     deploy:
