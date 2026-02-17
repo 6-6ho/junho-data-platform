@@ -39,17 +39,17 @@ $ports = @(5432, 3000, 8000, 9092, 9090, 3002, 9100, 8080)
 foreach ($port in $ports) {
     Write-Host "Configuring Port $port..." -ForegroundColor Yellow
     
-    # 1. Delete existing portproxy (to avoid stale config)
+    # 1. Delete existing portproxy
     netsh interface portproxy delete v4tov4 listenport=$port listenaddress=0.0.0.0 | Out-Null
 
     # 2. Add new portproxy
     netsh interface portproxy add v4tov4 listenport=$port listenaddress=0.0.0.0 connectport=$port connectaddress=$wsl_ip
     
-    # 3. Add Firewall Rule (Delete existing first to avoid duplicates)
+    # 3. Add Firewall Rule (Force Allow)
     Remove-NetFirewallRule -DisplayName "JunhoPlatform Port $port" -ErrorAction SilentlyContinue
-    New-NetFirewallRule -DisplayName "JunhoPlatform Port $port" -Direction Inbound -LocalPort $port -Protocol TCP -Action Allow | Out-Null
+    New-NetFirewallRule -DisplayName "JunhoPlatform Port $port" -Direction Inbound -LocalPort $port -Protocol TCP -Action Allow -Profile Any | Out-Null
     
-    Write-Host "  [OK] Forwarded $port -> $wsl_ip:$port" -ForegroundColor Green
+    Write-Host "  [OK] Forwarded $port -> $wsl_ip:$port (Firewall Allowed)" -ForegroundColor Green
 }
 
 Write-Host "`nAll ports configured successfully! 🚀" -ForegroundColor Green
