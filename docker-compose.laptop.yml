@@ -103,6 +103,7 @@ services:
     env_file: [.env]
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
+      - SPARK_MASTER_API=http://192.168.219.108:8081
     volumes:
       - ./apps/trade-backend/app:/app/app
     deploy:
