@@ -55,11 +55,11 @@ read -p "Enter choice [1-2]: " CHOICE
 case $CHOICE in
     1)
         echo "🛍️  Starting Shop Processing..."
-        docker compose -f docker-compose.desktop.yml up -d kafka spark-master spark-worker-1 spark-worker-2 minio minio-init shop-api shop-analytics shop-analytics-job shop-generator
+        docker compose -f docker-compose.desktop.yml up -d --remove-orphans kafka spark-master spark-worker-1 spark-worker-2 minio minio-init shop-api shop-analytics shop-analytics-job shop-generator
         ;;
     2)
         echo "🔥 Starting ALL Desktop Services..."
-        docker compose -f docker-compose.desktop.yml up -d
+        docker compose -f docker-compose.desktop.yml up -d --remove-orphans
         ;;
     *)
         echo "❌ Invalid choice. Exiting."

@@ -11,7 +11,7 @@ fi
 
 
 export COMPOSE_PROJECT_NAME=jdp
-docker compose -f docker-compose.laptop.yml up -d
+docker compose -f docker-compose.laptop.yml up -d --remove-orphans
 
 echo ""
 echo "⏳ Waiting for services to initialize..."
