@@ -4,7 +4,7 @@ USER root
 
 # Install Python & Pip & System Deps
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip wget curl && \
+    apt-get install -y python3 python3-pip wget curl dos2unix && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -34,7 +34,7 @@ WORKDIR /app
 COPY . .
 
 # Make shell scripts executable
-RUN chmod +x /app/*.sh
+RUN dos2unix /app/*.sh && chmod +x /app/*.sh
 
 # Grant permissions to spark user
 RUN chown -R 185:185 /app
