@@ -75,3 +75,16 @@
     - **Anomaly Price**: 1% 확률로 비정상 가격($1,000,000) 발생.
     - **Category/Payment Null**: 필수 필드 누락 시뮬레이션.
     - **High Latency**: 네트워크 지연 시뮬레이션.
+
+---
+
+## 5. 🏗️ Data Pipeline Health
+
+Data Pipeline의 안정성과 성능을 모니터링하기 위한 기술적 지표와 정의입니다.
+
+| Metric | Definition | Logic / Query Source | Threshold (Warning/Critical) |
+|--------|------------|----------------------|------------------------------|
+| **Pipeline Lag** | 데이터 지연 시간<br>(`Current Time` - `Event Time`) | **Trade**: `NOW() - MAX(event_time)` (`movers_latest`)<br>**Shop**: `NOW() - MAX(window_start)` (`shop_brand_stats_log`) | > 60s / > 5m |
+| **Today's Records** | 금일(00:00~) 처리 및 적재된 데이터 총량 | `COUNT(*)` FROM `shop_brand_stats_log`<br>WHERE `window_start >= CURRENT_DATE` | N/A (Trending) |
+| **Total Rows** | 주요 분석 테이블의 총 데이터 수 | `SUM(n_live_tup)` FROM `pg_stat_user_tables` | N/A (Capacity Planning) |
+| **Hourly Ingestion** | 시간당 데이터 유입량 추이 | `COUNT(*)` GROUP BY `hour(window_start)` | < 100/hr (Low Traffic) |
