@@ -73,7 +73,15 @@
                     "format": "table",
                     "rawQuery": true,
                     "rawSql": "SELECT extract(epoch from (NOW() - MAX(event_time))) as time\nFROM movers_latest;",
-                    "refId": "A"
+                    "refId": "A",
+                    "hide": false
+                },
+                {
+                    "format": "table",
+                    "rawQuery": true,
+                    "rawSql": "SELECT extract(epoch from (NOW() - MAX(window_start))) as time\nFROM shop_brand_stats_log;",
+                    "refId": "B",
+                    "hide": false
                 }
             ],
             "title": "Pipeline Lag",
@@ -239,14 +247,19 @@
             },
             "targets": [
                 {
-                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-spark-job-runner.*\"}[1m])",
-                    "legendFormat": "Job Runner",
+                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-shop-analytics-job.*\"}[1m])",
+                    "legendFormat": "Shop Job",
                     "refId": "A"
                 },
                 {
                     "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-spark-worker.*\"}[1m])",
                     "legendFormat": "Worker",
                     "refId": "B"
+                },
+                {
+                    "expr": "rate(container_cpu_usage_seconds_total{name=~\"junho-data-platform-trade-movers.*\"}[1m])",
+                    "legendFormat": "Trade Job",
+                    "refId": "C"
                 }
             ],
             "title": "Spark CPU",
