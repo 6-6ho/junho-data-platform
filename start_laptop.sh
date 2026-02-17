@@ -9,7 +9,6 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
-fi
 
 export COMPOSE_PROJECT_NAME=jdp
 docker compose -f docker-compose.laptop.yml up -d

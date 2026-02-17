@@ -28,7 +28,6 @@ if [ -f .env ]; then
   export $(grep -v '^#' .env | xargs)
 fi
 
-fi
 
 export COMPOSE_PROJECT_NAME=jdp
 export PGPASSWORD=${POSTGRES_PASSWORD:-postgres}
