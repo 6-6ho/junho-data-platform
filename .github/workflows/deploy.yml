@@ -31,4 +31,9 @@ jobs:
             docker compose down
             docker compose up -d --build
             
+            # Deploy to Desktop (Unified CD)
+            echo "🚀 Triggering Desktop Deployment..."
+            chmod +x deploy_desktop.sh
+            ./deploy_desktop.sh
+            
             echo "Deployment completed successfully!"

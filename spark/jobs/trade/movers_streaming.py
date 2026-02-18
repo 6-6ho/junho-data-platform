@@ -141,8 +141,14 @@ def process_movers_5m(batch_df, batch_id):
         save_movers_batch(movers)
 
 def process_movers_10m(batch_df, batch_id):
-    # Keep original alerting logic for 10m with cooldown dedup
-    rows = batch_df.collect()
+    # Optimize: Filter on Spark side before collect to reduce driver load
+    # Only interested in rows that exceed the threshold (Rise or Fall)
+    # Note: Logic in classify_status tracks ABS(change) >= 7% for Mid, so we filter broadly here.
+    # THRESHOLD_10M is 7.0
+    
+    filtered_df = batch_df.filter(expr(f"abs(change_pct_window) >= {THRESHOLD_10M}"))
+    
+    rows = filtered_df.collect()
     if not rows:
         return
         
