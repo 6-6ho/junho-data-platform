@@ -12,6 +12,8 @@ import random
 import uuid
 from datetime import datetime
 from faker import Faker
+import psycopg2
+from config import get_settings
 
 fake = Faker('ko_KR')
 
@@ -64,14 +66,52 @@ class ShoppingEventGenerator:
     REFERRERS = ['direct', 'google_search', 'instagram', 'facebook', 'youtube', 'blog', 'email']
 
     def __init__(self, chaos_mode: bool = False):
+        self.settings = get_settings()
         self.chaos_mode = chaos_mode
-        self.product_cache = self._generate_product_catalog()
+        self.product_cache = self._load_products_from_db()
+        if not self.product_cache:
+            print("⚠️ DB Connection failed or empty. Fallback to synthetic products.")
+            self.product_cache = self._generate_product_catalog()
+        else:
+            print(f"✅ Loaded {len(self.product_cache)} products from Database.")
         self.user_pool = [f"u_{uuid.uuid4().hex[:8]}" for _ in range(10000)]
         
-        # Chaos Mode: 장애 상태 관리
-        self.failed_categories = set()      # 장애 난 카테고리
         self.failed_payments = set()        # 장애 난 결제수단
         self._chaos_check_counter = 0       # 장애 상태 변경 주기 관리
+        
+        self.last_reload_time = datetime.now()
+        self.RELOAD_INTERVAL = 3600 # 1 hour
+
+    def _load_products_from_db(self):
+        """Attempt to load products from Postgres table 'shop_product'."""
+        products = []
+        try:
+            conn = psycopg2.connect(
+                host=self.settings.DB_HOST,
+                database=self.settings.POSTGRES_DB,
+                user=self.settings.POSTGRES_USER,
+                password=self.settings.POSTGRES_PASSWORD
+            )
+            cur = conn.cursor()
+            cur.execute("SELECT product_id, name, category, price FROM shop_product")
+            rows = cur.fetchall()
+            
+            for row in rows:
+                products.append({
+                    'product_id': str(row[0]),
+                    'name': row[1],
+                    'category': row[2],
+                    'brand': 'Premium', # DB에 브랜드 컬럼이 없어서 임시 지정
+                    'item_type': row[2],
+                    'price': row[3]
+                })
+            
+            cur.close()
+            conn.close()
+            return products
+        except Exception as e:
+            print(f"❌ DB Loading Error: {e}")
+            return []
 
     def _generate_product_catalog(self, num_products=1000):
         """Pre-generate product catalog for consistency."""
@@ -135,6 +175,15 @@ class ShoppingEventGenerator:
         # Chaos Mode: 장애 상태 업데이트
         if self.chaos_mode:
             self._simulate_failures()
+            
+        # Check for product reload
+        if (datetime.now() - self.last_reload_time).total_seconds() > self.RELOAD_INTERVAL:
+            print("🔄 Reloading product catalog from DB...")
+            new_products = self._load_products_from_db()
+            if new_products:
+                self.product_cache = new_products
+                print(f"✅ Reloaded {len(self.product_cache)} products.")
+            self.last_reload_time = datetime.now()
 
         # Select event type based on weights
         event_type = random.choices(self.EVENT_TYPES, weights=self.EVENT_WEIGHTS)[0]

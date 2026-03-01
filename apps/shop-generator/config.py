@@ -21,8 +21,10 @@ class Settings(BaseSettings):
     # DQ Testing: Chaos Mode (장애 시뮬레이션)
     CHAOS_MODE: bool = False
 
-    # Host Info (injected from docker-compose)
-    HOST_IP: str = "localhost"
+    POSTGRES_USER: str = "postgres"
+    POSTGRES_PASSWORD: str = "postgres"
+    DB_HOST: str = "localhost"
+    POSTGRES_DB: str = "app"
 
     class Config:
         env_file = ".env"

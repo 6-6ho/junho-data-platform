@@ -254,3 +254,120 @@ async def get_schedule_info():
         ],
         "note": "System is now consolidated to Trade Mode only.",
     }
+
+
+@router.get("/performance/time-based")
+async def get_time_based_performance(days: int = 7):
+    """
+    Get time-based performance analysis (5min intervals from 5min to 240min).
+
+    Calculates win rate and profit ratio for each 5-minute interval
+    across all signals in the specified time period.
+
+    Returns:
+        - summary: Total signals analyzed, date range
+        - time_intervals: List of 48 time points with win_rate and profit_ratio
+        - best_intervals: Time points with highest win rate and profit ratio
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            # Fetch all timeseries data
+            cur.execute("""
+                SELECT timeseries_data
+                FROM trade_performance_timeseries
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+            """ % days)
+
+            rows = cur.fetchall()
+
+            if not rows:
+                return {
+                    "summary": {"total_signals": 0},
+                    "time_intervals": [],
+                    "best_intervals": {}
+                }
+
+            # Aggregate stats per time interval
+            time_stats = {}  # {5: {wins: 0, losses: 0, total_profit: 0, ...}, 10: {...}, ...}
+
+            for row in rows:
+                ts_data = row[0]  # JSONB
+
+                for time_min_str, data in ts_data.items():
+                    time_min = int(time_min_str)
+
+                    if time_min not in time_stats:
+                        time_stats[time_min] = {
+                            "wins": 0,
+                            "losses": 0,
+                            "total_profit": 0.0,
+                            "total_loss": 0.0
+                        }
+
+                    stats = time_stats[time_min]
+                    profit_pct = data["profit_pct"]
+                    is_win = data["is_win"]
+
+                    if is_win:
+                        stats["wins"] += 1
+                        stats["total_profit"] += profit_pct
+                    else:
+                        stats["losses"] += 1
+                        if profit_pct < 0:
+                            stats["total_loss"] += abs(profit_pct)
+
+            # Calculate metrics per interval
+            time_intervals = []
+            for time_min in sorted(time_stats.keys()):
+                stats = time_stats[time_min]
+                total = stats["wins"] + stats["losses"]
+
+                avg_profit = stats["total_profit"] / stats["wins"] if stats["wins"] > 0 else 0
+                avg_loss = stats["total_loss"] / stats["losses"] if stats["losses"] > 0 else 1
+                profit_ratio = avg_profit / avg_loss if avg_loss > 0 else 0
+
+                time_intervals.append({
+                    "time_minutes": time_min,
+                    "total_signals": total,
+                    "wins": stats["wins"],
+                    "losses": stats["losses"],
+                    "win_rate": round((stats["wins"] / total) * 100, 1) if total > 0 else 0,
+                    "avg_profit": round(avg_profit, 2),
+                    "avg_loss": round(avg_loss, 2),
+                    "profit_ratio": round(profit_ratio, 2)
+                })
+
+            # Find best intervals
+            if time_intervals:
+                best_win_rate = max(time_intervals, key=lambda x: x["win_rate"])
+                best_profit_ratio = max(time_intervals, key=lambda x: x["profit_ratio"])
+
+                return {
+                    "summary": {
+                        "total_signals": len(rows),
+                        "date_range_days": days
+                    },
+                    "time_intervals": time_intervals,
+                    "best_intervals": {
+                        "highest_win_rate": {
+                            "time_minutes": best_win_rate["time_minutes"],
+                            "win_rate": best_win_rate["win_rate"]
+                        },
+                        "highest_profit_ratio": {
+                            "time_minutes": best_profit_ratio["time_minutes"],
+                            "profit_ratio": best_profit_ratio["profit_ratio"]
+                        }
+                    }
+                }
+            else:
+                return {
+                    "summary": {"total_signals": 0},
+                    "time_intervals": [],
+                    "best_intervals": {}
+                }
+    except Exception as e:
+        logger.error(f"Failed to get time-based performance: {e}")
+        return {"summary": {"total_signals": 0}, "time_intervals": [], "error": str(e)}
+    finally:
+        conn.close()

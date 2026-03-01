@@ -9,7 +9,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install Python Libs
-RUN pip3 install kafka-python-ng psycopg2-binary==2.9.9
+RUN pip3 install kafka-python-ng psycopg2-binary==2.9.9 numpy
 
 # Download Spark-Kafka & Iceberg Jars (Same as Shopping project)
 WORKDIR /opt/spark/jars

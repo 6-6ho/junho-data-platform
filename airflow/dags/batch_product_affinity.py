@@ -31,22 +31,20 @@ def run():
         print(f"No data found: {e}")
         return
 
-    # 1. Prepare Transactions (Group by User + Date)
-    # Filter for 'purchase' events and group items by user_id and date
-    from pyspark.sql.functions import to_date
+    # 1. Prepare Transactions (Group by Session)
+    # Filter for 'purchase' events and group items by session_id
     transactions = df.filter(col("event_type") == "purchase") \
-        .withColumn("date", to_date("event_time")) \
-        .groupBy("user_id", "date") \
-        .agg(collect_list("product_id").alias("items")) \
+        .groupBy("session_id") \
+        .agg(collect_list("product_name").alias("items")) \
         .withColumn("items", array_distinct(col("items"))) \
-        .filter(size(col("items")) > 1)  # Only baskets with >= 2 items
+        .filter(size(col("items")) > 1)  # Only sessions with >= 2 items
 
-    print(f"Analyzing {transactions.count()} transactions (User+Date)...")
+    print(f"Analyzing {transactions.count()} transactions...")
 
     # 2. FP-Growth (Association Rules)
-    # minSupport=0.0005: Lowered to catch more patterns
-    # minConfidence=0.05 (5%): Low bar for confidence
-    fpGrowth = FPGrowth(itemsCol="items", minSupport=0.0005, minConfidence=0.05)
+    # minSupport=0.001 (0.1%): Allow niche combinations
+    # minConfidence=0.05 (5%): Low bar for confidence to catch interesting but rare associations
+    fpGrowth = FPGrowth(itemsCol="items", minSupport=0.001, minConfidence=0.05)
     model = fpGrowth.fit(transactions)
 
     # 3. Get Rules & Filter "Obvious" ones
@@ -54,12 +52,12 @@ def run():
     
     # Filter by Lift > 1.2 to find meaningful associations
     rules_df = rules.select(
-        col("antecedent").astype("string").alias("item_a"),
-        col("consequent").astype("string").alias("item_b"),
+        col("antecedents").cast("string").alias("item_a"),
+        col("consequents").cast("string").alias("item_b"),
         col("confidence"),
         col("lift"),
         col("support")
-    ).filter("lift > 1.0") \
+    ).filter("lift > 1.2") \
      .orderBy(desc("lift"))  # Order by Relevance (Lift)
 
     # 4. Write to Postgres

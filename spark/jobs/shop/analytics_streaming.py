@@ -7,7 +7,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import (
     from_json, col, window, to_timestamp, expr, 
     count, sum as spark_sum, approx_count_distinct,
-    to_date, hour
+    to_date, hour, from_utc_timestamp
 )
 from pyspark.sql.types import (
     StructType, StructField, StringType, DoubleType, LongType, IntegerType, TimestampType
@@ -223,11 +223,11 @@ def run():
         .format("kafka") \
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP) \
         .option("subscribe", SHOP_TOPIC) \
-        .option("startingOffsets", "earliest") \
+        .option("startingOffsets", "latest") \
         .load() \
         .select(from_json(col("value").cast("string"), SHOP_SCHEMA).alias("data")) \
         .select("data.*") \
-        .withColumn("event_time", col("timestamp").cast(TimestampType()))
+        .withColumn("event_time", from_utc_timestamp(col("timestamp").cast(TimestampType()), "Asia/Seoul"))
     
     shop_df = shop_raw.withWatermark("event_time", "10 minutes")
 
@@ -252,6 +252,8 @@ def run():
 
     # --- 2. RAW ARCHIVAL ---
     query_archival = shop_df.writeStream \
+        .trigger(processingTime='1 minute') \
+        .option("checkpointLocation", "s3a://raw/checkpoints/shop_archival") \
         .foreachBatch(process_raw_archival) \
         .start()
 
@@ -284,7 +286,7 @@ def run():
         .agg(
             count("session_id").alias("total_sessions"),
             spark_sum(expr("case when event_type = 'view' then 1 else 0 end")).alias("view_count"),
-            spark_sum(expr("case when event_type = 'cart' then 1 else 0 end")).alias("cart_count"),
+            spark_sum(expr("case when event_type = 'add_cart' then 1 else 0 end")).alias("cart_count"),
             spark_sum(expr("case when event_type = 'purchase' then 1 else 0 end")).alias("purchase_count")
         ) \
         .withColumn("conversion_rate", col("purchase_count") / col("total_sessions")) \

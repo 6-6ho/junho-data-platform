@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { fetchSystemPerformance } from '../api/client';
-import { BarChart3, Activity, Trophy, Target } from 'lucide-react';
+import { BarChart3, Activity, Trophy, Target, TrendingUp } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 interface PerformanceSummary {
     window_minutes: number;
@@ -33,6 +34,36 @@ interface PerformanceData {
     error?: string;
 }
 
+interface TimeInterval {
+    time_minutes: number;
+    total_signals: number;
+    wins: number;
+    losses: number;
+    win_rate: number;
+    avg_profit: number;
+    avg_loss: number;
+    profit_ratio: number;
+}
+
+interface TimeBasedData {
+    summary: {
+        total_signals: number;
+        date_range_days: number;
+    };
+    time_intervals: TimeInterval[];
+    best_intervals: {
+        highest_win_rate: {
+            time_minutes: number;
+            win_rate: number;
+        };
+        highest_profit_ratio: {
+            time_minutes: number;
+            profit_ratio: number;
+        };
+    };
+    error?: string;
+}
+
 const formatPct = (v: number | null | undefined) =>
     v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 
@@ -41,6 +72,7 @@ const pctColor = (v: number | null | undefined) =>
 
 export default function PerformancePage() {
     const [data, setData] = useState<PerformanceData | null>(null);
+    const [timeBasedData, setTimeBasedData] = useState<TimeBasedData | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedWindow, setSelectedWindow] = useState(60);
 
@@ -55,8 +87,21 @@ export default function PerformancePage() {
                 setLoading(false);
             }
         };
+        const loadTimeBasedData = async () => {
+            try {
+                const res = await fetch('/api/system/performance/time-based?days=7');
+                const json = await res.json();
+                setTimeBasedData(json);
+            } catch (err) {
+                console.error('Failed to load time-based data:', err);
+            }
+        };
         loadData();
-        const interval = setInterval(loadData, 60000);
+        loadTimeBasedData();
+        const interval = setInterval(() => {
+            loadData();
+            loadTimeBasedData();
+        }, 60000);
         return () => clearInterval(interval);
     }, []);
 
@@ -184,6 +229,115 @@ export default function PerformancePage() {
                             최고: <span style={{ color: '#00e676', fontWeight: 600 }}>+{summary.best_profit}%</span>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Time-Based Performance Analysis Section */}
+            {timeBasedData && timeBasedData.time_intervals && timeBasedData.time_intervals.length > 0 && (
+                <div style={{
+                    background: '#111',
+                    borderRadius: 12,
+                    border: '1px solid #222',
+                    padding: '16px 20px',
+                }}>
+                    <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <TrendingUp size={16} style={{ color: '#ffd740' }} />
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                                시간별 성과 분석
+                            </div>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                            5분~240분 구간의 승률과 손익비 추이 ({timeBasedData.summary.total_signals}개 신호 분석)
+                        </div>
+                    </div>
+
+                    {/* Line Charts */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                        {/* Win Rate Chart */}
+                        <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 8 }}>승률 (%)</div>
+                            <ResponsiveContainer width="100%" height={200}>
+                                <LineChart data={timeBasedData.time_intervals} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                                    <XAxis
+                                        dataKey="time_minutes"
+                                        stroke="#666"
+                                        fontSize={10}
+                                        tickFormatter={(value) => `${value}m`}
+                                    />
+                                    <YAxis stroke="#666" fontSize={10} />
+                                    <RechartsTooltip
+                                        contentStyle={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
+                                        labelStyle={{ color: '#fff', fontWeight: 600 }}
+                                        formatter={(value: number) => [`${value.toFixed(1)}%`, '승률']}
+                                        labelFormatter={(label) => `${label}분 시점`}
+                                    />
+                                    <Line type="monotone" dataKey="win_rate" stroke="#00e676" strokeWidth={2} dot={{ fill: '#00e676', r: 3 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        {/* Profit Ratio Chart */}
+                        <div>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: '#888', marginBottom: 8 }}>손익비 (Ratio)</div>
+                            <ResponsiveContainer width="100%" height={200}>
+                                <LineChart data={timeBasedData.time_intervals} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                                    <XAxis
+                                        dataKey="time_minutes"
+                                        stroke="#666"
+                                        fontSize={10}
+                                        tickFormatter={(value) => `${value}m`}
+                                    />
+                                    <YAxis stroke="#666" fontSize={10} />
+                                    <RechartsTooltip
+                                        contentStyle={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
+                                        labelStyle={{ color: '#fff', fontWeight: 600 }}
+                                        formatter={(value: number) => [value.toFixed(2), '손익비']}
+                                        labelFormatter={(label) => `${label}분 시점`}
+                                    />
+                                    <ReferenceLine y={1.0} stroke="#666" strokeDasharray="3 3" label={{ value: '균형', position: 'right', fill: '#666', fontSize: 10 }} />
+                                    <Line type="monotone" dataKey="profit_ratio" stroke="#ffd740" strokeWidth={2} dot={{ fill: '#ffd740', r: 3 }} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Optimal Timing Card */}
+                    {timeBasedData.best_intervals && (
+                        <div style={{
+                            background: 'rgba(255,215,64,0.05)',
+                            border: '1px solid rgba(255,215,64,0.2)',
+                            borderRadius: 8,
+                            padding: '12px 16px',
+                            display: 'flex',
+                            gap: 16,
+                        }}>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 10, color: '#ffd740', fontWeight: 600, marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                    💡 최고 승률 시점
+                                </div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
+                                    {timeBasedData.best_intervals.highest_win_rate.time_minutes}분
+                                </div>
+                                <div style={{ fontSize: 11, color: '#888' }}>
+                                    승률 {timeBasedData.best_intervals.highest_win_rate.win_rate}% (가장 안정적)
+                                </div>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: 10, color: '#ffd740', fontWeight: 600, marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                    💰 최고 손익비 시점
+                                </div>
+                                <div style={{ fontSize: 18, fontWeight: 800, color: '#fff' }}>
+                                    {timeBasedData.best_intervals.highest_profit_ratio.time_minutes}분
+                                </div>
+                                <div style={{ fontSize: 11, color: '#888' }}>
+                                    손익비 {timeBasedData.best_intervals.highest_profit_ratio.profit_ratio.toFixed(2)} (리스크 대비 높은 수익)
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 

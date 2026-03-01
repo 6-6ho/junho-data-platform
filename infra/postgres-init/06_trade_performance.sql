@@ -14,6 +14,10 @@ create table if not exists trade_performance (
     min_price double precision not null,
     close_price double precision not null,
     
+    -- Timing Data
+    time_to_max_minutes integer not null default 0,
+    time_to_min_minutes integer not null default 0,
+    
     -- Performance Metrics
     max_profit_pct double precision not null,
     max_drawdown_pct double precision not null,
@@ -28,3 +32,24 @@ create table if not exists trade_performance (
 
 create index if not exists idx_trade_performance_time on trade_performance(alert_time);
 create index if not exists idx_trade_performance_symbol on trade_performance(symbol);
+
+-- Trade Performance Time-Series Analysis
+-- Stores 48 time points (5min intervals from 5min to 240min) for each signal
+create table if not exists trade_performance_timeseries (
+    id serial primary key,
+    symbol text not null,
+    alert_type text not null,
+    alert_time timestamptz not null,
+    entry_price double precision not null,
+
+    -- JSONB structure: {"5": {"price": 100.5, "profit_pct": 1.2, "is_win": true}, "10": {...}, ...}
+    timeseries_data jsonb not null,
+
+    created_at timestamptz not null default now(),
+
+    unique(symbol, alert_type, alert_time)
+);
+
+create index if not exists idx_perf_timeseries_time on trade_performance_timeseries(alert_time);
+create index if not exists idx_perf_timeseries_symbol on trade_performance_timeseries(symbol);
+create index if not exists idx_perf_timeseries_data on trade_performance_timeseries using gin (timeseries_data);

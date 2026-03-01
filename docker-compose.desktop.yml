@@ -70,6 +70,8 @@ services:
       - "8081:8080"
       - "7077:7077"
     networks: [appnet]
+    volumes:
+      - ./spark/jobs:/app/jobs
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.master.Master
 
   spark-worker-1:
@@ -87,6 +89,8 @@ services:
           cpus: '3.0'
           memory: 4G
     networks: [appnet]
+    volumes:
+      - ./spark/jobs:/app/jobs
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
 
   spark-worker-2:
@@ -104,6 +108,8 @@ services:
           cpus: '3.0'
           memory: 4G
     networks: [appnet]
+    volumes:
+      - ./spark/jobs:/app/jobs
     command: /opt/spark/bin/spark-class org.apache.spark.deploy.worker.Worker spark://spark-master:7077
 
   # === Batch Orchestration ===
@@ -111,6 +117,7 @@ services:
     build: ./airflow
     container_name: jdp-airflow
     restart: unless-stopped
+    user: root
     env_file: [.env]
     deploy:
       resources:
@@ -198,6 +205,9 @@ services:
       - DB_HOST=${LAPTOP_IP}
       - POSTGRES_DB=app
       - POSTGRES_USER=postgres
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./apps/shop-backend:/app
     deploy:
       resources:
         limits:
@@ -235,7 +245,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1G
+          memory: 2G
     environment:
       - SPARK_JOB_NAME=shop/analytics_streaming.py
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -249,17 +259,16 @@ services:
   shop-generator:
     build: ./apps/shop-generator
     container_name: shop-generator
+    depends_on: [kafka, shop-api]
+    restart: always
+    networks: [appnet]
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - MODE=normal
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 256M
-    depends_on: [kafka]
-    restart: always
-    networks: [appnet]
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_HOST=${LAPTOP_IP}
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
 
   # === Monitoring ===
   node-exporter:
