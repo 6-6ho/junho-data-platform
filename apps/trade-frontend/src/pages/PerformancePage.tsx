@@ -280,9 +280,9 @@ export default function PerformancePage() {
             {/* PnL Trend Chart (daily for ≤14d, weekly for 30d/all) */}
             {pnlTrendData.length > 0 && (
                 <div style={{
-                    background: '#111',
+                    background: '#0d1117',
                     borderRadius: 12,
-                    border: '1px solid #222',
+                    border: '1px solid #1c2333',
                     padding: '16px 20px',
                 }}>
                     <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -354,9 +354,9 @@ export default function PerformancePage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px 280px', gap: 16 }}>
                 {/* Heatmap */}
                 <div style={{
-                    background: '#111',
+                    background: '#0d1117',
                     borderRadius: 12,
-                    border: '1px solid #222',
+                    border: '1px solid #1c2333',
                     padding: '16px 20px',
                 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -441,16 +441,16 @@ export default function PerformancePage() {
 
                 {/* Top 5 Strategies */}
                 <div style={{
-                    background: '#111',
+                    background: '#0d1117',
                     borderRadius: 12,
-                    border: '1px solid #222',
+                    border: '1px solid #1c2333',
                     padding: '16px 20px',
                 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 12 }}>
                         Top 5 전략
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 10, color: '#666', fontWeight: 600, paddingBottom: 4, borderBottom: '1px solid #222' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 10, color: '#666', fontWeight: 600, paddingBottom: 4, borderBottom: '1px solid #1c2333' }}>
                             <span>TP</span>
                             <span>SL</span>
                             <span style={{ textAlign: 'right' }}>승률</span>
@@ -471,9 +471,9 @@ export default function PerformancePage() {
 
                 {/* Compound Simulation */}
                 <div style={{
-                    background: '#111',
+                    background: '#0d1117',
                     borderRadius: 12,
-                    border: '1px solid #222',
+                    border: '1px solid #1c2333',
                     padding: '16px 20px',
                 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 12 }}>

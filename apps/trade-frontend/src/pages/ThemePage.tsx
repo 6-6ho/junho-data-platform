@@ -147,9 +147,9 @@ export default function ThemePage() {
 
             {/* Theme RS Table */}
             <div style={{
-                background: '#111',
+                background: '#0d1117',
                 borderRadius: 12,
-                border: '1px solid #222',
+                border: '1px solid #1c2333',
                 overflow: 'hidden',
             }}>
                 {/* Table Header */}
