@@ -85,11 +85,20 @@ interface ProfitTargetData {
     error?: string;
 }
 
+interface WeeklyPnlEntry {
+    week: string;
+    trades: number;
+    wins: number;
+    win_rate: number;
+    avg_pnl: number;
+}
+
 export default function PerformancePage() {
     const [optimizeData, setOptimizeData] = useState<OptimizeData | null>(null);
     const [compoundData, setCompoundData] = useState<CompoundData | null>(null);
     const [timeBasedData, setTimeBasedData] = useState<TimeBasedData | null>(null);
     const [profitTargetData, setProfitTargetData] = useState<ProfitTargetData | null>(null);
+    const [weeklyPnlData, setWeeklyPnlData] = useState<WeeklyPnlEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedDays, setSelectedDays] = useState(15);
 
@@ -109,13 +118,16 @@ export default function PerformancePage() {
             setTimeBasedData(tbJson);
             setProfitTargetData(ptJson);
 
-            // Load compound data based on recommended strategy
+            // Load compound + weekly data based on recommended strategy
             if (optJson.recommendation) {
-                const compRes = await fetch(
-                    `/api/system/performance/compound?take_profit=${optJson.recommendation.take_profit}&stop_loss=${optJson.recommendation.stop_loss}&days=${days}`
-                );
+                const [compRes, weeklyRes] = await Promise.all([
+                    fetch(`/api/system/performance/compound?take_profit=${optJson.recommendation.take_profit}&stop_loss=${optJson.recommendation.stop_loss}&days=${days}`),
+                    fetch(`/api/system/performance/weekly-pnl?take_profit=${optJson.recommendation.take_profit}&stop_loss=${optJson.recommendation.stop_loss}&days=${days}`)
+                ]);
                 const compJson = await compRes.json();
+                const weeklyJson = await weeklyRes.json();
                 setCompoundData(compJson);
+                setWeeklyPnlData(weeklyJson.weeks || []);
             }
         } catch (err) {
             console.error('Failed to load data:', err);
@@ -150,10 +162,10 @@ export default function PerformancePage() {
         });
     }
 
-    // Get min/max PnL for color scaling
-    const allPnls = Object.values(heatmapData).map(s => s.total_pnl);
-    const maxPnl = Math.max(...allPnls, 1);
-    const minPnl = Math.min(...allPnls, -1);
+    // Get min/max avg PnL for color scaling
+    const allPnls = Object.values(heatmapData).map(s => s.avg_pnl);
+    const maxPnl = Math.max(...allPnls, 0.1);
+    const minPnl = Math.min(...allPnls, -0.1);
 
     const getPnlColor = (pnl: number) => {
         if (pnl >= maxPnl * 0.5) return '#00e676';
@@ -240,18 +252,65 @@ export default function PerformancePage() {
                             </div>
                         </div>
                         <div>
+                            <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>평균 PnL</div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: optimizeData.recommendation.avg_pnl >= 0 ? '#00e676' : '#ff5252' }}>
+                                {optimizeData.recommendation.avg_pnl >= 0 ? '+' : ''}{optimizeData.recommendation.avg_pnl}%
+                            </div>
+                        </div>
+                        <div>
                             <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>총 PnL</div>
                             <div style={{ fontSize: 24, fontWeight: 800, color: optimizeData.recommendation.total_pnl >= 0 ? '#00e676' : '#ff5252' }}>
                                 {optimizeData.recommendation.total_pnl >= 0 ? '+' : ''}{optimizeData.recommendation.total_pnl}%
                             </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>평균 거래당</div>
-                            <div style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>
-                                {optimizeData.recommendation.avg_pnl >= 0 ? '+' : ''}{optimizeData.recommendation.avg_pnl}%
+                    </div>
+                </div>
+            )}
+
+            {/* Weekly PnL Chart */}
+            {weeklyPnlData.length > 0 && (
+                <div style={{
+                    background: '#111',
+                    borderRadius: 12,
+                    border: '1px solid #222',
+                    padding: '16px 20px',
+                }}>
+                    <div style={{ marginBottom: 12 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <TrendingUp size={16} style={{ color: '#82aaff' }} />
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                                주간별 평균 PnL 추이
                             </div>
                         </div>
+                        <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                            추천 전략 기준 주간 성과 ({optimizeData?.recommendation ? `TP ${optimizeData.recommendation.take_profit}% / SL ${optimizeData.recommendation.stop_loss}%` : ''})
+                        </div>
                     </div>
+                    <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={weeklyPnlData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                            <XAxis dataKey="week" stroke="#666" fontSize={10} tickFormatter={(v: string) => v.split('-')[1]} />
+                            <YAxis stroke="#666" fontSize={10} tickFormatter={(v: number) => `${v}%`} />
+                            <RechartsTooltip
+                                contentStyle={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
+                                formatter={(value: number, name: string) => [
+                                    `${value >= 0 ? '+' : ''}${value.toFixed(3)}%`,
+                                    name === 'avg_pnl' ? '평균 PnL' : name
+                                ]}
+                                labelFormatter={(label: string) => `${label}`}
+                            />
+                            <ReferenceLine y={0} stroke="#555" strokeDasharray="3 3" />
+                            <Bar dataKey="avg_pnl" radius={[4, 4, 0, 0]}>
+                                {weeklyPnlData.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.avg_pnl >= 0 ? '#00e676' : '#ff5252'}
+                                        fillOpacity={0.8}
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
                 </div>
             )}
 
@@ -269,7 +328,7 @@ export default function PerformancePage() {
                         TP/SL 조합별 성과
                     </div>
                     <div style={{ fontSize: 11, color: '#666', marginBottom: 12 }}>
-                        색상: 총 PnL 기준 (녹색=양수, 빨강=음수)
+                        색상: 평균 PnL 기준 (녹색=양수, 빨강=음수)
                     </div>
 
                     {/* Heatmap Grid */}
@@ -321,10 +380,10 @@ export default function PerformancePage() {
                                     }
 
                                     return (
-                                        <Tooltip key={sl} content={`TP ${tp}% / SL ${sl}%: 승률 ${strategy.win_rate}%, PnL ${strategy.total_pnl}%`}>
+                                        <Tooltip key={sl} content={`TP ${tp}% / SL ${sl}%: 승률 ${strategy.win_rate}%, 평균 PnL ${strategy.avg_pnl}%`}>
                                             <div style={{
                                                 width: 48, height: 32,
-                                                background: getPnlColor(strategy.total_pnl),
+                                                background: getPnlColor(strategy.avg_pnl),
                                                 borderRadius: 4,
                                                 display: 'flex',
                                                 alignItems: 'center',
@@ -334,7 +393,7 @@ export default function PerformancePage() {
                                                 fontWeight: 600,
                                                 color: '#000',
                                             }}>
-                                                {strategy.total_pnl > 0 ? '+' : ''}{strategy.total_pnl.toFixed(0)}%
+                                                {strategy.avg_pnl > 0 ? '+' : ''}{strategy.avg_pnl.toFixed(2)}%
                                             </div>
                                         </Tooltip>
                                     );
@@ -366,8 +425,8 @@ export default function PerformancePage() {
                                 <span style={{ color: '#00e676', fontWeight: 600 }}>+{s.take_profit}%</span>
                                 <span style={{ color: '#ff5252' }}>-{s.stop_loss}%</span>
                                 <span style={{ textAlign: 'right', color: s.win_rate >= 50 ? '#00e676' : '#888' }}>{s.win_rate}%</span>
-                                <span style={{ textAlign: 'right', color: s.total_pnl >= 0 ? '#00e676' : '#ff5252', fontWeight: 600 }}>
-                                    {s.total_pnl >= 0 ? '+' : ''}{s.total_pnl}%
+                                <span style={{ textAlign: 'right', color: s.avg_pnl >= 0 ? '#00e676' : '#ff5252', fontWeight: 600 }}>
+                                    {s.avg_pnl >= 0 ? '+' : ''}{s.avg_pnl}%
                                 </span>
                             </div>
                         ))}
