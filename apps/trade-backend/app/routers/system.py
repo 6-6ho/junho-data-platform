@@ -256,6 +256,81 @@ async def get_schedule_info():
     }
 
 
+@router.get("/performance/profit-targets")
+async def get_profit_target_analysis(days: int = 7):
+    """
+    Analyze hit rate for different profit targets.
+
+    For each target (1%, 2%, 3%...), calculates:
+    - hit_rate: % of signals that reached the target within 60min
+    - avg_time_to_hit: average minutes to reach target (for signals that hit)
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT timeseries_data
+                FROM trade_performance_timeseries
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+            """ % days)
+
+            rows = cur.fetchall()
+
+            if not rows:
+                return {"summary": {"total_signals": 0}, "targets": []}
+
+            # Analyze each target: 0.5%, 1%, 1.5%, 2%, ... 10%
+            targets = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
+            target_stats = {t: {"hits": 0, "total_time": 0} for t in targets}
+            total_signals = len(rows)
+
+            for row in rows:
+                ts_data = row[0]
+
+                # For each target, check if it was hit and when
+                for target in targets:
+                    hit_time = None
+                    for time_min in range(1, 61):
+                        time_key = str(time_min)
+                        if time_key in ts_data:
+                            profit_pct = ts_data[time_key]["profit_pct"]
+                            if profit_pct >= target:
+                                hit_time = time_min
+                                break
+
+                    if hit_time:
+                        target_stats[target]["hits"] += 1
+                        target_stats[target]["total_time"] += hit_time
+
+            # Calculate results
+            results = []
+            for target in targets:
+                stats = target_stats[target]
+                hits = stats["hits"]
+                hit_rate = round((hits / total_signals) * 100, 1) if total_signals > 0 else 0
+                avg_time = round(stats["total_time"] / hits, 1) if hits > 0 else None
+
+                results.append({
+                    "target_pct": target,
+                    "hits": hits,
+                    "hit_rate": hit_rate,
+                    "avg_time_to_hit": avg_time
+                })
+
+            return {
+                "summary": {
+                    "total_signals": total_signals,
+                    "date_range_days": days
+                },
+                "targets": results
+            }
+    except Exception as e:
+        logger.error(f"Failed to get profit target analysis: {e}")
+        return {"summary": {"total_signals": 0}, "targets": [], "error": str(e)}
+    finally:
+        conn.close()
+
+
 @router.get("/performance/time-based")
 async def get_time_based_performance(days: int = 7):
     """
