@@ -558,3 +558,260 @@ async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1
         return {"summary": {"total_signals": 0}, "drawdown_levels": [], "error": str(e)}
     finally:
         conn.close()
+
+
+@router.get("/performance/simulate")
+async def simulate_trading_strategy(
+    take_profit: float = 2.0,
+    stop_loss: float = 2.5,
+    days: int = 7
+):
+    """
+    Simulate a trading strategy with given take-profit and stop-loss levels.
+
+    For each signal:
+    1. Iterate through 1-60 minutes
+    2. If price reaches +take_profit% first → book profit
+    3. If price reaches -stop_loss% first → book loss
+    4. If neither within 60min → use final price
+
+    Returns daily P&L, total stats, and strategy performance metrics.
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT symbol, alert_time, timeseries_data
+                FROM trade_performance_timeseries
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+                ORDER BY alert_time
+            """ % days)
+
+            rows = cur.fetchall()
+
+            if not rows:
+                return {"summary": {"total_signals": 0}, "trades": [], "daily_pnl": []}
+
+            trades = []
+            daily_pnl = {}
+
+            for symbol, alert_time, ts_data in rows:
+                # Sort by time
+                time_points = []
+                for time_str, data in ts_data.items():
+                    time_points.append((int(time_str), data["profit_pct"]))
+                time_points.sort(key=lambda x: x[0])
+
+                if not time_points:
+                    continue
+
+                # Simulate trade
+                result_pct = None
+                result_type = None
+                exit_time = None
+
+                for t, profit in time_points:
+                    if profit >= take_profit:
+                        result_pct = take_profit
+                        result_type = "TP"  # Take Profit
+                        exit_time = t
+                        break
+                    elif profit <= -stop_loss:
+                        result_pct = -stop_loss
+                        result_type = "SL"  # Stop Loss
+                        exit_time = t
+                        break
+
+                # If neither TP nor SL hit, use last available price
+                if result_pct is None:
+                    last_point = time_points[-1]
+                    result_pct = last_point[1]
+                    result_type = "TIMEOUT"
+                    exit_time = last_point[0]
+
+                trade = {
+                    "symbol": symbol,
+                    "alert_time": alert_time.isoformat() if alert_time else None,
+                    "result_pct": round(result_pct, 2),
+                    "result_type": result_type,
+                    "exit_time_min": exit_time
+                }
+                trades.append(trade)
+
+                # Aggregate daily P&L
+                if alert_time:
+                    day_key = alert_time.strftime("%Y-%m-%d")
+                    if day_key not in daily_pnl:
+                        daily_pnl[day_key] = {"trades": 0, "pnl": 0.0, "wins": 0, "losses": 0}
+                    daily_pnl[day_key]["trades"] += 1
+                    daily_pnl[day_key]["pnl"] += result_pct
+                    if result_pct > 0:
+                        daily_pnl[day_key]["wins"] += 1
+                    else:
+                        daily_pnl[day_key]["losses"] += 1
+
+            # Calculate summary stats
+            total_trades = len(trades)
+            wins = sum(1 for t in trades if t["result_pct"] > 0)
+            losses = sum(1 for t in trades if t["result_pct"] < 0)
+            breakeven = total_trades - wins - losses
+
+            total_pnl = sum(t["result_pct"] for t in trades)
+            avg_pnl = total_pnl / total_trades if total_trades > 0 else 0
+
+            tp_count = sum(1 for t in trades if t["result_type"] == "TP")
+            sl_count = sum(1 for t in trades if t["result_type"] == "SL")
+            timeout_count = sum(1 for t in trades if t["result_type"] == "TIMEOUT")
+
+            avg_win = sum(t["result_pct"] for t in trades if t["result_pct"] > 0) / wins if wins > 0 else 0
+            avg_loss = sum(t["result_pct"] for t in trades if t["result_pct"] < 0) / losses if losses > 0 else 0
+
+            # Daily P&L list
+            daily_list = []
+            for day, stats in sorted(daily_pnl.items()):
+                daily_list.append({
+                    "date": day,
+                    "trades": stats["trades"],
+                    "pnl": round(stats["pnl"], 2),
+                    "wins": stats["wins"],
+                    "losses": stats["losses"],
+                    "win_rate": round((stats["wins"] / stats["trades"]) * 100, 1) if stats["trades"] > 0 else 0
+                })
+
+            return {
+                "strategy": {
+                    "take_profit_pct": take_profit,
+                    "stop_loss_pct": stop_loss
+                },
+                "summary": {
+                    "total_trades": total_trades,
+                    "wins": wins,
+                    "losses": losses,
+                    "breakeven": breakeven,
+                    "win_rate": round((wins / total_trades) * 100, 1) if total_trades > 0 else 0,
+                    "total_pnl": round(total_pnl, 2),
+                    "avg_pnl_per_trade": round(avg_pnl, 3),
+                    "avg_win": round(avg_win, 2),
+                    "avg_loss": round(avg_loss, 2),
+                    "profit_factor": round(abs(avg_win * wins) / abs(avg_loss * losses), 2) if losses > 0 and avg_loss != 0 else 0,
+                    "tp_hits": tp_count,
+                    "sl_hits": sl_count,
+                    "timeouts": timeout_count
+                },
+                "daily_pnl": daily_list,
+                "recent_trades": trades[-20:]  # Last 20 trades
+            }
+    except Exception as e:
+        logger.error(f"Failed to simulate strategy: {e}")
+        return {"summary": {"total_trades": 0}, "error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/performance/optimize")
+async def find_optimal_strategy(days: int = 7):
+    """
+    Test multiple take-profit and stop-loss combinations to find optimal strategy.
+
+    Tests combinations:
+    - Take profit: 1%, 1.5%, 2%, 2.5%, 3%, 4%, 5%
+    - Stop loss: 1%, 1.5%, 2%, 2.5%, 3%, 4%, 5%
+
+    Returns top strategies ranked by total P&L and profit factor.
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT symbol, alert_time, timeseries_data
+                FROM trade_performance_timeseries
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+            """ % days)
+
+            rows = cur.fetchall()
+
+            if not rows:
+                return {"summary": {"total_signals": 0}, "strategies": []}
+
+            # Preprocess all signals
+            signals = []
+            for symbol, alert_time, ts_data in rows:
+                time_points = []
+                for time_str, data in ts_data.items():
+                    time_points.append((int(time_str), data["profit_pct"]))
+                time_points.sort(key=lambda x: x[0])
+                if time_points:
+                    signals.append(time_points)
+
+            # Test combinations
+            tp_levels = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+            sl_levels = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+
+            results = []
+
+            for tp in tp_levels:
+                for sl in sl_levels:
+                    total_pnl = 0
+                    wins = 0
+                    losses = 0
+                    total_win_pnl = 0
+                    total_loss_pnl = 0
+
+                    for time_points in signals:
+                        result_pct = None
+
+                        for t, profit in time_points:
+                            if profit >= tp:
+                                result_pct = tp
+                                break
+                            elif profit <= -sl:
+                                result_pct = -sl
+                                break
+
+                        if result_pct is None:
+                            result_pct = time_points[-1][1]
+
+                        total_pnl += result_pct
+                        if result_pct > 0:
+                            wins += 1
+                            total_win_pnl += result_pct
+                        elif result_pct < 0:
+                            losses += 1
+                            total_loss_pnl += abs(result_pct)
+
+                    total_trades = len(signals)
+                    win_rate = (wins / total_trades) * 100 if total_trades > 0 else 0
+                    profit_factor = (total_win_pnl / total_loss_pnl) if total_loss_pnl > 0 else 0
+                    avg_pnl = total_pnl / total_trades if total_trades > 0 else 0
+
+                    results.append({
+                        "take_profit": tp,
+                        "stop_loss": sl,
+                        "total_pnl": round(total_pnl, 2),
+                        "avg_pnl": round(avg_pnl, 3),
+                        "win_rate": round(win_rate, 1),
+                        "wins": wins,
+                        "losses": losses,
+                        "profit_factor": round(profit_factor, 2)
+                    })
+
+            # Sort by total P&L
+            results_by_pnl = sorted(results, key=lambda x: x["total_pnl"], reverse=True)
+            # Sort by profit factor (for risk-adjusted)
+            results_by_pf = sorted(results, key=lambda x: x["profit_factor"], reverse=True)
+
+            return {
+                "summary": {
+                    "total_signals": len(signals),
+                    "date_range_days": days,
+                    "combinations_tested": len(results)
+                },
+                "best_by_pnl": results_by_pnl[:5],
+                "best_by_profit_factor": results_by_pf[:5],
+                "recommendation": results_by_pnl[0] if results_by_pnl else None
+            }
+    except Exception as e:
+        logger.error(f"Failed to optimize strategy: {e}")
+        return {"summary": {"total_signals": 0}, "error": str(e)}
+    finally:
+        conn.close()
