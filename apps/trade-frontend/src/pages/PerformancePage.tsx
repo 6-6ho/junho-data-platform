@@ -227,7 +227,7 @@ export default function PerformancePage() {
                             추천 전략 ({optimizeData.summary.total_signals}개 신호 기준)
                         </span>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr 1fr', gap: 16 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: 16 }}>
                         <div>
                             <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>익절 (TP)</div>
                             <div style={{ fontSize: 28, fontWeight: 800, color: '#00e676' }}>
@@ -256,12 +256,6 @@ export default function PerformancePage() {
                             <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>평균 PnL</div>
                             <div style={{ fontSize: 24, fontWeight: 800, color: optimizeData.recommendation.avg_pnl >= 0 ? '#00e676' : '#ff5252' }}>
                                 {optimizeData.recommendation.avg_pnl >= 0 ? '+' : ''}{optimizeData.recommendation.avg_pnl}%
-                            </div>
-                        </div>
-                        <div>
-                            <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>총 PnL</div>
-                            <div style={{ fontSize: 24, fontWeight: 800, color: optimizeData.recommendation.total_pnl >= 0 ? '#00e676' : '#ff5252' }}>
-                                {optimizeData.recommendation.total_pnl >= 0 ? '+' : ''}{optimizeData.recommendation.total_pnl}%
                             </div>
                         </div>
                     </div>
