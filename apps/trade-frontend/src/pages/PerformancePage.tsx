@@ -101,7 +101,7 @@ export default function PerformancePage() {
     const [profitTargetData, setProfitTargetData] = useState<ProfitTargetData | null>(null);
     const [weeklyPnlData, setWeeklyPnlData] = useState<WeeklyPnlEntry[]>([]);
     const [loading, setLoading] = useState(true);
-    const [selectedDays, setSelectedDays] = useState(15);
+    const [selectedDays, setSelectedDays] = useState(7);
 
     const loadAllData = async (days: number) => {
         try {
@@ -191,7 +191,7 @@ export default function PerformancePage() {
                     </Tooltip>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                    {[15, 30, 0].map(d => (
+                    {[7, 14, 30, 0].map(d => (
                         <button
                             key={d}
                             onClick={() => { setSelectedDays(d); setLoading(true); loadAllData(d); }}
