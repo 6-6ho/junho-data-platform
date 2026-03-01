@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 BINANCE_API = "https://fapi.binance.com"
 WIN_THRESHOLD_PCT = 1.0  # Win if profit >= 1%
-DAYS_BACK = 7
+DAYS_BACK = int(os.getenv("DAYS_BACK", "30"))  # Default 30 days for full backfill
 RATE_LIMIT_SLEEP = 0.15
 
 DB_CONFIG = {
