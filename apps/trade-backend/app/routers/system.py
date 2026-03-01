@@ -761,65 +761,69 @@ async def find_optimal_strategy(days: int = 15):
         conn.close()
 
 
+def _simulate_tpsl_results(rows, take_profit: float, stop_loss: float):
+    """Simulate TP/SL for each signal and return (alert_time, result_pct) list."""
+    results = []
+    for symbol, alert_time, ts_data in rows:
+        time_points = []
+        for time_str, data in ts_data.items():
+            time_points.append((int(time_str), data["profit_pct"]))
+        time_points.sort(key=lambda x: x[0])
+        if not time_points:
+            continue
+
+        result_pct = None
+        for t, profit in time_points:
+            if profit >= take_profit:
+                result_pct = take_profit
+                break
+            elif profit <= -stop_loss:
+                result_pct = -stop_loss
+                break
+        if result_pct is None:
+            result_pct = time_points[-1][1]
+
+        results.append((alert_time, result_pct))
+    return results
+
+
+def _fetch_timeseries_rows(cur, days: int):
+    date_filter = get_date_filter_sql(days)
+    cur.execute(f"""
+        SELECT symbol, alert_time, timeseries_data
+        FROM trade_performance_timeseries
+        WHERE {date_filter}
+        ORDER BY alert_time
+    """)
+    return cur.fetchall()
+
+
 @router.get("/performance/weekly-pnl")
 async def weekly_pnl(
     take_profit: float = 5.0,
     stop_loss: float = 2.0,
     days: int = 0
 ):
-    """
-    Weekly avg PnL and win rate for a given TP/SL strategy.
-    Used to visualize strategy performance trend over time.
-    """
+    """Weekly avg PnL and win rate for a given TP/SL strategy."""
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT symbol, alert_time, timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-                ORDER BY alert_time
-            """)
-            rows = cur.fetchall()
-
+            rows = _fetch_timeseries_rows(cur, days)
             if not rows:
                 return {"weeks": []}
 
-            # Group signals by ISO week
             from collections import defaultdict
+            from datetime import date
             weekly = defaultdict(list)
 
-            for symbol, alert_time, ts_data in rows:
-                time_points = []
-                for time_str, data in ts_data.items():
-                    time_points.append((int(time_str), data["profit_pct"]))
-                time_points.sort(key=lambda x: x[0])
-                if not time_points:
-                    continue
-
-                # Simulate TP/SL result
-                result_pct = None
-                for t, profit in time_points:
-                    if profit >= take_profit:
-                        result_pct = take_profit
-                        break
-                    elif profit <= -stop_loss:
-                        result_pct = -stop_loss
-                        break
-                if result_pct is None:
-                    result_pct = time_points[-1][1]
-
-                week_key = alert_time.isocalendar()[:2]  # (year, week)
+            for alert_time, result_pct in _simulate_tpsl_results(rows, take_profit, stop_loss):
+                week_key = alert_time.isocalendar()[:2]
                 weekly[week_key].append(result_pct)
 
-            # Build weekly summary
             weeks = []
             for (year, week_num), pnls in sorted(weekly.items()):
                 wins = sum(1 for p in pnls if p > 0)
                 total = len(pnls)
-                # Monday of this ISO week
-                from datetime import date
                 mon = date.fromisocalendar(year, week_num, 1)
                 weeks.append({
                     "week": f"{year}-W{week_num:02d}",
@@ -834,6 +838,48 @@ async def weekly_pnl(
     except Exception as e:
         logger.error(f"Failed to get weekly PnL: {e}")
         return {"weeks": [], "error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/performance/daily-pnl")
+async def daily_pnl(
+    take_profit: float = 5.0,
+    stop_loss: float = 2.0,
+    days: int = 7
+):
+    """Daily avg PnL and win rate for a given TP/SL strategy."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            rows = _fetch_timeseries_rows(cur, days)
+            if not rows:
+                return {"days": []}
+
+            from collections import defaultdict
+            daily = defaultdict(list)
+
+            for alert_time, result_pct in _simulate_tpsl_results(rows, take_profit, stop_loss):
+                day_key = alert_time.date()
+                daily[day_key].append(result_pct)
+
+            result = []
+            for day, pnls in sorted(daily.items()):
+                wins = sum(1 for p in pnls if p > 0)
+                total = len(pnls)
+                result.append({
+                    "date": day.isoformat(),
+                    "label": f"{day.month}/{day.day}",
+                    "trades": total,
+                    "wins": wins,
+                    "win_rate": round((wins / total) * 100, 1) if total > 0 else 0,
+                    "avg_pnl": round(sum(pnls) / total, 3) if total > 0 else 0,
+                })
+
+            return {"days": result}
+    except Exception as e:
+        logger.error(f"Failed to get daily PnL: {e}")
+        return {"days": [], "error": str(e)}
     finally:
         conn.close()
 
