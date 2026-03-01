@@ -33,7 +33,7 @@ def get_date_filter_sql(days: int) -> str:
     """Generate SQL date filter. days=0 means no filter (all data)."""
     if days <= 0:
         return "TRUE"  # No filter
-    return f"created_at >= NOW() - INTERVAL '{days} days'"
+    return f"alert_time >= NOW() - INTERVAL '{days} days'"
 
 
 def ensure_system_config_table():
