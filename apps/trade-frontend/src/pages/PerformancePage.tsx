@@ -195,7 +195,7 @@ export default function PerformancePage() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Zap size={20} style={{ color: '#ffd740' }} />
+                    <Zap size={20} style={{ color: '#82aaff' }} />
                     <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>TP/SL 전략 최적화</h2>
                     <span style={{ fontSize: 12, color: '#888', marginLeft: 4 }}>Rise 알람 기준 매매 전략</span>
                     <Tooltip content="Rise 알람 후 어떤 익절/손절 기준이 최적인지 분석합니다.">
@@ -214,9 +214,9 @@ export default function PerformancePage() {
                                 padding: '4px 12px',
                                 borderRadius: 6,
                                 border: '1px solid',
-                                borderColor: selectedDays === d ? '#ffd740' : '#333',
-                                background: selectedDays === d ? 'rgba(255,215,64,0.1)' : 'transparent',
-                                color: selectedDays === d ? '#ffd740' : '#888',
+                                borderColor: selectedDays === d ? '#82aaff' : '#333',
+                                background: selectedDays === d ? 'rgba(130,170,255,0.1)' : 'transparent',
+                                color: selectedDays === d ? '#82aaff' : '#888',
                                 fontSize: 12,
                                 fontWeight: 600,
                                 cursor: 'pointer',
@@ -231,14 +231,14 @@ export default function PerformancePage() {
             {/* Recommendation Hero Card */}
             {optimizeData?.recommendation && (
                 <div style={{
-                    background: 'linear-gradient(135deg, rgba(255,215,64,0.12) 0%, rgba(255,215,64,0.03) 100%)',
-                    border: '1px solid rgba(255,215,64,0.3)',
+                    background: 'linear-gradient(135deg, rgba(130,170,255,0.12) 0%, rgba(130,170,255,0.03) 100%)',
+                    border: '1px solid rgba(130,170,255,0.3)',
                     borderRadius: 12,
                     padding: '20px 24px',
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                        <Target size={18} style={{ color: '#ffd740' }} />
-                        <span style={{ fontSize: 11, color: '#ffd740', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+                        <Target size={18} style={{ color: '#82aaff' }} />
+                        <span style={{ fontSize: 11, color: '#82aaff', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
                             추천 전략 ({optimizeData.summary.total_signals}개 신호 기준)
                         </span>
                     </div>
@@ -305,7 +305,7 @@ export default function PerformancePage() {
                                     onChange={(e) => { const tp = Number(e.target.value); setTrendTp(tp); loadPnlTrend(tp, trendSl, selectedDays); }}
                                     style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 4, color: '#00e676', fontSize: 12, padding: '2px 4px', fontWeight: 600 }}
                                 >
-                                    {[3,4,5,6,7,8,9,10].map(v => <option key={v} value={v}>+{v}%</option>)}
+                                    {[3,4,5,6,7,8,9,10].filter(v => v > trendSl).map(v => <option key={v} value={v}>+{v}%</option>)}
                                 </select>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -315,7 +315,7 @@ export default function PerformancePage() {
                                     onChange={(e) => { const sl = Number(e.target.value); setTrendSl(sl); loadPnlTrend(trendTp, sl, selectedDays); }}
                                     style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 4, color: '#ff5252', fontSize: 12, padding: '2px 4px', fontWeight: 600 }}
                                 >
-                                    {[1,2,3,4,5].map(v => <option key={v} value={v}>-{v}%</option>)}
+                                    {[1,2,3,4,5].filter(v => v < trendTp).map(v => <option key={v} value={v}>-{v}%</option>)}
                                 </select>
                             </div>
                         </div>
