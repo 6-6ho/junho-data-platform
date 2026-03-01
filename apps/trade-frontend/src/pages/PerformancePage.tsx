@@ -360,7 +360,7 @@ export default function PerformancePage() {
                     padding: '16px 20px',
                 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <TrendingUp size={16} style={{ color: '#ffd740' }} />
+                        <TrendingUp size={16} style={{ color: '#82aaff' }} />
                         TP/SL 조합별 성과
                     </div>
                     <div style={{ fontSize: 11, color: '#666', marginBottom: 12 }}>

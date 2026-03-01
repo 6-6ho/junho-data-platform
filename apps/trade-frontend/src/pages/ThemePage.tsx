@@ -114,8 +114,8 @@ export default function ThemePage() {
             {/* Today's Top Theme */}
             {topTheme && (
                 <div style={{
-                    background: 'linear-gradient(135deg, rgba(255,215,64,0.08) 0%, rgba(255,215,64,0.02) 100%)',
-                    border: '1px solid rgba(255,215,64,0.2)',
+                    background: 'linear-gradient(135deg, rgba(130,170,255,0.08) 0%, rgba(130,170,255,0.02) 100%)',
+                    border: '1px solid rgba(130,170,255,0.2)',
                     borderRadius: 12,
                     padding: '20px 24px',
                     display: 'flex',
@@ -185,11 +185,11 @@ export default function ThemePage() {
                                 borderBottom: '1px solid #1a1a1a',
                                 cursor: 'pointer',
                                 transition: 'background 0.15s',
-                                background: expandedId === t.theme_id ? 'rgba(255,215,64,0.04)' : 'transparent',
+                                background: expandedId === t.theme_id ? 'rgba(130,170,255,0.04)' : 'transparent',
                                 alignItems: 'center',
                             }}
                             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = expandedId === t.theme_id ? 'rgba(255,215,64,0.04)' : 'transparent'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = expandedId === t.theme_id ? 'rgba(130,170,255,0.04)' : 'transparent'; }}
                         >
                             <span style={{ fontSize: 13, fontWeight: 700, color: idx < 3 ? '#82aaff' : '#666' }}>
                                 {idx + 1}
@@ -232,7 +232,7 @@ export default function ThemePage() {
                         {/* Expanded Coins Panel */}
                         {expandedId === t.theme_id && (
                             <div style={{
-                                background: 'rgba(255,215,64,0.02)',
+                                background: 'rgba(130,170,255,0.02)',
                                 borderBottom: '1px solid #222',
                                 padding: '8px 16px 12px 56px',
                             }}>
