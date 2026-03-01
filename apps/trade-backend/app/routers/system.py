@@ -818,8 +818,12 @@ async def weekly_pnl(
             for (year, week_num), pnls in sorted(weekly.items()):
                 wins = sum(1 for p in pnls if p > 0)
                 total = len(pnls)
+                # Monday of this ISO week
+                from datetime import date
+                mon = date.fromisocalendar(year, week_num, 1)
                 weeks.append({
                     "week": f"{year}-W{week_num:02d}",
+                    "label": f"{mon.month}/{mon.day}~",
                     "trades": total,
                     "wins": wins,
                     "win_rate": round((wins / total) * 100, 1) if total > 0 else 0,

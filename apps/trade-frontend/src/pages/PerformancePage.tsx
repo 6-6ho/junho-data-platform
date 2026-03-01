@@ -87,6 +87,7 @@ interface ProfitTargetData {
 
 interface WeeklyPnlEntry {
     week: string;
+    label: string;
     trades: number;
     wins: number;
     win_rate: number;
@@ -289,15 +290,15 @@ export default function PerformancePage() {
                     <ResponsiveContainer width="100%" height={200}>
                         <BarChart data={weeklyPnlData} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                            <XAxis dataKey="week" stroke="#666" fontSize={10} tickFormatter={(v: string) => v.split('-')[1]} />
+                            <XAxis dataKey="label" stroke="#666" fontSize={10} />
                             <YAxis stroke="#666" fontSize={10} tickFormatter={(v: number) => `${v}%`} />
                             <RechartsTooltip
-                                contentStyle={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
+                                contentStyle={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 6, fontSize: 12, color: '#fff' }}
                                 formatter={(value: number, name: string) => [
                                     `${value >= 0 ? '+' : ''}${value.toFixed(3)}%`,
                                     name === 'avg_pnl' ? '평균 PnL' : name
                                 ]}
-                                labelFormatter={(label: string) => `${label}`}
+                                labelFormatter={(_: string, payload: any[]) => payload?.[0]?.payload?.week || ''}
                             />
                             <ReferenceLine y={0} stroke="#555" strokeDasharray="3 3" />
                             <Bar dataKey="avg_pnl" radius={[4, 4, 0, 0]}>
