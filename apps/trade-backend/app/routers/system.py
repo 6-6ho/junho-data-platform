@@ -485,6 +485,7 @@ async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1
 
             # Drawdown buckets: -0.5%, -1%, -1.5%, -2%, -2.5%, -3%, -4%, -5%, -7%, -10%
             drawdown_buckets = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0, -7.0, -10.0]
+            # Cumulative stats: for each level, count signals that went AT LEAST this deep
             bucket_stats = {b: {"total": 0, "recovered": 0} for b in drawdown_buckets}
 
             for row in rows:
@@ -514,13 +515,12 @@ async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1
                         recovered = True
                         break
 
-                # Assign to appropriate bucket
+                # Assign to ALL buckets where drawdown reached that level (cumulative)
                 for bucket in drawdown_buckets:
                     if min_profit <= bucket:
                         bucket_stats[bucket]["total"] += 1
                         if recovered:
                             bucket_stats[bucket]["recovered"] += 1
-                        break
 
             # Calculate results
             results = []
