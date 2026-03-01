@@ -8,7 +8,7 @@ Backfill Script: Timeseries Performance Analysis for Existing Signals
 import os
 import time
 import json
-import subprocess
+import requests
 import psycopg2
 from datetime import datetime, timezone
 
@@ -26,19 +26,13 @@ DB_CONFIG = {
 }
 
 
-def curl_get(url):
-    """Use curl to bypass Python SSL issues."""
-    r = subprocess.run(["curl", "-s", "--connect-timeout", "10", url],
-                       capture_output=True, text=True, timeout=20)
-    return json.loads(r.stdout)
-
-
-def fetch_klines(symbol, start_time_ms, interval="5m", limit=100):
+def fetch_klines(symbol, start_time_ms, interval="1m", limit=100):
     """Fetch klines from Binance Futures API."""
     url = (f"{BINANCE_API}/fapi/v1/klines?"
            f"symbol={symbol}&interval={interval}&startTime={start_time_ms}&limit={limit}")
     try:
-        klines = curl_get(url)
+        resp = requests.get(url, timeout=10)
+        klines = resp.json()
         if isinstance(klines, dict):  # Error response
             return []
         return klines
