@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchSystemPerformance } from '../api/client';
 import { BarChart3, Activity, Trophy, Target, TrendingUp } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
 
 interface PerformanceSummary {
     window_minutes: number;
@@ -64,6 +64,22 @@ interface TimeBasedData {
     error?: string;
 }
 
+interface ProfitTarget {
+    target_pct: number;
+    hits: number;
+    hit_rate: number;
+    avg_time_to_hit: number | null;
+}
+
+interface ProfitTargetData {
+    summary: {
+        total_signals: number;
+        date_range_days: number;
+    };
+    targets: ProfitTarget[];
+    error?: string;
+}
+
 const formatPct = (v: number | null | undefined) =>
     v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 
@@ -73,6 +89,7 @@ const pctColor = (v: number | null | undefined) =>
 export default function PerformancePage() {
     const [data, setData] = useState<PerformanceData | null>(null);
     const [timeBasedData, setTimeBasedData] = useState<TimeBasedData | null>(null);
+    const [profitTargetData, setProfitTargetData] = useState<ProfitTargetData | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedWindow, setSelectedWindow] = useState(60);
 
@@ -96,11 +113,22 @@ export default function PerformancePage() {
                 console.error('Failed to load time-based data:', err);
             }
         };
+        const loadProfitTargetData = async () => {
+            try {
+                const res = await fetch('/api/system/performance/profit-targets?days=7');
+                const json = await res.json();
+                setProfitTargetData(json);
+            } catch (err) {
+                console.error('Failed to load profit target data:', err);
+            }
+        };
         loadData();
         loadTimeBasedData();
+        loadProfitTargetData();
         const interval = setInterval(() => {
             loadData();
             loadTimeBasedData();
+            loadProfitTargetData();
         }, 60000);
         return () => clearInterval(interval);
     }, []);
@@ -396,6 +424,140 @@ export default function PerformancePage() {
                             </div>
                             <div style={{ fontSize: 11, color: '#888' }}>
                                 손익비 {timeBasedData.best_intervals.highest_profit_ratio.profit_ratio.toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                );
+            })()}
+
+            {/* Profit Target Analysis Section */}
+            {profitTargetData && profitTargetData.targets && profitTargetData.targets.length > 0 && (() => {
+                const targets = profitTargetData.targets;
+                const maxHitRate = Math.max(...targets.map(t => t.hit_rate));
+
+                // Find optimal target (highest hit rate with target >= 1%)
+                const validTargets = targets.filter(t => t.target_pct >= 1.0);
+                const optimalTarget = validTargets.length > 0
+                    ? validTargets.reduce((best, curr) => curr.hit_rate > best.hit_rate ? curr : best)
+                    : targets[0];
+
+                return (
+                <div style={{
+                    background: '#111',
+                    borderRadius: 12,
+                    border: '1px solid #222',
+                    padding: '16px 20px',
+                }}>
+                    <div style={{ marginBottom: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <Target size={16} style={{ color: '#82aaff' }} />
+                            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                                목표 수익률별 도달 확률
+                            </div>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                            60분 내 각 목표 수익률에 도달한 신호 비율 ({profitTargetData.summary.total_signals}개 신호 분석)
+                        </div>
+                    </div>
+
+                    {/* Bar Chart for Profit Targets */}
+                    <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={targets} margin={{ top: 10, right: 10, left: -10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#222" />
+                            <XAxis
+                                dataKey="target_pct"
+                                stroke="#666"
+                                fontSize={10}
+                                tickFormatter={(value) => `${value}%`}
+                            />
+                            <YAxis
+                                stroke="#666"
+                                fontSize={10}
+                                tickFormatter={(value) => `${value}%`}
+                                domain={[0, Math.ceil(maxHitRate / 10) * 10 + 10]}
+                            />
+                            <RechartsTooltip
+                                contentStyle={{ background: '#0a0a0a', border: '1px solid #333', borderRadius: 6, fontSize: 12 }}
+                                labelStyle={{ color: '#fff', fontWeight: 600 }}
+                                formatter={(value: number, name: string, props: any) => {
+                                    const target = props.payload;
+                                    return [
+                                        <span key="content">
+                                            도달률: <strong>{value.toFixed(1)}%</strong>
+                                            {target.avg_time_to_hit && (
+                                                <span style={{ color: '#888' }}> (평균 {target.avg_time_to_hit.toFixed(0)}분)</span>
+                                            )}
+                                        </span>,
+                                        ''
+                                    ];
+                                }}
+                                labelFormatter={(label) => `목표: +${label}%`}
+                            />
+                            <Bar dataKey="hit_rate" radius={[4, 4, 0, 0]}>
+                                {targets.map((entry, index) => (
+                                    <Cell
+                                        key={`cell-${index}`}
+                                        fill={entry.hit_rate >= 50 ? '#00e676' : entry.hit_rate >= 30 ? '#ffd740' : '#ff5252'}
+                                        fillOpacity={entry.target_pct === optimalTarget.target_pct ? 1 : 0.6}
+                                    />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+
+                    {/* Optimal Target Card */}
+                    <div style={{
+                        background: 'rgba(130,170,255,0.08)',
+                        border: '1px solid rgba(130,170,255,0.3)',
+                        borderRadius: 8,
+                        padding: '12px 16px',
+                        marginTop: 16,
+                        display: 'flex',
+                        gap: 16,
+                    }}>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 10, color: '#82aaff', fontWeight: 600, marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                🎯 추천 목표 수익률
+                            </div>
+                            <div style={{ fontSize: 24, fontWeight: 800, color: '#fff' }}>
+                                +{optimalTarget.target_pct}%
+                            </div>
+                            <div style={{ fontSize: 11, color: '#888' }}>
+                                도달 확률 {optimalTarget.hit_rate.toFixed(1)}%
+                                {optimalTarget.avg_time_to_hit && ` | 평균 ${optimalTarget.avg_time_to_hit.toFixed(0)}분 소요`}
+                            </div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 10, color: '#666', fontWeight: 600, marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                빠른 참고
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {[1.0, 2.0, 3.0].map(targetPct => {
+                                    const t = targets.find(x => x.target_pct === targetPct);
+                                    return t ? (
+                                        <div key={targetPct} style={{ fontSize: 11, color: '#888' }}>
+                                            +{targetPct}%: <span style={{ color: t.hit_rate >= 50 ? '#00e676' : t.hit_rate >= 30 ? '#ffd740' : '#ff5252', fontWeight: 600 }}>{t.hit_rate.toFixed(1)}%</span>
+                                            {t.avg_time_to_hit && <span style={{ color: '#555' }}> ({t.avg_time_to_hit.toFixed(0)}분)</span>}
+                                        </div>
+                                    ) : null;
+                                })}
+                            </div>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 10, color: '#666', fontWeight: 600, marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                고수익 목표
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {[5.0, 7.0, 10.0].map(targetPct => {
+                                    const t = targets.find(x => x.target_pct === targetPct);
+                                    return t ? (
+                                        <div key={targetPct} style={{ fontSize: 11, color: '#888' }}>
+                                            +{targetPct}%: <span style={{ color: t.hit_rate >= 50 ? '#00e676' : t.hit_rate >= 30 ? '#ffd740' : '#ff5252', fontWeight: 600 }}>{t.hit_rate.toFixed(1)}%</span>
+                                            {t.avg_time_to_hit && <span style={{ color: '#555' }}> ({t.avg_time_to_hit.toFixed(0)}분)</span>}
+                                        </div>
+                                    ) : null;
+                                })}
                             </div>
                         </div>
                     </div>
