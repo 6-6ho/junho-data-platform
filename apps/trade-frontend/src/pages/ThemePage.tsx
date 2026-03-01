@@ -96,7 +96,7 @@ export default function ThemePage() {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <Layers size={20} style={{ color: '#ffd740' }} />
+                    <Layers size={20} style={{ color: '#82aaff' }} />
                     <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>Theme RS</h2>
                     <span style={{ fontSize: 12, color: '#888', marginLeft: 4 }}>테마별 상대강도</span>
                     <div style={{ cursor: 'help', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
@@ -124,8 +124,8 @@ export default function ThemePage() {
                 }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                            <Flame size={18} style={{ color: '#ffd740' }} />
-                            <span style={{ fontSize: 11, color: '#ffd740', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>오늘의 테마</span>
+                            <Flame size={18} style={{ color: '#82aaff' }} />
+                            <span style={{ fontSize: 11, color: '#82aaff', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>오늘의 테마</span>
                         </div>
                         <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
                             {topTheme.theme_name}
@@ -191,7 +191,7 @@ export default function ThemePage() {
                             onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = expandedId === t.theme_id ? 'rgba(255,215,64,0.04)' : 'transparent'; }}
                         >
-                            <span style={{ fontSize: 13, fontWeight: 700, color: idx < 3 ? '#ffd740' : '#666' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: idx < 3 ? '#82aaff' : '#666' }}>
                                 {idx + 1}
                             </span>
                             <div>
