@@ -82,7 +82,3 @@ export const fetchLatestReport = async (date?: string) => {
   return data;
 };
 
-export const fetchSystemPerformance = async () => {
-  const { data } = await api.get('/system/performance');
-  return data;
-};

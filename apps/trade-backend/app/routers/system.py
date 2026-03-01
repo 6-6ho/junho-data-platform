@@ -168,83 +168,6 @@ async def _trigger_dag(client, auth, dag_id):
 
 
 
-@router.get("/performance")
-async def get_performance_summary():
-    """Get latest performance analysis results."""
-    conn = get_db_conn()
-    try:
-        with conn.cursor() as cur:
-            # Get summary for last 7 days
-            cur.execute("""
-                SELECT
-                    analysis_window_minutes,
-                    COUNT(*) as total_signals,
-                    SUM(CASE WHEN is_win THEN 1 ELSE 0 END) as wins,
-                    ROUND(AVG(max_profit_pct)::numeric, 2) as avg_max_profit,
-                    ROUND(AVG(max_drawdown_pct)::numeric, 2) as avg_max_drawdown,
-                    ROUND(AVG(final_profit_pct)::numeric, 2) as avg_final_profit,
-                    MAX(max_profit_pct) as best_profit,
-                    MIN(max_drawdown_pct) as worst_drawdown
-                FROM trade_performance
-                WHERE created_at >= NOW() - INTERVAL '7 days'
-                GROUP BY analysis_window_minutes
-                ORDER BY analysis_window_minutes
-            """)
-            rows = cur.fetchall()
-
-            summary = []
-            for row in rows:
-                window, total, wins, avg_max, avg_dd, avg_final, best, worst = row
-                summary.append({
-                    "window_minutes": window,
-                    "total_signals": total,
-                    "wins": wins,
-                    "win_rate": round((wins / total) * 100, 1) if total > 0 else 0,
-                    "avg_max_profit": float(avg_max) if avg_max else 0,
-                    "avg_max_drawdown": float(avg_dd) if avg_dd else 0,
-                    "avg_final_profit": float(avg_final) if avg_final else 0,
-                    "best_profit": float(best) if best else 0,
-                    "worst_drawdown": float(worst) if worst else 0,
-                })
-
-            # Get recent individual results (last 20)
-            cur.execute("""
-                SELECT symbol, alert_type, alert_time,
-                       analysis_window_minutes,
-                       max_profit_pct, max_drawdown_pct, final_profit_pct,
-                       is_win, result_type
-                FROM trade_performance
-                WHERE analysis_window_minutes = 60
-                ORDER BY created_at DESC
-                LIMIT 20
-            """)
-            recent = cur.fetchall()
-            recent_results = []
-            for r in recent:
-                recent_results.append({
-                    "symbol": r[0],
-                    "alert_type": r[1],
-                    "alert_time": r[2].isoformat() if r[2] else None,
-                    "window_minutes": r[3],
-                    "max_profit_pct": float(r[4]),
-                    "max_drawdown_pct": float(r[5]),
-                    "final_profit_pct": float(r[6]),
-                    "is_win": r[7],
-                    "result_type": r[8],
-                    "window_minutes": r[3]
-                })
-
-            return {
-                "summary": summary,
-                "recent": recent_results,
-            }
-    except Exception as e:
-        logger.error(f"Failed to get performance: {e}")
-        return {"summary": [], "recent": [], "error": str(e)}
-    finally:
-        conn.close()
-
-
 @router.get("/schedule")
 async def get_schedule_info():
     """Get the current schedule configuration."""
@@ -743,14 +666,16 @@ async def find_optimal_strategy(days: int = 7):
                 if time_points:
                     signals.append(time_points)
 
-            # Test combinations
-            tp_levels = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
-            sl_levels = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
+            # Test combinations (TP: 3~10%, SL: 1~5%, only TP > SL)
+            tp_levels = [3, 4, 5, 6, 7, 8, 9, 10]
+            sl_levels = [1, 2, 3, 4, 5]
 
             results = []
 
             for tp in tp_levels:
                 for sl in sl_levels:
+                    if tp <= sl:  # Skip invalid combinations
+                        continue
                     total_pnl = 0
                     wins = 0
                     losses = 0
@@ -808,6 +733,7 @@ async def find_optimal_strategy(days: int = 7):
                 },
                 "best_by_pnl": results_by_pnl[:5],
                 "best_by_profit_factor": results_by_pf[:5],
+                "all_results": results,  # Full list for heatmap
                 "recommendation": results_by_pnl[0] if results_by_pnl else None
             }
     except Exception as e:
