@@ -446,3 +446,115 @@ async def get_time_based_performance(days: int = 7):
         return {"summary": {"total_signals": 0}, "time_intervals": [], "error": str(e)}
     finally:
         conn.close()
+
+
+@router.get("/performance/drawdown-recovery")
+async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1.0):
+    """
+    Analyze recovery probability after different drawdown levels.
+
+    For each signal:
+    1. Find the max drawdown (lowest point) within 60 minutes
+    2. Check if price recovered to target_profit% after that low point
+    3. Group by drawdown level and calculate recovery rate
+
+    This helps determine optimal stop-loss levels.
+
+    Returns:
+        - summary: Total signals, date range
+        - drawdown_levels: Recovery rate for each drawdown level
+        - recommendation: Suggested stop-loss level
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT timeseries_data
+                FROM trade_performance_timeseries
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+            """ % days)
+
+            rows = cur.fetchall()
+
+            if not rows:
+                return {
+                    "summary": {"total_signals": 0},
+                    "drawdown_levels": [],
+                    "recommendation": None
+                }
+
+            # Drawdown buckets: -0.5%, -1%, -1.5%, -2%, -2.5%, -3%, -4%, -5%, -7%, -10%
+            drawdown_buckets = [-0.5, -1.0, -1.5, -2.0, -2.5, -3.0, -4.0, -5.0, -7.0, -10.0]
+            bucket_stats = {b: {"total": 0, "recovered": 0} for b in drawdown_buckets}
+
+            for row in rows:
+                ts_data = row[0]
+
+                # Convert to sorted list by time
+                time_points = []
+                for time_str, data in ts_data.items():
+                    time_points.append((int(time_str), data["profit_pct"]))
+                time_points.sort(key=lambda x: x[0])
+
+                if not time_points:
+                    continue
+
+                # Find max drawdown point and its time
+                min_profit = float('inf')
+                min_time = 0
+                for t, profit in time_points:
+                    if profit < min_profit:
+                        min_profit = profit
+                        min_time = t
+
+                # Check recovery after the lowest point
+                recovered = False
+                for t, profit in time_points:
+                    if t > min_time and profit >= target_profit:
+                        recovered = True
+                        break
+
+                # Assign to appropriate bucket
+                for bucket in drawdown_buckets:
+                    if min_profit <= bucket:
+                        bucket_stats[bucket]["total"] += 1
+                        if recovered:
+                            bucket_stats[bucket]["recovered"] += 1
+                        break
+
+            # Calculate results
+            results = []
+            recommended_stoploss = None
+
+            for bucket in drawdown_buckets:
+                stats = bucket_stats[bucket]
+                if stats["total"] > 0:
+                    recovery_rate = round((stats["recovered"] / stats["total"]) * 100, 1)
+                    results.append({
+                        "drawdown_pct": bucket,
+                        "signals": stats["total"],
+                        "recovered": stats["recovered"],
+                        "recovery_rate": recovery_rate
+                    })
+
+                    # Recommend stop-loss where recovery rate drops below 30%
+                    if recovery_rate < 30 and recommended_stoploss is None:
+                        recommended_stoploss = bucket
+
+            return {
+                "summary": {
+                    "total_signals": len(rows),
+                    "date_range_days": days,
+                    "target_profit_pct": target_profit
+                },
+                "drawdown_levels": results,
+                "recommendation": {
+                    "stop_loss_pct": recommended_stoploss,
+                    "explanation": f"{abs(recommended_stoploss)}% 이상 하락 시 {target_profit}% 회복 확률 30% 미만" if recommended_stoploss else "데이터 부족"
+                } if recommended_stoploss else None
+            }
+    except Exception as e:
+        logger.error(f"Failed to get drawdown recovery analysis: {e}")
+        return {"summary": {"total_signals": 0}, "drawdown_levels": [], "error": str(e)}
+    finally:
+        conn.close()
