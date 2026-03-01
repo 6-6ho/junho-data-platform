@@ -815,3 +815,135 @@ async def find_optimal_strategy(days: int = 7):
         return {"summary": {"total_signals": 0}, "error": str(e)}
     finally:
         conn.close()
+
+
+@router.get("/performance/compound")
+async def simulate_compound_growth(
+    take_profit: float = 5.0,
+    stop_loss: float = 1.0,
+    position_size_pct: float = 10.0,
+    initial_seed: float = 1000.0,
+    days: int = 7
+):
+    """
+    Simulate compound growth with position sizing.
+
+    Parameters:
+    - take_profit: Take profit % (default 5%)
+    - stop_loss: Stop loss % (default 1%)
+    - position_size_pct: % of seed to use per trade (default 10%)
+    - initial_seed: Starting capital (default 1000)
+    - days: Days to simulate
+
+    Returns daily seed growth with compound interest.
+    """
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT symbol, alert_time, timeseries_data
+                FROM trade_performance_timeseries
+                WHERE created_at >= NOW() - INTERVAL '%s days'
+                ORDER BY alert_time
+            """ % days)
+
+            rows = cur.fetchall()
+
+            if not rows:
+                return {"error": "No data"}
+
+            # Process trades in chronological order
+            seed = initial_seed
+            position_ratio = position_size_pct / 100.0
+
+            daily_seed = {}
+            trade_results = []
+
+            for symbol, alert_time, ts_data in rows:
+                time_points = []
+                for time_str, data in ts_data.items():
+                    time_points.append((int(time_str), data["profit_pct"]))
+                time_points.sort(key=lambda x: x[0])
+
+                if not time_points:
+                    continue
+
+                # Determine trade result
+                result_pct = None
+                for t, profit in time_points:
+                    if profit >= take_profit:
+                        result_pct = take_profit
+                        break
+                    elif profit <= -stop_loss:
+                        result_pct = -stop_loss
+                        break
+
+                if result_pct is None:
+                    result_pct = time_points[-1][1]
+
+                # Calculate P&L with position sizing
+                position_value = seed * position_ratio
+                pnl = position_value * (result_pct / 100.0)
+                seed += pnl
+
+                trade_results.append({
+                    "symbol": symbol,
+                    "result_pct": result_pct,
+                    "pnl": round(pnl, 2),
+                    "seed_after": round(seed, 2)
+                })
+
+                # Track daily seed
+                if alert_time:
+                    day_key = alert_time.strftime("%Y-%m-%d")
+                    daily_seed[day_key] = round(seed, 2)
+
+            # Calculate metrics
+            total_return_pct = ((seed - initial_seed) / initial_seed) * 100
+            daily_list = [{"date": k, "seed": v} for k, v in sorted(daily_seed.items())]
+
+            # Calculate daily returns
+            daily_returns = []
+            prev_seed = initial_seed
+            for item in daily_list:
+                daily_return = ((item["seed"] - prev_seed) / prev_seed) * 100
+                daily_returns.append({
+                    "date": item["date"],
+                    "seed": item["seed"],
+                    "daily_return_pct": round(daily_return, 2)
+                })
+                prev_seed = item["seed"]
+
+            # Project future growth (assuming same daily avg return)
+            avg_daily_return = total_return_pct / days if days > 0 else 0
+
+            projections = {
+                "1_week": round(initial_seed * ((1 + avg_daily_return/100) ** 7), 0),
+                "1_month": round(initial_seed * ((1 + avg_daily_return/100) ** 30), 0),
+                "3_months": round(initial_seed * ((1 + avg_daily_return/100) ** 90), 0),
+                "6_months": round(initial_seed * ((1 + avg_daily_return/100) ** 180), 0),
+                "1_year": round(initial_seed * ((1 + avg_daily_return/100) ** 365), 0),
+            }
+
+            return {
+                "strategy": {
+                    "take_profit_pct": take_profit,
+                    "stop_loss_pct": stop_loss,
+                    "position_size_pct": position_size_pct
+                },
+                "result": {
+                    "initial_seed": initial_seed,
+                    "final_seed": round(seed, 2),
+                    "total_return_pct": round(total_return_pct, 2),
+                    "total_trades": len(trade_results),
+                    "avg_daily_return_pct": round(avg_daily_return, 2)
+                },
+                "daily_growth": daily_returns,
+                "projections": projections,
+                "recent_trades": trade_results[-10:]
+            }
+    except Exception as e:
+        logger.error(f"Failed to simulate compound growth: {e}")
+        return {"error": str(e)}
+    finally:
+        conn.close()
