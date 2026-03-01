@@ -100,8 +100,20 @@ export default function PerformancePage() {
     const [timeBasedData, setTimeBasedData] = useState<TimeBasedData | null>(null);
     const [profitTargetData, setProfitTargetData] = useState<ProfitTargetData | null>(null);
     const [weeklyPnlData, setWeeklyPnlData] = useState<WeeklyPnlEntry[]>([]);
+    const [weeklyTp, setWeeklyTp] = useState<number>(0);
+    const [weeklySl, setWeeklySl] = useState<number>(0);
     const [loading, setLoading] = useState(true);
     const [selectedDays, setSelectedDays] = useState(7);
+
+    const loadWeeklyPnl = async (tp: number, sl: number, days: number) => {
+        try {
+            const res = await fetch(`/api/system/performance/weekly-pnl?take_profit=${tp}&stop_loss=${sl}&days=${days}`);
+            const json = await res.json();
+            setWeeklyPnlData(json.weeks || []);
+        } catch (err) {
+            console.error('Failed to load weekly PnL:', err);
+        }
+    };
 
     const loadAllData = async (days: number) => {
         try {
@@ -119,16 +131,18 @@ export default function PerformancePage() {
             setTimeBasedData(tbJson);
             setProfitTargetData(ptJson);
 
-            // Load compound + weekly data based on recommended strategy
             if (optJson.recommendation) {
-                const [compRes, weeklyRes] = await Promise.all([
-                    fetch(`/api/system/performance/compound?take_profit=${optJson.recommendation.take_profit}&stop_loss=${optJson.recommendation.stop_loss}&days=${days}`),
-                    fetch(`/api/system/performance/weekly-pnl?take_profit=${optJson.recommendation.take_profit}&stop_loss=${optJson.recommendation.stop_loss}&days=${days}`)
+                const tp = optJson.recommendation.take_profit;
+                const sl = optJson.recommendation.stop_loss;
+                setWeeklyTp(tp);
+                setWeeklySl(sl);
+
+                const [compRes] = await Promise.all([
+                    fetch(`/api/system/performance/compound?take_profit=${tp}&stop_loss=${sl}&days=${days}`),
+                    loadWeeklyPnl(tp, sl, days)
                 ]);
                 const compJson = await compRes.json();
-                const weeklyJson = await weeklyRes.json();
                 setCompoundData(compJson);
-                setWeeklyPnlData(weeklyJson.weeks || []);
             }
         } catch (err) {
             console.error('Failed to load data:', err);
@@ -270,15 +284,39 @@ export default function PerformancePage() {
                     border: '1px solid #222',
                     padding: '16px 20px',
                 }}>
-                    <div style={{ marginBottom: 12 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <TrendingUp size={16} style={{ color: '#82aaff' }} />
-                            <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
-                                주간별 평균 PnL 추이
+                    <div style={{ marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <TrendingUp size={16} style={{ color: '#82aaff' }} />
+                                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>
+                                    주간별 평균 PnL 추이
+                                </div>
+                            </div>
+                            <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
+                                설정한 TP/SL 기준 주간 성과
                             </div>
                         </div>
-                        <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                            추천 전략 기준 주간 성과 ({optimizeData?.recommendation ? `TP ${optimizeData.recommendation.take_profit}% / SL ${optimizeData.recommendation.stop_loss}%` : ''})
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontSize: 11, color: '#888' }}>TP</span>
+                                <select
+                                    value={weeklyTp}
+                                    onChange={(e) => { const tp = Number(e.target.value); setWeeklyTp(tp); loadWeeklyPnl(tp, weeklySl, selectedDays); }}
+                                    style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 4, color: '#00e676', fontSize: 12, padding: '2px 4px', fontWeight: 600 }}
+                                >
+                                    {[3,4,5,6,7,8,9,10].map(v => <option key={v} value={v}>+{v}%</option>)}
+                                </select>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <span style={{ fontSize: 11, color: '#888' }}>SL</span>
+                                <select
+                                    value={weeklySl}
+                                    onChange={(e) => { const sl = Number(e.target.value); setWeeklySl(sl); loadWeeklyPnl(weeklyTp, sl, selectedDays); }}
+                                    style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 4, color: '#ff5252', fontSize: 12, padding: '2px 4px', fontWeight: 600 }}
+                                >
+                                    {[1,2,3,4,5].map(v => <option key={v} value={v}>-{v}%</option>)}
+                                </select>
+                            </div>
                         </div>
                     </div>
                     <ResponsiveContainer width="100%" height={200}>
