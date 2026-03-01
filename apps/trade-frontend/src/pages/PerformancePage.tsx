@@ -91,7 +91,7 @@ export default function PerformancePage() {
     const [timeBasedData, setTimeBasedData] = useState<TimeBasedData | null>(null);
     const [profitTargetData, setProfitTargetData] = useState<ProfitTargetData | null>(null);
     const [loading, setLoading] = useState(true);
-    const [selectedDays, setSelectedDays] = useState(7);
+    const [selectedDays, setSelectedDays] = useState(15);
 
     const loadAllData = async (days: number) => {
         try {
@@ -178,7 +178,7 @@ export default function PerformancePage() {
                     </Tooltip>
                 </div>
                 <div style={{ display: 'flex', gap: 4 }}>
-                    {[7, 14].map(d => (
+                    {[15, 30, 0].map(d => (
                         <button
                             key={d}
                             onClick={() => { setSelectedDays(d); setLoading(true); loadAllData(d); }}
@@ -194,7 +194,7 @@ export default function PerformancePage() {
                                 cursor: 'pointer',
                             }}
                         >
-                            {d}일
+                            {d === 0 ? '전체' : `${d}일`}
                         </button>
                     ))}
                 </div>

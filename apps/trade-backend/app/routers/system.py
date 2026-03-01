@@ -29,6 +29,13 @@ def get_db_conn():
     return psycopg2.connect(DATABASE_URL)
 
 
+def get_date_filter_sql(days: int) -> str:
+    """Generate SQL date filter. days=0 means no filter (all data)."""
+    if days <= 0:
+        return "TRUE"  # No filter
+    return f"created_at >= NOW() - INTERVAL '{days} days'"
+
+
 def ensure_system_config_table():
     """Create system_config table if not exists."""
     conn = get_db_conn()
@@ -180,22 +187,25 @@ async def get_schedule_info():
 
 
 @router.get("/performance/profit-targets")
-async def get_profit_target_analysis(days: int = 7):
+async def get_profit_target_analysis(days: int = 15):
     """
     Analyze hit rate for different profit targets.
 
     For each target (1%, 2%, 3%...), calculates:
     - hit_rate: % of signals that reached the target within 60min
     - avg_time_to_hit: average minutes to reach target (for signals that hit)
+
+    days=0 returns all data.
     """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            date_filter = get_date_filter_sql(days)
+            cur.execute(f"""
                 SELECT timeseries_data
                 FROM trade_performance_timeseries
-                WHERE created_at >= NOW() - INTERVAL '%s days'
-            """ % days)
+                WHERE {date_filter}
+            """)
 
             rows = cur.fetchall()
 
@@ -255,12 +265,14 @@ async def get_profit_target_analysis(days: int = 7):
 
 
 @router.get("/performance/time-based")
-async def get_time_based_performance(days: int = 7):
+async def get_time_based_performance(days: int = 15):
     """
     Get time-based performance analysis (5min intervals from 5min to 240min).
 
     Calculates win rate and profit ratio for each 5-minute interval
     across all signals in the specified time period.
+
+    days=0 returns all data.
 
     Returns:
         - summary: Total signals analyzed, date range
@@ -271,11 +283,12 @@ async def get_time_based_performance(days: int = 7):
     try:
         with conn.cursor() as cur:
             # Fetch all timeseries data
-            cur.execute("""
+            date_filter = get_date_filter_sql(days)
+            cur.execute(f"""
                 SELECT timeseries_data
                 FROM trade_performance_timeseries
-                WHERE created_at >= NOW() - INTERVAL '%s days'
-            """ % days)
+                WHERE {date_filter}
+            """)
 
             rows = cur.fetchall()
 
@@ -372,7 +385,7 @@ async def get_time_based_performance(days: int = 7):
 
 
 @router.get("/performance/drawdown-recovery")
-async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1.0):
+async def get_drawdown_recovery_analysis(days: int = 15, target_profit: float = 1.0):
     """
     Analyze recovery probability after different drawdown levels.
 
@@ -381,7 +394,7 @@ async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1
     2. Check if price recovered to target_profit% after that low point
     3. Group by drawdown level and calculate recovery rate
 
-    This helps determine optimal stop-loss levels.
+    This helps determine optimal stop-loss levels. days=0 returns all data.
 
     Returns:
         - summary: Total signals, date range
@@ -391,11 +404,12 @@ async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            date_filter = get_date_filter_sql(days)
+            cur.execute(f"""
                 SELECT timeseries_data
                 FROM trade_performance_timeseries
-                WHERE created_at >= NOW() - INTERVAL '%s days'
-            """ % days)
+                WHERE {date_filter}
+            """)
 
             rows = cur.fetchall()
 
@@ -487,7 +501,7 @@ async def get_drawdown_recovery_analysis(days: int = 7, target_profit: float = 1
 async def simulate_trading_strategy(
     take_profit: float = 2.0,
     stop_loss: float = 2.5,
-    days: int = 7
+    days: int = 15
 ):
     """
     Simulate a trading strategy with given take-profit and stop-loss levels.
@@ -498,17 +512,19 @@ async def simulate_trading_strategy(
     3. If price reaches -stop_loss% first → book loss
     4. If neither within 60min → use final price
 
+    days=0 returns all data.
     Returns daily P&L, total stats, and strategy performance metrics.
     """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            date_filter = get_date_filter_sql(days)
+            cur.execute(f"""
                 SELECT symbol, alert_time, timeseries_data
                 FROM trade_performance_timeseries
-                WHERE created_at >= NOW() - INTERVAL '%s days'
+                WHERE {date_filter}
                 ORDER BY alert_time
-            """ % days)
+            """)
 
             rows = cur.fetchall()
 
@@ -632,24 +648,26 @@ async def simulate_trading_strategy(
 
 
 @router.get("/performance/optimize")
-async def find_optimal_strategy(days: int = 7):
+async def find_optimal_strategy(days: int = 15):
     """
     Test multiple take-profit and stop-loss combinations to find optimal strategy.
 
     Tests combinations:
-    - Take profit: 1%, 1.5%, 2%, 2.5%, 3%, 4%, 5%
-    - Stop loss: 1%, 1.5%, 2%, 2.5%, 3%, 4%, 5%
+    - Take profit: 3~10%
+    - Stop loss: 1~5% (only TP > SL combinations)
 
+    days=0 returns all data.
     Returns top strategies ranked by total P&L and profit factor.
     """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            date_filter = get_date_filter_sql(days)
+            cur.execute(f"""
                 SELECT symbol, alert_time, timeseries_data
                 FROM trade_performance_timeseries
-                WHERE created_at >= NOW() - INTERVAL '%s days'
-            """ % days)
+                WHERE {date_filter}
+            """)
 
             rows = cur.fetchall()
 
@@ -749,7 +767,7 @@ async def simulate_compound_growth(
     stop_loss: float = 1.0,
     position_size_pct: float = 10.0,
     initial_seed: float = 1000.0,
-    days: int = 7
+    days: int = 15
 ):
     """
     Simulate compound growth with position sizing.
@@ -759,19 +777,20 @@ async def simulate_compound_growth(
     - stop_loss: Stop loss % (default 1%)
     - position_size_pct: % of seed to use per trade (default 10%)
     - initial_seed: Starting capital (default 1000)
-    - days: Days to simulate
+    - days: Days to simulate (0 = all data)
 
     Returns daily seed growth with compound interest.
     """
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            cur.execute("""
+            date_filter = get_date_filter_sql(days)
+            cur.execute(f"""
                 SELECT symbol, alert_time, timeseries_data
                 FROM trade_performance_timeseries
-                WHERE created_at >= NOW() - INTERVAL '%s days'
+                WHERE {date_filter}
                 ORDER BY alert_time
-            """ % days)
+            """)
 
             rows = cur.fetchall()
 
