@@ -49,7 +49,7 @@ class MoversSink5m(MapFunction):
     Keeps last 5 bars per symbol, computes open/close/change_pct."""
 
     def open(self, runtime_context: RuntimeContext):
-        self._bars = defaultdict(lambda: deque(maxlen=5))
+        self._bars = defaultdict(lambda: deque(maxlen=60))  # 5m / 5s = 60 bars
         self._cooldowns = {}
         self._snapshot_buf = []
         self._movers_buf = []
@@ -144,7 +144,7 @@ class MoversSink5m(MapFunction):
                     except Exception:
                         pass
 
-        if len(self._snapshot_buf) >= 100 or (time.time() - self._last_flush) > 2:
+        if len(self._snapshot_buf) >= 100 or (time.time() - self._last_flush) > 1:
             self._flush()
 
         return value
@@ -157,7 +157,7 @@ class MoversSink10m(MapFunction):
     """Assembles 10m sliding window from 1-min bars. Movers only."""
 
     def open(self, runtime_context: RuntimeContext):
-        self._bars = defaultdict(lambda: deque(maxlen=10))
+        self._bars = defaultdict(lambda: deque(maxlen=120))  # 10m / 5s = 120 bars
         self._cooldowns = {}
         self._movers_buf = []
         self._last_flush = time.time()
@@ -232,7 +232,7 @@ class MoversSink10m(MapFunction):
             except Exception:
                 pass
 
-        if len(self._movers_buf) >= 10 or (time.time() - self._last_flush) > 2:
+        if len(self._movers_buf) >= 10 or (time.time() - self._last_flush) > 1:
             self._flush()
 
         return value
@@ -272,7 +272,7 @@ def run():
             volume_24h    DOUBLE,
             change_pct_24h DOUBLE,
             event_time AS TO_TIMESTAMP_LTZ(event_time_ms, 3),
-            WATERMARK FOR event_time AS event_time - INTERVAL '1' MINUTE
+            WATERMARK FOR event_time AS event_time - INTERVAL '3' SECOND
         ) WITH (
             'connector'                    = 'kafka',
             'topic'                        = 'raw.ticker.usdtm',
@@ -284,8 +284,8 @@ def run():
         )
     """)
 
-    # --- 1-minute TUMBLE (JVM) — no merge needed, FIRST/LAST_VALUE work ---
-    result_1m = t_env.sql_query("""
+    # --- 5-second TUMBLE (JVM) — low latency, no merge needed ---
+    result_5s = t_env.sql_query("""
         SELECT
             window_end,
             symbol,
@@ -295,18 +295,18 @@ def run():
             LAST_VALUE(change_pct_24h) AS change_pct_24h
         FROM TABLE(
             TUMBLE(TABLE raw_trades, DESCRIPTOR(event_time),
-                   INTERVAL '1' MINUTE)
+                   INTERVAL '5' SECOND)
         )
         WHERE symbol LIKE '%USDT' AND POSITION('_' IN symbol) = 0
         GROUP BY window_start, window_end, symbol
     """)
 
     # --- Table → DataStream → Python Sinks ---
-    ds_1m = t_env.to_data_stream(result_1m)
+    ds_5s = t_env.to_data_stream(result_5s)
 
-    # Both sinks receive 1-min bars; each assembles its own sliding window
-    ds_1m.map(MoversSink5m())    # 5-bar buffer → 5m window
-    ds_1m.map(MoversSink10m())   # 10-bar buffer → 10m window
+    # Both sinks receive 5s bars; each assembles its own sliding window
+    ds_5s.map(MoversSink5m())    # 60-bar buffer → 5m window
+    ds_5s.map(MoversSink10m())   # 120-bar buffer → 10m window
 
     print("Executing Flink SQL job...")
     env.execute("TradeMovers-SQL")
