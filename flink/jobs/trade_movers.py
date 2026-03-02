@@ -2,22 +2,22 @@
 Flink SQL + Python Sink job for Trade Movers detection.
 
 v3: SQL-based pipeline
-  - Parsing, filtering, windowing, aggregation all run in JVM via Flink SQL
-  - Only the sink (DB writes + alerts) runs in Python
-  - Beam gRPC overhead reduced from 5 calls/record to 1 call/window-result
+  - Parsing, filtering, 1-min TUMBLE aggregation all run in JVM via Flink SQL
+  - Python sink assembles 5m/10m sliding windows from 1-min bars
+  - Beam gRPC overhead reduced from 5 calls/record to 1 call/1-min-bar
 
 Data flow:
   Kafka(raw.ticker.usdtm)
-    → [SQL: JSON parse + USDT filter + watermark]  — JVM
-    → [SQL: HOP(5m,1m) FIRST_VALUE/LAST_VALUE]     — JVM
-    → [SQL: HOP(10m,1m) FIRST_VALUE/LAST_VALUE]    — JVM
-    → to_data_stream()
-    → [Python Sink: batch DB write + threshold check + alert]
+    → [SQL: JSON parse + USDT filter + watermark]          — JVM
+    → [SQL: TUMBLE(1m) + FIRST_VALUE/LAST_VALUE per symbol] — JVM
+    → to_data_stream()  (~300 rows/min)
+    → [Python Sink: 5m/10m sliding buffer + DB write + alert]
 """
 
 import os
 import sys
 import time
+from collections import defaultdict, deque
 from datetime import datetime
 
 from pyflink.datastream import StreamExecutionEnvironment
@@ -45,10 +45,12 @@ am = AlertManager()
 # ── Sink Functions ──────────────────────────────────────────────────────
 
 class MoversSink5m(MapFunction):
-    """5m window sink: snapshot + movers + alerts. Batched DB writes."""
+    """Assembles 5m sliding window from 1-min bars.
+    Keeps last 5 bars per symbol, computes open/close/change_pct."""
 
     def open(self, runtime_context: RuntimeContext):
-        self._cooldowns = {}  # symbol -> last_trigger_time_ms
+        self._bars = defaultdict(lambda: deque(maxlen=5))
+        self._cooldowns = {}
         self._snapshot_buf = []
         self._movers_buf = []
         self._last_flush = time.time()
@@ -71,18 +73,33 @@ class MoversSink5m(MapFunction):
         self._last_flush = time.time()
 
     def map(self, value):
-        row = value  # Row object from SQL result
+        row = value
         symbol = str(row[1])
-        open_price = float(row[2])
-        close_price = float(row[3])
+        open_1m = float(row[2])
+        close_1m = float(row[3])
         volume_24h = float(row[4])
         change_pct_24h = float(row[5])
+        event_time_str = str(row[0])
+
+        # Append this 1-min bar
+        self._bars[symbol].append({
+            "open": open_1m, "close": close_1m,
+            "volume_24h": volume_24h, "change_pct_24h": change_pct_24h,
+            "event_time": event_time_str
+        })
+
+        bars = self._bars[symbol]
+        if len(bars) < 2:
+            return value
+
+        # 5m window: open from oldest bar, close from newest
+        open_price = bars[0]["open"]
+        close_price = bars[-1]["close"]
 
         if open_price == 0:
             return value
 
         change_pct = ((close_price - open_price) / open_price) * 100
-        event_time_str = str(row[0])  # window_end
 
         # Buffer snapshot
         self._snapshot_buf.append({
@@ -137,9 +154,10 @@ class MoversSink5m(MapFunction):
 
 
 class MoversSink10m(MapFunction):
-    """10m window sink: movers only (no snapshot)."""
+    """Assembles 10m sliding window from 1-min bars. Movers only."""
 
     def open(self, runtime_context: RuntimeContext):
+        self._bars = defaultdict(lambda: deque(maxlen=10))
         self._cooldowns = {}
         self._movers_buf = []
         self._last_flush = time.time()
@@ -161,15 +179,28 @@ class MoversSink10m(MapFunction):
     def map(self, value):
         row = value
         symbol = str(row[1])
-        open_price = float(row[2])
-        close_price = float(row[3])
+        open_1m = float(row[2])
+        close_1m = float(row[3])
+        change_pct_24h = float(row[5])
+        event_time_str = str(row[0])
+
+        self._bars[symbol].append({
+            "open": open_1m, "close": close_1m,
+            "change_pct_24h": change_pct_24h,
+            "event_time": event_time_str
+        })
+
+        bars = self._bars[symbol]
+        if len(bars) < 5:
+            return value
+
+        open_price = bars[0]["open"]
+        close_price = bars[-1]["close"]
 
         if open_price == 0:
             return value
 
         change_pct = ((close_price - open_price) / open_price) * 100
-        event_time_str = str(row[0])
-        change_pct_24h = float(row[5])
 
         if change_pct < THRESHOLD_10M:
             return value
@@ -243,18 +274,18 @@ def run():
             event_time AS TO_TIMESTAMP_LTZ(event_time_ms, 3),
             WATERMARK FOR event_time AS event_time - INTERVAL '1' MINUTE
         ) WITH (
-            'connector'                  = 'kafka',
-            'topic'                      = 'raw.ticker.usdtm',
+            'connector'                    = 'kafka',
+            'topic'                        = 'raw.ticker.usdtm',
             'properties.bootstrap.servers' = '{KAFKA_BOOTSTRAP}',
-            'properties.group.id'        = 'flink-trade-movers-sql',
-            'scan.startup.mode'          = 'latest-offset',
-            'format'                     = 'json',
-            'json.ignore-parse-errors'   = 'true'
+            'properties.group.id'          = 'flink-trade-movers-sql',
+            'scan.startup.mode'            = 'latest-offset',
+            'format'                       = 'json',
+            'json.ignore-parse-errors'     = 'true'
         )
     """)
 
-    # --- 5-minute sliding window (SQL) — runs entirely in JVM ---
-    result_5m = t_env.sql_query("""
+    # --- 1-minute TUMBLE (JVM) — no merge needed, FIRST/LAST_VALUE work ---
+    result_1m = t_env.sql_query("""
         SELECT
             window_end,
             symbol,
@@ -263,36 +294,19 @@ def run():
             LAST_VALUE(volume_24h) AS volume_24h,
             LAST_VALUE(change_pct_24h) AS change_pct_24h
         FROM TABLE(
-            HOP(TABLE raw_trades, DESCRIPTOR(event_time),
-                INTERVAL '1' MINUTE, INTERVAL '5' MINUTES)
+            TUMBLE(TABLE raw_trades, DESCRIPTOR(event_time),
+                   INTERVAL '1' MINUTE)
         )
         WHERE symbol LIKE '%USDT' AND POSITION('_' IN symbol) = 0
         GROUP BY window_start, window_end, symbol
     """)
 
-    # --- 10-minute sliding window (SQL) — runs entirely in JVM ---
-    result_10m = t_env.sql_query("""
-        SELECT
-            window_end,
-            symbol,
-            FIRST_VALUE(price) AS open_price,
-            LAST_VALUE(price)  AS close_price,
-            LAST_VALUE(volume_24h) AS volume_24h,
-            LAST_VALUE(change_pct_24h) AS change_pct_24h
-        FROM TABLE(
-            HOP(TABLE raw_trades, DESCRIPTOR(event_time),
-                INTERVAL '1' MINUTE, INTERVAL '10' MINUTES)
-        )
-        WHERE symbol LIKE '%USDT' AND POSITION('_' IN symbol) = 0
-        GROUP BY window_start, window_end, symbol
-    """)
+    # --- Table → DataStream → Python Sinks ---
+    ds_1m = t_env.to_data_stream(result_1m)
 
-    # --- Table → DataStream → Python Sink (only Python operator) ---
-    ds_5m = t_env.to_data_stream(result_5m)
-    ds_10m = t_env.to_data_stream(result_10m)
-
-    ds_5m.map(MoversSink5m())
-    ds_10m.map(MoversSink10m())
+    # Both sinks receive 1-min bars; each assembles its own sliding window
+    ds_1m.map(MoversSink5m())    # 5-bar buffer → 5m window
+    ds_1m.map(MoversSink10m())   # 10-bar buffer → 10m window
 
     print("Executing Flink SQL job...")
     env.execute("TradeMovers-SQL")
