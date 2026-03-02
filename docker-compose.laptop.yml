@@ -83,6 +83,7 @@ services:
       - ./checkpoints:/app/checkpoints
     command: ./start.sh
 
+
   # === Frontend & Routing ===
   frontend:
     build: ./apps/trade-frontend
@@ -159,6 +160,8 @@ services:
           cpus: '0.5'
           memory: 256M
     environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
     ports:
       - "3002:3000"
