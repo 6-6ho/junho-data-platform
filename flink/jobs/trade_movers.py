@@ -223,13 +223,14 @@ def run():
         FileSystemCheckpointStorage("file:///opt/flink/checkpoints")
     )
 
-    # --- Table Environment ---
-    t_env = StreamTableEnvironment.create(stream_execution_environment=env)
-    t_env.get_config().set(
-        "pipeline.jars",
-        "file:///opt/flink/usrlib/flink-sql-connector-kafka-3.1.0-1.18.jar;"
+    # --- JARs (must be added before TableEnvironment creation) ---
+    env.add_jars(
+        "file:///opt/flink/usrlib/flink-sql-connector-kafka-3.1.0-1.18.jar",
         "file:///opt/flink/usrlib/flink-json-1.18.1.jar"
     )
+
+    # --- Table Environment ---
+    t_env = StreamTableEnvironment.create(stream_execution_environment=env)
 
     # --- Kafka Source (SQL DDL) — runs entirely in JVM ---
     t_env.execute_sql(f"""
