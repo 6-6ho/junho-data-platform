@@ -266,7 +266,7 @@ def run():
             HOP(TABLE raw_trades, DESCRIPTOR(event_time),
                 INTERVAL '1' MINUTE, INTERVAL '5' MINUTES)
         )
-        WHERE symbol LIKE '%USDT' AND symbol NOT LIKE '%\_%' ESCAPE '\'
+        WHERE symbol LIKE '%USDT' AND POSITION('_' IN symbol) = 0
         GROUP BY window_start, window_end, symbol
     """)
 
@@ -283,7 +283,7 @@ def run():
             HOP(TABLE raw_trades, DESCRIPTOR(event_time),
                 INTERVAL '1' MINUTE, INTERVAL '10' MINUTES)
         )
-        WHERE symbol LIKE '%USDT' AND symbol NOT LIKE '%\_%' ESCAPE '\'
+        WHERE symbol LIKE '%USDT' AND POSITION('_' IN symbol) = 0
         GROUP BY window_start, window_end, symbol
     """)
 
