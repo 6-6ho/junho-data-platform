@@ -2,6 +2,14 @@ tunnel: 05b88928-b53c-4ed6-aa52-6f1e0895f59d
 credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
+  - hostname: 6-6ho.com
+    service: http://frontend:80
+  - hostname: www.6-6ho.com
+    service: http://frontend:80
+  - hostname: trade.6-6ho.com
+    service: http://frontend:80
+  - hostname: monitor.6-6ho.com
+    service: http://grafana:3000
   - hostname: shop.6-6ho.com
     service: http://shop-api:3000
   - hostname: admin.6-6ho.com
