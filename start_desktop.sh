@@ -9,6 +9,8 @@ if ! docker info > /dev/null 2>&1; then
   exit 1
 fi
 
+
+
 # Check LAPTOP_IP
 if [ -z "$LAPTOP_IP" ]; then
   echo "⚠️  LAPTOP_IP is not set."
@@ -76,9 +78,10 @@ echo "✅ Desktop Node Started!"
 echo ""
 echo "🔗 Access Points:"
 echo "   - ⚡ Spark Master:   http://localhost:8081"
-echo "   - 💨 Airflow:        http://localhost:8080 (admin/admin)"
+echo "   - 💨 Airflow:        https://airflow.6-6ho.com (admin/admin)"
 echo "   - 🗄️  MinIO Console:  http://localhost:9001 (minio/minio123)"
-echo "   - 🛍️  Shop App:       http://localhost:3001"
+echo "   - 🛍️  Shop App:       https://shop.6-6ho.com (or analytics.6-6ho.com)"
+echo "   - 📊 cAdvisor:       http://localhost:8086"
 echo ""
 echo "📡 Connected to Laptop Postgres: ${LAPTOP_IP}:5432"
 echo "💡 Stop: ./stop_desktop.sh"
