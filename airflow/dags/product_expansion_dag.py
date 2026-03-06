@@ -1,9 +1,12 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
+import os
+
+DB_HOST = os.getenv("DB_HOST", "postgres")
 
 default_args = {
-    'owner': 'airflow',
+    'owner': 'junho',
     'depends_on_past': False,
     'email_on_failure': False,
     'email_on_retry': False,
@@ -23,5 +26,5 @@ with DAG(
 
     expand_products = BashOperator(
         task_id='expand_products_faker',
-        bash_command='docker exec -e DB_HOST=192.168.219.108 jdp-shop-api python3 /app/expand_products_faker.py',
+        bash_command=f'docker exec -e DB_HOST={DB_HOST} jdp-shop-api python3 /app/expand_products_faker.py',
     )

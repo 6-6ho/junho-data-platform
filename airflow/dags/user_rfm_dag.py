@@ -1,6 +1,7 @@
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
+import os
 
 default_args = {
     'owner': 'junho',
@@ -10,6 +11,10 @@ default_args = {
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
 }
+
+LAPTOP_IP = os.getenv("LAPTOP_IP", "postgres")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minio")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minio123")
 
 with DAG(
     'user_rfm_dag',
@@ -23,14 +28,19 @@ with DAG(
     # Run Spark Job via BashOperator (Docker Exec)
     submit_job = BashOperator(
         task_id='run_user_rfm',
-        bash_command='''
-            docker exec -e DB_HOST=192.168.219.101 spark-master /opt/spark/bin/spark-submit \
+        bash_command=f'''
+            docker exec -e DB_HOST={LAPTOP_IP} spark-master /opt/spark/bin/spark-submit \
             --master spark://spark-master:7077 \
+            --conf spark.cores.max=3 \
+            --conf spark.executor.cores=1 \
             --conf spark.driver.memory=1g \
             --conf spark.executor.memory=1g \
+            --conf spark.sql.shuffle.partitions=6 \
+            --conf spark.sql.adaptive.enabled=true \
+            --conf spark.sql.adaptive.skewJoin.enabled=true \
             --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
-            --conf spark.hadoop.fs.s3a.access.key=minio \
-            --conf spark.hadoop.fs.s3a.secret.key=minio123 \
+            --conf spark.hadoop.fs.s3a.access.key={MINIO_ACCESS_KEY} \
+            --conf spark.hadoop.fs.s3a.secret.key={MINIO_SECRET_KEY} \
             --conf spark.hadoop.fs.s3a.path.style.access=true \
             --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
             --name UserRFM \
