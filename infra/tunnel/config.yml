@@ -11,7 +11,7 @@ ingress:
   - hostname: shop.6-6ho.com
     service: http://192.168.219.108:3001
   - hostname: admin.6-6ho.com
-    service: http://192.168.219.108:80
+    service: http://192.168.219.108:3003
   - hostname: analytics.6-6ho.com
     service: http://192.168.219.108:3001
   - hostname: airflow.6-6ho.com
