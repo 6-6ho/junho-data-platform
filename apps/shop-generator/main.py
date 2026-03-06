@@ -20,6 +20,7 @@ from generators.review import ReviewGenerator
 from generators.search_query import SearchQueryGenerator
 from generators.session_event import SessionEventGenerator
 from generators.traffic_pattern import TrafficPatternController
+from generators.config_consumer import ConfigConsumerThread
 from config import get_settings
 from metrics import MetricsCollector
 
@@ -84,8 +85,21 @@ def generate_and_send(producer, generators, traffic_controller, mode, metrics):
 
     while running:
         try:
+            # --- Auto-Revert Logic for Time-Bound Execution ---
+            if getattr(settings, 'EXPIRES_AT', None):
+                if datetime.now() >= settings.EXPIRES_AT:
+                    logger.info("⏱️ Override Duration Expired. Reverting to Default settings.")
+                    settings.MODE = 'normal'
+                    settings.BASE_TPS = 100
+                    settings.CHAOS_MODE = False
+                    settings.EXPIRES_AT = None
+                    shopping_gen.chaos_mode = False
+                    shopping_gen.category_bias = None
+                    shopping_gen.persona_bias = None
+            # --------------------------------------------------
+
             # Get current traffic multiplier
-            multiplier = traffic_controller.get_current_multiplier(mode)
+            multiplier = traffic_controller.get_current_multiplier(settings.MODE)
             metrics.set_multiplier(multiplier)
 
             # Calculate events per second based on traffic pattern
@@ -138,7 +152,7 @@ def generate_and_send(producer, generators, traffic_controller, mode, metrics):
             if events_sent % 1000 == 0:
                 elapsed = time.time() - start_time
                 eps = events_sent / elapsed if elapsed > 0 else 0
-                logger.info(f"Events sent: {events_sent} | Rate: {eps:.1f}/s | Multiplier: {multiplier:.2f}x | Mode: {mode}")
+                logger.info(f"Events sent: {events_sent} | Rate: {eps:.1f}/s | Multiplier: {multiplier:.2f}x | Mode: {settings.MODE}")
 
             # Sleep to maintain rate
             time.sleep(0.1)
@@ -195,9 +209,15 @@ def main():
         timer.daemon = True
         timer.start()
 
+    # Start Config Consumer
+    config_consumer = ConfigConsumerThread(settings, traffic_controller, generators['shopping'])
+    config_consumer.start()
+
     try:
         generate_and_send(producer, generators, traffic_controller, args.mode, metrics)
     finally:
+        config_consumer.stop()
+        config_consumer.join(timeout=2)
         producer.close()
         logger.info("Kafka producer closed")
 
