@@ -52,21 +52,6 @@ FROM shop_funnel_stats_log
 ORDER BY window_start, created_at DESC;
 
 
--- 4. Brand Performance LOG
-CREATE TABLE IF NOT EXISTS shop_brand_stats_log (
-    window_start TIMESTAMP,
-    brand_name VARCHAR(50),
-    total_revenue DECIMAL(14, 2),
-    order_count INT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE OR REPLACE VIEW shop_brand_stats AS
-SELECT DISTINCT ON (window_start, brand_name) *
-FROM shop_brand_stats_log
-ORDER BY window_start, brand_name, created_at DESC;
-
-
 -- Seed Data (Optional)
 INSERT INTO shop_realtime_metrics_log (metric_name, metric_value) VALUES 
 ('active_users_5m', 0),

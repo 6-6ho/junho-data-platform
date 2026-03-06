@@ -22,21 +22,6 @@ CREATE TABLE IF NOT EXISTS mart_daily_sales (
 CREATE INDEX IF NOT EXISTS idx_mart_daily_sales_date 
     ON mart_daily_sales(date DESC);
 
--- 일별 브랜드 분석
-CREATE TABLE IF NOT EXISTS mart_daily_brand (
-    date DATE NOT NULL,
-    brand_name VARCHAR(100) NOT NULL,
-    total_revenue DECIMAL(15,2) NOT NULL DEFAULT 0,
-    order_count INT NOT NULL DEFAULT 0,
-    avg_order_value DECIMAL(10,2),
-    market_share DECIMAL(5,2),  -- 해당일 전체 대비 비율
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (date, brand_name)
-);
-
-CREATE INDEX IF NOT EXISTS idx_mart_daily_brand_date 
-    ON mart_daily_brand(date DESC);
-
 -- 일별 Funnel 분석
 CREATE TABLE IF NOT EXISTS mart_daily_funnel (
     date DATE PRIMARY KEY,
@@ -59,7 +44,6 @@ CREATE TABLE IF NOT EXISTS mart_daily_summary (
     total_users INT NOT NULL DEFAULT 0,
     avg_order_value DECIMAL(10,2),
     top_category VARCHAR(50),
-    top_brand VARCHAR(100),
     dod_revenue_change DECIMAL(5,2),  -- Day over Day 변화율
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -124,7 +108,6 @@ CREATE TABLE IF NOT EXISTS mart_monthly_summary (
     total_users INT NOT NULL DEFAULT 0,
     avg_order_value DECIMAL(10,2),
     top_category VARCHAR(50),
-    top_brand VARCHAR(100),
     mom_revenue_change DECIMAL(5,2),
     yoy_revenue_change DECIMAL(5,2),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
