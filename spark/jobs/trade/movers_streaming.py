@@ -241,7 +241,7 @@ def run():
         .foreachBatch(process_movers_5m) \
         .outputMode("update") \
         .option("checkpointLocation", "/app/checkpoints/trade-movers-5m") \
-        .trigger(processingTime="1 minutes") \
+        .trigger(processingTime="10 seconds") \
         .start()
 
     # 10m Window
@@ -260,7 +260,7 @@ def run():
         .foreachBatch(process_movers_10m) \
         .outputMode("update") \
         .option("checkpointLocation", "/app/checkpoints/trade-movers-10m") \
-        .trigger(processingTime="1 minutes") \
+        .trigger(processingTime="10 seconds") \
         .start()
 
     spark.streams.awaitAnyTermination()

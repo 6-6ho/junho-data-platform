@@ -1,7 +1,6 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, collect_list, array_distinct, expr, size, desc
+from pyspark.sql.functions import col, collect_list, array_distinct, size, desc
 from pyspark.ml.fpm import FPGrowth
-import sys
 import os
 
 # Postgres Config
@@ -22,54 +21,58 @@ def run():
         .config("spark.hadoop.fs.s3a.path.style.access", "true") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
-    
-    # Read Raw Data (Parquet from Iceberg/MinIO raw zone)
+
+    # Read Raw Data - scan ALL available data (no date filter)
     try:
-        # Scan all available raw data
         df = spark.read.parquet("s3a://raw/shop_events")
     except Exception as e:
         print(f"No data found: {e}")
         return
 
-    # 1. Prepare Transactions (Group by User + Date)
-    # Filter for 'purchase' events and group items by user_id and date
-    from pyspark.sql.functions import to_date
+    # 1. Prepare Transactions (Group by session_id)
+    # Filter for 'purchase' events and group items by session
     transactions = df.filter(col("event_type") == "purchase") \
-        .withColumn("date", to_date("event_time")) \
-        .groupBy("user_id", "date") \
+        .groupBy("session_id") \
         .agg(collect_list("product_id").alias("items")) \
         .withColumn("items", array_distinct(col("items"))) \
-        .filter(size(col("items")) > 1)  # Only baskets with >= 2 items
+        .filter(size(col("items")) > 1)  # Only sessions with >= 2 items
 
-    print(f"Analyzing {transactions.count()} transactions (User+Date)...")
+    tx_count = transactions.count()
+    print(f"Analyzing {tx_count} transactions (session-based)...")
+
+    if tx_count == 0:
+        print("No multi-item sessions found. Skipping FP-Growth.")
+        return
 
     # 2. FP-Growth (Association Rules)
-    # minSupport=0.0005: Lowered to catch more patterns
-    # minConfidence=0.05 (5%): Low bar for confidence
-    fpGrowth = FPGrowth(itemsCol="items", minSupport=0.0005, minConfidence=0.05)
+    fpGrowth = FPGrowth(itemsCol="items", minSupport=0.001, minConfidence=0.05)
     model = fpGrowth.fit(transactions)
 
-    # 3. Get Rules & Filter "Obvious" ones
+    # 3. Get Rules & Filter
     rules = model.associationRules
-    
-    # Filter by Lift > 1.2 to find meaningful associations
+
     rules_df = rules.select(
-        col("antecedent").astype("string").alias("item_a"),
-        col("consequent").astype("string").alias("item_b"),
+        col("antecedent").cast("string").alias("antecedents"),
+        col("consequent").cast("string").alias("consequents"),
         col("confidence"),
         col("lift"),
         col("support")
     ).filter("lift > 1.0") \
-     .orderBy(desc("lift"))  # Order by Relevance (Lift)
+     .orderBy(desc("lift"))
 
-    # 4. Write to Postgres
-    # Use 'mart_basket_analysis' table
+    # 4. Write to Postgres — skip if 0 rules to prevent truncating existing data
+    rules_count = rules_df.count()
+    if rules_count == 0:
+        print("FP-Growth produced 0 rules (lift > 1.0). Skipping write to preserve existing data.")
+        return
+
     rules_df.write \
+        .option("truncate", "true") \
         .mode("overwrite") \
-        .jdbc(DB_URL, "mart_basket_analysis", properties=DB_PROPERTIES)
-    
-    print(f"Basket Analysis Updated. Rules generated: {rules_df.count()}")
-    
+        .jdbc(DB_URL, "mart_product_association", properties=DB_PROPERTIES)
+
+    print(f"Basket Analysis Updated. Rules generated: {rules_count}")
+
     # Show top 20 rules for logs
     rules_df.show(20, truncate=False)
 

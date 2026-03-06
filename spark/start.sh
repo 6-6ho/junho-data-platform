@@ -24,11 +24,16 @@ fi
 spark-submit \
   --master ${SPARK_MASTER_URL:-"local[*]"} \
   --deploy-mode client \
-  --conf spark.cores.max=1 \
-  --conf spark.executor.memory=1024m \
-  --conf spark.driver.memory=1024m \
+  --conf spark.cores.max=${SPARK_CORES_MAX:-4} \
+  --conf spark.executor.cores=${SPARK_EXECUTOR_CORES:-2} \
+  --conf spark.executor.memory=${SPARK_EXECUTOR_MEMORY:-1536m} \
+  --conf spark.driver.memory=${SPARK_DRIVER_MEMORY:-1024m} \
   --conf spark.scheduler.mode=FAIR \
-  --conf spark.sql.shuffle.partitions=4 \
-  --conf spark.streaming.kafka.maxRatePerPartition=50 \
+  --conf spark.sql.shuffle.partitions=${SPARK_SHUFFLE_PARTITIONS:-8} \
+  --conf spark.streaming.kafka.maxRatePerPartition=500 \
+  --conf spark.sql.adaptive.enabled=true \
+  --conf spark.sql.adaptive.skewJoin.enabled=true \
+  --conf spark.sql.adaptive.coalescePartitions.enabled=true \
+  --conf spark.locality.wait=3s \
   $ICEBERG_CONF \
   jobs/${SPARK_JOB_NAME:-unified_streaming.py}

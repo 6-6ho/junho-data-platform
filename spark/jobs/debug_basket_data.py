@@ -2,12 +2,15 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, count, size, collect_list, array_distinct
 import os
 
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minio")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minio123")
+
 def debug():
     spark = SparkSession.builder \
         .appName("BasketDataDebug") \
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
-        .config("spark.hadoop.fs.s3a.access.key", "minio") \
-        .config("spark.hadoop.fs.s3a.secret.key", "minio123") \
+        .config("spark.hadoop.fs.s3a.access.key", MINIO_ACCESS_KEY) \
+        .config("spark.hadoop.fs.s3a.secret.key", MINIO_SECRET_KEY) \
         .config("spark.hadoop.fs.s3a.path.style.access", "true") \
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
