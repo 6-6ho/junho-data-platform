@@ -8,14 +8,12 @@ ingress:
     service: http://frontend:80
   - hostname: trade.6-6ho.com
     service: http://frontend:80
+  - hostname: shop.6-6ho.com
+    service: http://192.168.219.108:3001
+  - hostname: analytics.6-6ho.com
+    service: http://192.168.219.108:3001
+  - hostname: airflow.6-6ho.com
+    service: http://192.168.219.108:8080
   - hostname: monitor.6-6ho.com
     service: http://grafana:3000
-  - hostname: shop.6-6ho.com
-    service: http://shop-api:3000
-  - hostname: admin.6-6ho.com
-    service: http://shop-admin:80
-  - hostname: analytics.6-6ho.com
-    service: http://shop-analytics:80
-  - hostname: airflow.6-6ho.com
-    service: http://airflow:8080
   - service: http_status:404
