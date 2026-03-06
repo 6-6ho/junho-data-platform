@@ -56,7 +56,7 @@ export default function SymbolSearch() {
     }, [isOpen]);
 
     const handleSelect = (symbol: string) => {
-        navigate(`/symbol/${symbol}`);
+        navigate(`/crypto/symbol/${symbol}`);
         setQuery('');
         setIsOpen(false);
     };

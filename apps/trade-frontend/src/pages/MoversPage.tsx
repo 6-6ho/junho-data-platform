@@ -59,7 +59,7 @@ export default function MoversPage() {
     const riseList = movers?.filter((m: any) => m.type === 'rise') || [];
     const volList = movers?.filter((m: any) => m.type === 'high_vol_up') || [];
 
-    const handleSelect = (symbol: string) => navigate(`/symbol/${symbol}`);
+    const handleSelect = (symbol: string) => navigate(`/crypto/symbol/${symbol}`);
 
     return (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-5)', height: 'calc(100vh - 120px)' }}>
