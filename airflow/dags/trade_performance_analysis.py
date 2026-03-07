@@ -243,76 +243,69 @@ def run_performance_analysis(**context):
     conn.commit()
     print(f"Collected {collected} new timeseries records")
 
-    # 2. Analyze optimal strategies (last 7 days data)
+    # 2. Analyze optimal strategies by tier (yesterday's data only)
     cur.execute("""
-        SELECT timeseries_data
-        FROM trade_performance_timeseries
-        WHERE created_at >= NOW() - INTERVAL '7 days'
+        SELECT t.timeseries_data,
+               CASE WHEN m.status LIKE '[High]%' THEN 'High'
+                    WHEN m.status LIKE '[Mid]%' THEN 'Mid'
+                    ELSE 'Small' END as tier
+        FROM trade_performance_timeseries t
+        JOIN (
+            SELECT DISTINCT ON (symbol, event_time) symbol, event_time, status
+            FROM movers_latest WHERE type = 'rise'
+            ORDER BY symbol, event_time, change_pct_window DESC
+        ) m ON m.symbol = t.symbol AND m.event_time = t.alert_time
+        WHERE t.alert_time >= (CURRENT_DATE - INTERVAL '1 day')
+          AND t.alert_time < CURRENT_DATE
     """)
     rows = cur.fetchall()
 
-    if not rows or len(rows) < 10:
-        send_telegram("📊 *전략 분석*\n\n데이터 부족 (최소 10개 신호 필요)")
+    if not rows or len(rows) < 3:
+        send_telegram("📊 *전략 분석*\n\n어제 데이터 부족 (최소 3개 신호 필요)")
         cur.close()
         conn.close()
         return
 
-    signals = [row[0] for row in rows]
-    total_signals = len(signals)
+    # Group signals by tier
+    tier_signals = {"High": [], "Mid": [], "Small": []}
+    for row in rows:
+        ts_data, tier = row[0], row[1]
+        tier_signals[tier].append(ts_data)
 
-    # Test TP/SL combinations
+    total_signals = len(rows)
+    tier_counts = {t: len(s) for t, s in tier_signals.items()}
+
+    # Test TP/SL combinations per tier
     tp_levels = [3, 4, 5, 6, 7, 8, 9, 10]
     sl_levels = [1, 2, 3]
 
-    results = []
-    for tp in tp_levels:
-        for sl in sl_levels:
-            if tp > sl:
-                result = simulate_strategy(signals, tp, sl)
-                results.append(result)
+    # 3. Build Telegram message
+    msg = f"📊 *최적 전략 분석* (어제 기준)\n"
+    msg += f"📈 총 신호: *{total_signals}개* "
+    msg += f"(High: {tier_counts['High']} / Mid: {tier_counts['Mid']} / Small: {tier_counts['Small']})\n\n"
 
-    # Sort by total PnL
-    results.sort(key=lambda x: x["total_pnl"], reverse=True)
-    top5 = results[:5]
+    tier_emoji = {"High": "🔴", "Mid": "🟡", "Small": "🟢"}
 
-    # 3. Calculate compound growth for best strategy
-    best = top5[0]
-    seed = 1000  # 만원 단위
-    position_size = 0.1  # 10%
+    for tier_name in ["High", "Mid", "Small"]:
+        signals = tier_signals[tier_name]
+        if len(signals) < 2:
+            continue
 
-    for ts_data in signals:
-        time_points = sorted([(int(k), v["profit_pct"]) for k, v in ts_data.items()])
-        result_pct = None
-        for t, profit in time_points:
-            if profit >= best["take_profit"]:
-                result_pct = best["take_profit"]
-                break
-            elif profit <= -best["stop_loss"]:
-                result_pct = -best["stop_loss"]
-                break
-        if result_pct is None and time_points:
-            result_pct = time_points[-1][1]
-        if result_pct:
-            seed += seed * position_size * (result_pct / 100)
+        results = []
+        for tp in tp_levels:
+            for sl in sl_levels:
+                if tp > sl:
+                    result = simulate_strategy(signals, tp, sl)
+                    results.append(result)
 
-    compound_return = ((seed - 1000) / 1000) * 100
+        results.sort(key=lambda x: x["total_pnl"], reverse=True)
+        best = results[0]
 
-    # 4. Send Telegram summary
-    msg = f"📊 *최적 전략 분석* (7일 기준)\n\n"
-    msg += f"📈 분석 신호: *{total_signals}개*\n\n"
-    msg += f"🏆 *추천 전략*\n"
-    msg += f"  익절: *+{best['take_profit']}%* / 손절: *-{best['stop_loss']}%*\n"
-    msg += f"  승률: {best['win_rate']}% ({best['wins']}/{best['losses']})\n"
-    msg += f"  총 수익: *+{best['total_pnl']}%*\n"
-    msg += f"  복리 수익 (10% 포지션): *+{compound_return:.1f}%*\n\n"
-
-    msg += f"📋 *Top 5 전략*\n"
-    msg += f"```\n"
-    msg += f"익절 손절 │ 승률   총PnL\n"
-    msg += f"─────────┼─────────────\n"
-    for r in top5:
-        msg += f" {r['take_profit']:2}%  {r['stop_loss']:2}% │ {r['win_rate']:5.1f}% {r['total_pnl']:+7.1f}%\n"
-    msg += f"```\n"
+        emoji = tier_emoji[tier_name]
+        msg += f"{emoji} *{tier_name}* — {len(signals)}개\n"
+        msg += f"  추천: TP *+{best['take_profit']}%* / SL *-{best['stop_loss']}%*"
+        msg += f" | 승률 {best['win_rate']}%"
+        msg += f" | PnL *{best['total_pnl']:+.1f}%*\n\n"
 
     send_telegram(msg)
 

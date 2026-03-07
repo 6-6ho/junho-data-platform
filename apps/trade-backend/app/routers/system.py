@@ -29,11 +29,44 @@ def get_db_conn():
     return psycopg2.connect(DATABASE_URL)
 
 
-def get_date_filter_sql(days: int) -> str:
+def get_date_filter_sql(days: int, prefix: str = "") -> str:
     """Generate SQL date filter. days=0 means no filter (all data)."""
     if days <= 0:
         return "TRUE"  # No filter
-    return f"alert_time >= NOW() - INTERVAL '{days} days'"
+    return f"{prefix}alert_time >= NOW() - INTERVAL '{days} days'"
+
+
+def _build_tier_filter(tier):
+    """Returns (join_clause, where_clause) for tier filtering."""
+    if not tier or tier == "all":
+        return "", ""
+    join = """
+        JOIN (
+            SELECT DISTINCT ON (symbol, event_time) symbol, event_time, status
+            FROM movers_latest WHERE type = 'rise'
+            ORDER BY symbol, event_time, change_pct_window DESC
+        ) m ON m.symbol = t.symbol AND m.event_time = t.alert_time
+    """
+    tier_map = {
+        "high": "m.status LIKE '[High]%'",
+        "mid": "m.status LIKE '[Mid]%'",
+        "small": "m.status NOT LIKE '[High]%' AND m.status NOT LIKE '[Mid]%'",
+    }
+    where = f"AND {tier_map.get(tier.lower(), 'TRUE')}"
+    return join, where
+
+
+def _fetch_timeseries_data(cur, days, tier=None):
+    """Fetch timeseries_data with optional tier filter."""
+    date_filter = get_date_filter_sql(days, "t.")
+    join_clause, tier_where = _build_tier_filter(tier)
+    cur.execute(f"""
+        SELECT t.timeseries_data
+        FROM trade_performance_timeseries t
+        {join_clause}
+        WHERE {date_filter} {tier_where}
+    """)
+    return cur.fetchall()
 
 
 def ensure_system_config_table():
@@ -187,7 +220,7 @@ async def get_schedule_info():
 
 
 @router.get("/performance/profit-targets")
-async def get_profit_target_analysis(days: int = 15):
+async def get_profit_target_analysis(days: int = 15, tier: str = "all"):
     """
     Analyze hit rate for different profit targets.
 
@@ -200,14 +233,7 @@ async def get_profit_target_analysis(days: int = 15):
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-            """)
-
-            rows = cur.fetchall()
+            rows = _fetch_timeseries_data(cur, days, tier)
 
             if not rows:
                 return {"summary": {"total_signals": 0}, "targets": []}
@@ -265,7 +291,7 @@ async def get_profit_target_analysis(days: int = 15):
 
 
 @router.get("/performance/time-based")
-async def get_time_based_performance(days: int = 15):
+async def get_time_based_performance(days: int = 15, tier: str = "all"):
     """
     Get time-based performance analysis (5min intervals from 5min to 240min).
 
@@ -282,15 +308,7 @@ async def get_time_based_performance(days: int = 15):
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            # Fetch all timeseries data
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-            """)
-
-            rows = cur.fetchall()
+            rows = _fetch_timeseries_data(cur, days, tier)
 
             if not rows:
                 return {
@@ -385,7 +403,7 @@ async def get_time_based_performance(days: int = 15):
 
 
 @router.get("/performance/drawdown-recovery")
-async def get_drawdown_recovery_analysis(days: int = 15, target_profit: float = 1.0):
+async def get_drawdown_recovery_analysis(days: int = 15, target_profit: float = 1.0, tier: str = "all"):
     """
     Analyze recovery probability after different drawdown levels.
 
@@ -404,14 +422,7 @@ async def get_drawdown_recovery_analysis(days: int = 15, target_profit: float = 
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-            """)
-
-            rows = cur.fetchall()
+            rows = _fetch_timeseries_data(cur, days, tier)
 
             if not rows:
                 return {
@@ -501,7 +512,8 @@ async def get_drawdown_recovery_analysis(days: int = 15, target_profit: float = 
 async def simulate_trading_strategy(
     take_profit: float = 2.0,
     stop_loss: float = 2.5,
-    days: int = 15
+    days: int = 15,
+    tier: str = "all"
 ):
     """
     Simulate a trading strategy with given take-profit and stop-loss levels.
@@ -518,15 +530,7 @@ async def simulate_trading_strategy(
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT symbol, alert_time, timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-                ORDER BY alert_time
-            """)
-
-            rows = cur.fetchall()
+            rows = _fetch_timeseries_rows(cur, days, tier)
 
             if not rows:
                 return {"summary": {"total_signals": 0}, "trades": [], "daily_pnl": []}
@@ -648,7 +652,7 @@ async def simulate_trading_strategy(
 
 
 @router.get("/performance/optimize")
-async def find_optimal_strategy(days: int = 15):
+async def find_optimal_strategy(days: int = 15, tier: str = "all"):
     """
     Test multiple take-profit and stop-loss combinations to find optimal strategy.
 
@@ -662,14 +666,7 @@ async def find_optimal_strategy(days: int = 15):
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT symbol, alert_time, timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-            """)
-
-            rows = cur.fetchall()
+            rows = _fetch_timeseries_rows(cur, days, tier)
 
             if not rows:
                 return {"summary": {"total_signals": 0}, "strategies": []}
@@ -787,13 +784,15 @@ def _simulate_tpsl_results(rows, take_profit: float, stop_loss: float):
     return results
 
 
-def _fetch_timeseries_rows(cur, days: int):
-    date_filter = get_date_filter_sql(days)
+def _fetch_timeseries_rows(cur, days, tier=None):
+    date_filter = get_date_filter_sql(days, "t.")
+    join_clause, tier_where = _build_tier_filter(tier)
     cur.execute(f"""
-        SELECT symbol, alert_time, timeseries_data
-        FROM trade_performance_timeseries
-        WHERE {date_filter}
-        ORDER BY alert_time
+        SELECT t.symbol, t.alert_time, t.timeseries_data
+        FROM trade_performance_timeseries t
+        {join_clause}
+        WHERE {date_filter} {tier_where}
+        ORDER BY t.alert_time
     """)
     return cur.fetchall()
 
@@ -802,13 +801,14 @@ def _fetch_timeseries_rows(cur, days: int):
 async def weekly_pnl(
     take_profit: float = 5.0,
     stop_loss: float = 2.0,
-    days: int = 0
+    days: int = 0,
+    tier: str = "all"
 ):
     """Weekly avg PnL and win rate for a given TP/SL strategy."""
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            rows = _fetch_timeseries_rows(cur, days)
+            rows = _fetch_timeseries_rows(cur, days, tier)
             if not rows:
                 return {"weeks": []}
 
@@ -846,13 +846,14 @@ async def weekly_pnl(
 async def daily_pnl(
     take_profit: float = 5.0,
     stop_loss: float = 2.0,
-    days: int = 7
+    days: int = 7,
+    tier: str = "all"
 ):
     """Daily avg PnL and win rate for a given TP/SL strategy."""
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            rows = _fetch_timeseries_rows(cur, days)
+            rows = _fetch_timeseries_rows(cur, days, tier)
             if not rows:
                 return {"days": []}
 
@@ -890,7 +891,8 @@ async def simulate_compound_growth(
     stop_loss: float = 1.0,
     position_size_pct: float = 10.0,
     initial_seed: float = 1000.0,
-    days: int = 15
+    days: int = 15,
+    tier: str = "all"
 ):
     """
     Simulate compound growth with position sizing.
@@ -907,15 +909,7 @@ async def simulate_compound_growth(
     conn = get_db_conn()
     try:
         with conn.cursor() as cur:
-            date_filter = get_date_filter_sql(days)
-            cur.execute(f"""
-                SELECT symbol, alert_time, timeseries_data
-                FROM trade_performance_timeseries
-                WHERE {date_filter}
-                ORDER BY alert_time
-            """)
-
-            rows = cur.fetchall()
+            rows = _fetch_timeseries_rows(cur, days, tier)
 
             if not rows:
                 return {"error": "No data"}
@@ -1013,5 +1007,40 @@ async def simulate_compound_growth(
     except Exception as e:
         logger.error(f"Failed to simulate compound growth: {e}")
         return {"error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/performance/tier-summary")
+async def get_tier_summary(days: int = 7):
+    """Get signal count per tier."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor() as cur:
+            date_filter = get_date_filter_sql(days, "t.")
+            cur.execute(f"""
+                SELECT
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE m.status LIKE '[High]%') as high,
+                    COUNT(*) FILTER (WHERE m.status LIKE '[Mid]%') as mid,
+                    COUNT(*) FILTER (
+                        WHERE m.status NOT LIKE '[High]%'
+                        AND m.status NOT LIKE '[Mid]%'
+                    ) as small
+                FROM trade_performance_timeseries t
+                JOIN (
+                    SELECT DISTINCT ON (symbol, event_time) symbol, event_time, status
+                    FROM movers_latest WHERE type = 'rise'
+                    ORDER BY symbol, event_time, change_pct_window DESC
+                ) m ON m.symbol = t.symbol AND m.event_time = t.alert_time
+                WHERE {date_filter}
+            """)
+            row = cur.fetchone()
+            if row:
+                return {"total": row[0], "high": row[1], "mid": row[2], "small": row[3]}
+            return {"total": 0, "high": 0, "mid": 0, "small": 0}
+    except Exception as e:
+        logger.error(f"Failed to get tier summary: {e}")
+        return {"total": 0, "high": 0, "mid": 0, "small": 0, "error": str(e)}
     finally:
         conn.close()

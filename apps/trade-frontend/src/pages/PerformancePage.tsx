@@ -85,6 +85,13 @@ interface ProfitTargetData {
     error?: string;
 }
 
+interface TierSummary {
+    total: number;
+    high: number;
+    mid: number;
+    small: number;
+}
+
 interface PnlTrendEntry {
     label: string;
     trades: number;
@@ -101,14 +108,16 @@ export default function PerformancePage() {
     const [pnlTrendData, setPnlTrendData] = useState<PnlTrendEntry[]>([]);
     const [trendTp, setTrendTp] = useState<number>(0);
     const [trendSl, setTrendSl] = useState<number>(0);
+    const [tierSummary, setTierSummary] = useState<TierSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedDays, setSelectedDays] = useState(7);
+    const [selectedTier, setSelectedTier] = useState('all');
 
-    const loadPnlTrend = async (tp: number, sl: number, days: number) => {
+    const loadPnlTrend = async (tp: number, sl: number, days: number, tier: string) => {
         try {
             const isDaily = days > 0 && days <= 14;
             const endpoint = isDaily ? 'daily-pnl' : 'weekly-pnl';
-            const res = await fetch(`/api/system/performance/${endpoint}?take_profit=${tp}&stop_loss=${sl}&days=${days}`);
+            const res = await fetch(`/api/system/performance/${endpoint}?take_profit=${tp}&stop_loss=${sl}&days=${days}&tier=${tier}`);
             const json = await res.json();
             setPnlTrendData(isDaily ? (json.days || []) : (json.weeks || []));
         } catch (err) {
@@ -116,21 +125,24 @@ export default function PerformancePage() {
         }
     };
 
-    const loadAllData = async (days: number) => {
+    const loadAllData = async (days: number, tier: string = selectedTier) => {
         try {
-            const [optRes, tbRes, ptRes] = await Promise.all([
-                fetch(`/api/system/performance/optimize?days=${days}`),
-                fetch(`/api/system/performance/time-based?days=${days}`),
-                fetch(`/api/system/performance/profit-targets?days=${days}`)
+            const [optRes, tbRes, ptRes, tsRes] = await Promise.all([
+                fetch(`/api/system/performance/optimize?days=${days}&tier=${tier}`),
+                fetch(`/api/system/performance/time-based?days=${days}&tier=${tier}`),
+                fetch(`/api/system/performance/profit-targets?days=${days}&tier=${tier}`),
+                fetch(`/api/system/performance/tier-summary?days=${days}`)
             ]);
 
             const optJson = await optRes.json();
             const tbJson = await tbRes.json();
             const ptJson = await ptRes.json();
+            const tsJson = await tsRes.json();
 
             setOptimizeData(optJson);
             setTimeBasedData(tbJson);
             setProfitTargetData(ptJson);
+            setTierSummary(tsJson);
 
             if (optJson.recommendation) {
                 const tp = optJson.recommendation.take_profit;
@@ -139,8 +151,8 @@ export default function PerformancePage() {
                 setTrendSl(sl);
 
                 const [compRes] = await Promise.all([
-                    fetch(`/api/system/performance/compound?take_profit=${tp}&stop_loss=${sl}&days=${days}`),
-                    loadPnlTrend(tp, sl, days)
+                    fetch(`/api/system/performance/compound?take_profit=${tp}&stop_loss=${sl}&days=${days}&tier=${tier}`),
+                    loadPnlTrend(tp, sl, days, tier)
                 ]);
                 const compJson = await compRes.json();
                 setCompoundData(compJson);
@@ -153,10 +165,10 @@ export default function PerformancePage() {
     };
 
     useEffect(() => {
-        loadAllData(selectedDays);
-        const interval = setInterval(() => loadAllData(selectedDays), 60000);
+        loadAllData(selectedDays, selectedTier);
+        const interval = setInterval(() => loadAllData(selectedDays, selectedTier), 60000);
         return () => clearInterval(interval);
-    }, [selectedDays]);
+    }, [selectedDays, selectedTier]);
 
     if (loading) {
         return (
@@ -205,26 +217,57 @@ export default function PerformancePage() {
                         }}>?</div>
                     </Tooltip>
                 </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                    {[7, 14, 30, 0].map(d => (
-                        <button
-                            key={d}
-                            onClick={() => { setSelectedDays(d); setLoading(true); loadAllData(d); }}
-                            style={{
-                                padding: '4px 12px',
-                                borderRadius: 6,
-                                border: '1px solid',
-                                borderColor: selectedDays === d ? '#82aaff' : '#333',
-                                background: selectedDays === d ? 'rgba(130,170,255,0.1)' : 'transparent',
-                                color: selectedDays === d ? '#82aaff' : '#888',
-                                fontSize: 12,
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                            }}
-                        >
-                            {d === 0 ? '전체' : `${d}일`}
-                        </button>
-                    ))}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    {/* Tier filter */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                        {([['all', '전체'], ['high', 'High'], ['mid', 'Mid'], ['small', 'Small']] as const).map(([key, label]) => {
+                            const tierColors: Record<string, string> = { all: '#82aaff', high: '#ff5252', mid: '#ffd740', small: '#00e676' };
+                            const color = tierColors[key];
+                            const count = tierSummary ? (key === 'all' ? tierSummary.total : tierSummary[key as 'high' | 'mid' | 'small']) : null;
+                            return (
+                                <button
+                                    key={key}
+                                    onClick={() => setSelectedTier(key)}
+                                    style={{
+                                        padding: '4px 10px',
+                                        borderRadius: 6,
+                                        border: '1px solid',
+                                        borderColor: selectedTier === key ? color : '#333',
+                                        background: selectedTier === key ? `${color}18` : 'transparent',
+                                        color: selectedTier === key ? color : '#888',
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                    }}
+                                >
+                                    {label}{count !== null ? ` (${count})` : ''}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div style={{ width: 1, height: 20, background: '#333' }} />
+                    {/* Period filter */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                        {[7, 14, 30, 0].map(d => (
+                            <button
+                                key={d}
+                                onClick={() => setSelectedDays(d)}
+                                style={{
+                                    padding: '4px 12px',
+                                    borderRadius: 6,
+                                    border: '1px solid',
+                                    borderColor: selectedDays === d ? '#82aaff' : '#333',
+                                    background: selectedDays === d ? 'rgba(130,170,255,0.1)' : 'transparent',
+                                    color: selectedDays === d ? '#82aaff' : '#888',
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                }}
+                            >
+                                {d === 0 ? '전체' : `${d}일`}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -302,7 +345,7 @@ export default function PerformancePage() {
                                 <span style={{ fontSize: 11, color: '#888' }}>TP</span>
                                 <select
                                     value={trendTp}
-                                    onChange={(e) => { const tp = Number(e.target.value); setTrendTp(tp); loadPnlTrend(tp, trendSl, selectedDays); }}
+                                    onChange={(e) => { const tp = Number(e.target.value); setTrendTp(tp); loadPnlTrend(tp, trendSl, selectedDays, selectedTier); }}
                                     style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 4, color: '#00e676', fontSize: 12, padding: '2px 4px', fontWeight: 600 }}
                                 >
                                     {[3,4,5,6,7,8,9,10].filter(v => v > trendSl).map(v => <option key={v} value={v}>+{v}%</option>)}
@@ -312,7 +355,7 @@ export default function PerformancePage() {
                                 <span style={{ fontSize: 11, color: '#888' }}>SL</span>
                                 <select
                                     value={trendSl}
-                                    onChange={(e) => { const sl = Number(e.target.value); setTrendSl(sl); loadPnlTrend(trendTp, sl, selectedDays); }}
+                                    onChange={(e) => { const sl = Number(e.target.value); setTrendSl(sl); loadPnlTrend(trendTp, sl, selectedDays, selectedTier); }}
                                     style={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 4, color: '#ff5252', fontSize: 12, padding: '2px 4px', fontWeight: 600 }}
                                 >
                                     {[1,2,3,4,5].filter(v => v < trendTp).map(v => <option key={v} value={v}>-{v}%</option>)}
