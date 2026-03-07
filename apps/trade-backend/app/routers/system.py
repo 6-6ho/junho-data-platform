@@ -48,7 +48,8 @@ def _build_tier_filter(tier):
         ) m ON m.symbol = t.symbol AND m.event_time = t.alert_time
     """
     tier_map = {
-        "large": "m.status LIKE '[Large]%'",
+        "high": "m.status LIKE '[High]%'",
+        "mid": "m.status LIKE '[Mid]%'",
         "small": "m.status LIKE '[Small]%'",
     }
     where = f"AND {tier_map.get(tier.lower(), 'TRUE')}"
@@ -1020,7 +1021,8 @@ async def get_tier_summary(days: int = 7):
             cur.execute(f"""
                 SELECT
                     COUNT(*) as total,
-                    COUNT(*) FILTER (WHERE m.status LIKE '[Large]%') as large,
+                    COUNT(*) FILTER (WHERE m.status LIKE '[High]%') as high,
+                    COUNT(*) FILTER (WHERE m.status LIKE '[Mid]%') as mid,
                     COUNT(*) FILTER (WHERE m.status LIKE '[Small]%') as small
                 FROM trade_performance_timeseries t
                 JOIN (
@@ -1032,10 +1034,10 @@ async def get_tier_summary(days: int = 7):
             """)
             row = cur.fetchone()
             if row:
-                return {"total": row[0], "large": row[1], "small": row[2]}
-            return {"total": 0, "large": 0, "small": 0}
+                return {"total": row[0], "high": row[1], "mid": row[2], "small": row[3]}
+            return {"total": 0, "high": 0, "mid": 0, "small": 0}
     except Exception as e:
         logger.error(f"Failed to get tier summary: {e}")
-        return {"total": 0, "large": 0, "small": 0, "error": str(e)}
+        return {"total": 0, "high": 0, "mid": 0, "small": 0, "error": str(e)}
     finally:
         conn.close()

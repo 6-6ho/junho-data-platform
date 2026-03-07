@@ -31,6 +31,20 @@ def send_telegram_alert(message):
     except Exception as e:
         print(f"[Alert] Error sending Telegram: {e}")
 
+def classify_status(change_pct, window_type):
+    """Classify movers into High/Mid/Small tiers based on change_pct and window."""
+    abs_change = abs(change_pct)
+    direction = "Rise" if change_pct > 0 else "Fall"
+    if window_type == "5m":
+        if abs_change >= 11: return f"[High] {direction}"
+        elif abs_change >= 7: return f"[Mid] {direction}"
+        else: return f"[Small] {direction}"
+    else:  # 10m
+        if abs_change >= 10: return f"[High] {direction}"
+        elif abs_change >= 7: return f"[Mid] {direction}"
+        else: return f"[Small] {direction}"
+
+
 class AlertManager:
     _instance = None
     _history = {}

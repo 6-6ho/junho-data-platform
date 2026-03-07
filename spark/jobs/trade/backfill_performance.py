@@ -3,12 +3,20 @@ Backfill Script: Detect movers from Binance Klines and analyze performance.
 Uses curl (subprocess) for Binance API calls to bypass Python SSL issues.
 """
 import os
+import sys
 import time
 import json
 import subprocess
 import psycopg2
 import psycopg2.extras
 from datetime import datetime, timezone
+
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+try:
+    from common.trade_utils import classify_status
+except ImportError:
+    sys.path.append(os.path.join(os.getcwd(), 'spark'))
+    from common.trade_utils import classify_status
 
 BINANCE_API = "https://fapi.binance.com"
 THRESHOLD_5M = 3.0
@@ -79,7 +87,7 @@ def detect_and_analyze(symbol, klines):
             continue
         last_t = t_ms
         at = datetime.fromtimestamp(t_ms / 1000, tz=timezone.utc)
-        st = "[Large] Rise" if chg >= 5.0 else "[Small] Rise"
+        st = classify_status(chg, "5m")
         movers.append({"type":"rise","symbol":symbol,"status":st,"window":"5m",
                        "event_time":at,"change_pct_window":round(chg,4),
                        "change_pct_24h":0.0,"vol_ratio":0.0})

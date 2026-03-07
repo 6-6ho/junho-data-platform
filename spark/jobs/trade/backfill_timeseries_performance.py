@@ -108,7 +108,7 @@ def save_timeseries_result(cur, symbol, alert_type, alert_time, entry_price, ts_
 
 def main():
     print("=" * 60)
-    print(f"Timeseries Backfill: Last {DAYS_BACK} days | [Large] Rise signals")
+    print(f"Timeseries Backfill: Last {DAYS_BACK} days | 3-tier signals (>=3%)")
     print("=" * 60, flush=True)
 
     conn = psycopg2.connect(**DB_CONFIG)
@@ -122,7 +122,7 @@ def main():
         FROM movers_latest
         WHERE event_time >= {cutoff_time}
           AND type = 'rise'
-          AND change_pct_window >= 5.0
+          AND change_pct_window >= 3.0
           AND NOT EXISTS (
               SELECT 1 FROM trade_performance_timeseries ts
               WHERE ts.symbol = movers_latest.symbol

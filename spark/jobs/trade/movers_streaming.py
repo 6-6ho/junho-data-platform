@@ -18,12 +18,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 try:
     from common.db import save_movers_batch, save_market_snapshot
-    from common.trade_utils import send_telegram_alert, AlertManager
+    from common.trade_utils import send_telegram_alert, AlertManager, classify_status
 except ImportError:
     # Fallback for when running from different context
     sys.path.append(os.path.join(os.getcwd(), 'spark'))
     from common.db import save_movers_batch, save_market_snapshot
-    from common.trade_utils import send_telegram_alert, AlertManager
+    from common.trade_utils import send_telegram_alert, AlertManager, classify_status
 
 # CONFIG
 KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
@@ -40,9 +40,8 @@ TRADE_SCHEMA = StructType([
 ])
 
 # Thresholds
-THRESHOLD_5M = 3.0
-THRESHOLD_5M_ALERT = 5.0
-THRESHOLD_10M = 7.0
+THRESHOLD_5M_MIN = 3.0    # 5m 최소 진입 기준
+THRESHOLD_10M_MIN = 7.0   # 10m 최소 진입 기준
 
 am = AlertManager()
 
@@ -52,19 +51,6 @@ _movers_cooldown_5m = {}
 _movers_cooldown_10m = {}
 MOVERS_COOLDOWN_5M = 300   # 5 minutes: suppress same symbol
 MOVERS_COOLDOWN_10M = 600  # 10 minutes: suppress same symbol
-
-def classify_status(change_pct, window_type):
-    abs_change = abs(change_pct)
-    direction = "Rise" if change_pct > 0 else "Fall"
-    
-    if window_type == "5m":
-        if abs_change >= 11: return f"[High] {direction}"
-        elif abs_change >= 7: return f"[Mid] {direction}"
-        else: return f"[Small] {direction}"
-    else: # 10m
-        if abs_change >= 10: return f"[High] {direction}"
-        elif abs_change >= 7: return f"[Mid] {direction}"
-        else: return f"[Small] {direction}"
 
 def process_movers_5m(batch_df, batch_id):
     print(f"[{datetime.now()}] Processing Batch {batch_id} for 5m Window...")
@@ -102,40 +88,38 @@ def process_movers_5m(batch_df, batch_id):
     movers = []
     now_ts = time.time()
     for row in rows:
-        status = None
-        if row.change_pct_window >= THRESHOLD_5M_ALERT:
-            status = "[Large] Rise"
-        elif row.change_pct_window >= THRESHOLD_5M:
-            status = "[Small] Rise"
-            
-        if status:
-            # Cooldown check: skip if this symbol was already alerted recently
-            last_alert = _movers_cooldown_5m.get(row.symbol, 0)
-            if now_ts - last_alert < MOVERS_COOLDOWN_5M:
-                continue  # Skip duplicate
-            
-            _movers_cooldown_5m[row.symbol] = now_ts
-            
-            if "Large" in status:
-                if am.should_send(row.symbol):
-                    icon = "🚀"
-                    msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
-                          f"Price: *{row.close_price}*\n" \
-                          f"Change: *{row.change_pct_window:.2f}%*\n" \
-                          f"Time: {row.latest_event_time}"
-                    send_telegram_alert(msg)
-                    am.update(row.symbol)
-                    print(f"[Alert] Sent Telegram: {row.symbol}")
+        if row.change_pct_window < THRESHOLD_5M_MIN:
+            continue
 
-            movers.append({
-                "type": "rise",
-                "symbol": row.symbol,
-                "status": status,
-                "window": "5m",
-                "event_time": row.latest_event_time,
-                "change_pct_window": row.change_pct_window,
-                "vol_ratio": 0.0
-            })
+        status = classify_status(row.change_pct_window, "5m")
+
+        # Cooldown check: skip if this symbol was already alerted recently
+        last_alert = _movers_cooldown_5m.get(row.symbol, 0)
+        if now_ts - last_alert < MOVERS_COOLDOWN_5M:
+            continue  # Skip duplicate
+
+        _movers_cooldown_5m[row.symbol] = now_ts
+
+        if "High" in status or "Mid" in status:
+            if am.should_send(row.symbol):
+                icon = "🚀"
+                msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
+                      f"Price: *{row.close_price}*\n" \
+                      f"Change: *{row.change_pct_window:.2f}%*\n" \
+                      f"Time: {row.latest_event_time}"
+                send_telegram_alert(msg)
+                am.update(row.symbol)
+                print(f"[Alert] Sent Telegram: {row.symbol}")
+
+        movers.append({
+            "type": "rise",
+            "symbol": row.symbol,
+            "status": status,
+            "window": "5m",
+            "event_time": row.latest_event_time,
+            "change_pct_window": row.change_pct_window,
+            "vol_ratio": 0.0
+        })
             
     if movers:
         save_movers_batch(movers)
@@ -146,27 +130,28 @@ def process_movers_10m(batch_df, batch_id):
     # Note: Logic in classify_status tracks ABS(change) >= 7% for Mid, so we filter broadly here.
     # THRESHOLD_10M is 7.0
     
-    filtered_df = batch_df.filter(expr(f"abs(change_pct_window) >= {THRESHOLD_10M}"))
-    
+    filtered_df = batch_df.filter(expr(f"abs(change_pct_window) >= {THRESHOLD_10M_MIN}"))
+
     rows = filtered_df.collect()
     if not rows:
         return
-        
+
     movers = []
     now_ts = time.time()
     for row in rows:
-        status = None
-        if row.change_pct_window >= THRESHOLD_10M:
-            status = "[Small] Rise"
-        
-        if status:
-            # Cooldown check: skip if this symbol was already alerted recently
-            last_alert = _movers_cooldown_10m.get(row.symbol, 0)
-            if now_ts - last_alert < MOVERS_COOLDOWN_10M:
-                continue  # Skip duplicate
-            
-            _movers_cooldown_10m[row.symbol] = now_ts
-            
+        if row.change_pct_window < THRESHOLD_10M_MIN:
+            continue
+
+        status = classify_status(row.change_pct_window, "10m")
+
+        # Cooldown check: skip if this symbol was already alerted recently
+        last_alert = _movers_cooldown_10m.get(row.symbol, 0)
+        if now_ts - last_alert < MOVERS_COOLDOWN_10M:
+            continue  # Skip duplicate
+
+        _movers_cooldown_10m[row.symbol] = now_ts
+
+        if "High" in status or "Mid" in status:
             if am.should_send(row.symbol, cooldown_override=MOVERS_COOLDOWN_10M):
                 icon = "🚀"
                 msg = f"{icon} *{status}: {row.symbol} (10m)*\n" \
@@ -177,14 +162,14 @@ def process_movers_10m(batch_df, batch_id):
                 am.update(row.symbol)
                 print(f"[Alert] Sent Telegram: {row.symbol}")
 
-            movers.append({
-                "type": "rise",
-                "symbol": row.symbol,
-                "status": status,
-                "window": "10m",
-                "event_time": row.latest_event_time,
-                "change_pct_window": row.change_pct_window
-            })
+        movers.append({
+            "type": "rise",
+            "symbol": row.symbol,
+            "status": status,
+            "window": "10m",
+            "event_time": row.latest_event_time,
+            "change_pct_window": row.change_pct_window
+        })
     
     if movers:
         save_movers_batch(movers)

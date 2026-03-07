@@ -87,7 +87,8 @@ interface ProfitTargetData {
 
 interface TierSummary {
     total: number;
-    large: number;
+    high: number;
+    mid: number;
     small: number;
 }
 
@@ -219,10 +220,10 @@ export default function PerformancePage() {
                 <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     {/* Tier filter */}
                     <div style={{ display: 'flex', gap: 4 }}>
-                        {([['all', '전체'], ['large', 'Large'], ['small', 'Small']] as const).map(([key, label]) => {
-                            const tierColors: Record<string, string> = { all: '#82aaff', large: '#ff5252', small: '#00e676' };
+                        {([['all', '전체'], ['high', 'High'], ['mid', 'Mid'], ['small', 'Small']] as const).map(([key, label]) => {
+                            const tierColors: Record<string, string> = { all: '#82aaff', high: '#ff5252', mid: '#ffd740', small: '#00e676' };
                             const color = tierColors[key];
-                            const count = tierSummary ? (key === 'all' ? tierSummary.total : tierSummary[key as 'large' | 'small']) : null;
+                            const count = tierSummary ? (key === 'all' ? tierSummary.total : tierSummary[key as 'high' | 'mid' | 'small']) : null;
                             return (
                                 <button
                                     key={key}
