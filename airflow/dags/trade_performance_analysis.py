@@ -246,8 +246,7 @@ def run_performance_analysis(**context):
     # 2. Analyze optimal strategies by tier (yesterday's data only)
     cur.execute("""
         SELECT t.timeseries_data,
-               CASE WHEN m.status LIKE '[High]%' THEN 'High'
-                    WHEN m.status LIKE '[Mid]%' THEN 'Mid'
+               CASE WHEN m.status LIKE '[Large]%' THEN 'Large'
                     ELSE 'Small' END as tier
         FROM trade_performance_timeseries t
         JOIN (
@@ -267,7 +266,7 @@ def run_performance_analysis(**context):
         return
 
     # Group signals by tier
-    tier_signals = {"High": [], "Mid": [], "Small": []}
+    tier_signals = {"Large": [], "Small": []}
     for row in rows:
         ts_data, tier = row[0], row[1]
         tier_signals[tier].append(ts_data)
@@ -282,11 +281,11 @@ def run_performance_analysis(**context):
     # 3. Build Telegram message
     msg = f"📊 *최적 전략 분석* (어제 기준)\n"
     msg += f"📈 총 신호: *{total_signals}개* "
-    msg += f"(High: {tier_counts['High']} / Mid: {tier_counts['Mid']} / Small: {tier_counts['Small']})\n\n"
+    msg += f"(Large: {tier_counts['Large']} / Small: {tier_counts['Small']})\n\n"
 
-    tier_emoji = {"High": "🔴", "Mid": "🟡", "Small": "🟢"}
+    tier_emoji = {"Large": "🔴", "Small": "🟢"}
 
-    for tier_name in ["High", "Mid", "Small"]:
+    for tier_name in ["Large", "Small"]:
         signals = tier_signals[tier_name]
         if len(signals) < 2:
             continue
