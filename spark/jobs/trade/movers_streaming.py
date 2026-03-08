@@ -100,7 +100,7 @@ def process_movers_5m(batch_df, batch_id):
 
         _movers_cooldown_5m[row.symbol] = now_ts
 
-        if "High" in status or "Mid" in status:
+        if "High" in status or "Mid" in status or (row.change_pct_window >= 5.0 and "Small" in status):
             if am.should_send(row.symbol):
                 icon = "🚀"
                 msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
