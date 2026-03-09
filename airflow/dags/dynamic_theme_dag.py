@@ -114,6 +114,11 @@ def discover_themes(**context):
                 continue
 
             high_change_pct = ((best_high - open_price) / open_price) * 100
+
+            # Only include coins with meaningful move (>= 3% from open)
+            if high_change_pct < 3.0:
+                continue
+
             # High time as minutes from midnight UTC
             high_ts = klines[best_idx][0] / 1000  # ms -> s
             high_dt = datetime.fromtimestamp(high_ts, tz=timezone.utc)
@@ -133,8 +138,8 @@ def discover_themes(**context):
 
         logger.info(f"Got high data for {len(high_data)} symbols")
 
-        if len(high_data) < 10:
-            logger.warning("Not enough data for clustering. Skipping.")
+        if len(high_data) < 5:
+            logger.warning(f"Not enough significant movers ({len(high_data)}). Skipping.")
             return
 
         # 3. DBSCAN clustering on high time (circular distance)
@@ -149,7 +154,7 @@ def discover_themes(**context):
                 dist_matrix[i, j] = d
                 dist_matrix[j, i] = d
 
-        clustering = DBSCAN(eps=30, min_samples=5, metric="precomputed").fit(dist_matrix)
+        clustering = DBSCAN(eps=15, min_samples=3, metric="precomputed").fit(dist_matrix)
         labels = clustering.labels_
 
         unique_labels = set(labels)
