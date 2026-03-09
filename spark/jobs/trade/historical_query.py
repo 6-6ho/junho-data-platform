@@ -17,8 +17,8 @@ import psycopg2
 DB_CONFIG = {
     "host": os.getenv("POSTGRES_HOST", "localhost"),
     "port": int(os.getenv("POSTGRES_PORT", "5432")),
-    "dbname": os.getenv("POSTGRES_DB", "pipeline"),
-    "user": os.getenv("POSTGRES_USER", "pipeline"),
+    "dbname": os.getenv("POSTGRES_DB", "app"),
+    "user": os.getenv("POSTGRES_USER", "postgres"),
     "password": os.getenv("POSTGRES_PASSWORD", "postgres"),
 }
 

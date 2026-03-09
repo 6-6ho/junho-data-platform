@@ -7,7 +7,6 @@ app = FastAPI(title="Trade Helper API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -48,12 +47,8 @@ async def system_status():
     except Exception:
         status = "DEGRADED"
     
-    # Kafka throughput은 shop-generator 로그 기반 추정 (실제로는 Kafka metrics API 필요)
-    kafka_throughput = "~50 msg/sec"
-    
     return {
         "status": status,
         "pipeline_lag": pipeline_lag,
         "active_workers": active_workers,
-        "kafka_throughput": kafka_throughput
     }

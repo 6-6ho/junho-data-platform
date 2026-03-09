@@ -7,15 +7,17 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 import os
 import json
+import logging
 import jwt
 from kafka import KafkaProducer
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Shop Analytics API")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -116,6 +118,7 @@ async def get_summary():
             "data_freshness_sec": data_freshness_sec
         }
     except Exception as e:
+        logger.error(f"summary failed: {e}")
         return {
             "total_events": 0,
             "today_events": 0,
@@ -159,6 +162,7 @@ async def get_hourly_traffic():
 
         return result
     except Exception as e:
+        logger.error(f"hourly-traffic failed: {e}")
         return []
 
 @router.get("/hourly-throughput")
@@ -191,6 +195,7 @@ async def get_hourly_throughput():
 
         return result
     except Exception as e:
+        logger.error(f"hourly-throughput failed: {e}")
         return []
 
 @router.get("/funnel")
@@ -223,6 +228,7 @@ async def get_funnel():
             "conversion_rate": round(purchase / pv * 100, 2) if pv > 0 else 0
         }
     except Exception as e:
+        logger.error(f"funnel failed: {e}")
         return {
             "page_view": 0,
             "add_to_cart": 0,
@@ -249,6 +255,7 @@ async def get_dq_score_trend():
         conn.close()
         return list(reversed(rows))
     except Exception as e:
+        logger.error(f"dq/score-trend failed: {e}")
         return []
 
 @router.get("/dq/anomalies")
@@ -275,6 +282,7 @@ async def get_dq_anomalies():
         conn.close()
         return rows
     except Exception as e:
+        logger.error(f"dq/anomalies failed: {e}")
         return []
 
 @router.get("/dq/category-health")
@@ -301,6 +309,7 @@ async def get_dq_category_health():
         conn.close()
         return rows
     except Exception as e:
+        logger.error(f"dq/category-health failed: {e}")
         return []
 
 @router.get("/dq/payment-health")
@@ -325,6 +334,7 @@ async def get_dq_payment_health():
         conn.close()
         return rows
     except Exception as e:
+        logger.error(f"dq/payment-health failed: {e}")
         return []
 
 @router.get("/dq/reconciliation")
@@ -372,6 +382,7 @@ async def get_dq_reconciliation():
         conn.close()
         return result
     except Exception as e:
+        logger.error(f"dq/reconciliation failed: {e}")
         return []
 
 @router.get("/dq/rules-summary")
@@ -410,6 +421,7 @@ async def get_dq_rules_summary():
             })
         return result
     except Exception as e:
+        logger.error(f"dq/rules-summary failed: {e}")
         return []
 
 @router.get("/dq/anomaly-raw-count")
@@ -433,6 +445,7 @@ async def get_dq_anomaly_raw_count():
         conn.close()
         return {"total": total, "breakdown": breakdown}
     except Exception as e:
+        logger.error(f"dq/anomaly-raw-count failed: {e}")
         return {"total": 0, "breakdown": {}}
 
 @router.get("/reports/latest")

@@ -23,6 +23,7 @@ services:
   kafka:
     image: confluentinc/cp-kafka:latest
     hostname: kafka
+    restart: unless-stopped
     deploy:
       resources:
         limits:
@@ -48,6 +49,7 @@ services:
   # === Data Ingestion ===
   ingest:
     build: ./apps/trade-ingest
+    restart: unless-stopped
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     deploy:
@@ -62,6 +64,7 @@ services:
   trade-movers:
     build: ./spark
     user: root  # Fix checkpoint permission on WSL
+    restart: unless-stopped
     depends_on: [kafka, postgres]
     env_file: [.env]
     deploy:
@@ -87,6 +90,7 @@ services:
   # === Frontend & Routing ===
   frontend:
     build: ./apps/trade-frontend
+    restart: unless-stopped
     ports:
       - "3000:80"
     deploy:
@@ -104,6 +108,7 @@ services:
   # === Trade API ===
   api:
     build: ./apps/trade-backend
+    restart: unless-stopped
     env_file: [.env]
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
@@ -129,6 +134,7 @@ services:
   # === Database ===
   postgres:
     image: postgres:16
+    restart: unless-stopped
     env_file: [.env]
     deploy:
       resources:

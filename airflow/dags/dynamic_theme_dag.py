@@ -246,7 +246,7 @@ with DAG(
     default_args=default_args,
     description="Discover dynamic themes via high-time DBSCAN clustering (daily)",
     schedule_interval="0 21 * * *",
-    catchup=True,
+    catchup=False,
     tags=["theme", "analysis", "trade"],
 ) as dag:
 
