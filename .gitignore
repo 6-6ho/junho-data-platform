@@ -52,3 +52,12 @@ DE_Portfolio/
 1.txt
 current.txt
 valid.txt
+
+# Claude Code / AI tools
+CLAUDE.md
+.claude/
+.agent/
+install_claude.sh
+
+# Tunnel credentials
+infra/tunnel/credentials.json

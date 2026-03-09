@@ -1,6 +1,6 @@
 #!/bin/bash
 # Backfill Timeseries Performance Analysis
-# Run this script on Desktop (192.168.219.108)
+# Run this script on Desktop node
 
 set -e
 
@@ -10,13 +10,13 @@ echo "====================================="
 
 # Check if running on Desktop
 if ! docker ps | grep -q jdp-airflow; then
-    echo "ERROR: This script should run on Desktop (192.168.219.108)"
-    echo "Please run: ssh desktop 'cd ~/junho-data-platform && ./run_backfill_timeseries.sh'"
+    echo "ERROR: This script should run on Desktop node"
+    echo "Please run: ssh <DESKTOP_HOST> 'cd ~/junho-data-platform && ./run_backfill_timeseries.sh'"
     exit 1
 fi
 
 # Set environment variables
-export DB_HOST=192.168.219.101
+export DB_HOST=${LAPTOP_IP:-localhost}
 export POSTGRES_PASSWORD=postgres
 export DAYS_BACK=7
 
@@ -44,4 +44,4 @@ echo "Backfill Complete!"
 echo "====================================="
 echo ""
 echo "Check results:"
-echo "  docker exec jdp-shop-api python3 -c \"import psycopg2; conn=psycopg2.connect(host='192.168.219.101',port=5432,database='app',user='postgres',password='postgres'); cur=conn.cursor(); cur.execute('SELECT COUNT(*) FROM trade_performance_timeseries'); print('Total timeseries records:', cur.fetchone()[0])\""
+echo "  docker exec jdp-shop-api python3 -c \"import psycopg2; conn=psycopg2.connect(host='\$DB_HOST',port=5432,database='app',user='postgres',password='\$POSTGRES_PASSWORD'); cur=conn.cursor(); cur.execute('SELECT COUNT(*) FROM trade_performance_timeseries'); print('Total timeseries records:', cur.fetchone()[0])\""

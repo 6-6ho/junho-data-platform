@@ -9,10 +9,10 @@
 ### 접속 정보
 | 항목 | 값 |
 |------|-----|
-| API Endpoint | `http://192.168.219.108:9000` |
-| Console | `http://192.168.219.108:9001` |
+| API Endpoint | `http://<DESKTOP_IP>:9000` |
+| Console | `http://<DESKTOP_IP>:9001` |
 | Access Key | `minio` |
-| Secret Key | `minio123` |
+| Secret Key | `<your-password>` |
 
 ### 현재 버킷 구조
 ```
@@ -64,7 +64,7 @@ rsync -av /mnt/d/minio-data/ /path/to/backup/
 --conf spark.sql.catalog.my_catalog.warehouse=s3a://iceberg-warehouse/
 --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000
 --conf spark.hadoop.fs.s3a.access.key=minio
---conf spark.hadoop.fs.s3a.secret.key=minio123
+--conf spark.hadoop.fs.s3a.secret.key=<your-password>
 --conf spark.hadoop.fs.s3a.path.style.access=true
 --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem
 ```
@@ -75,9 +75,9 @@ import boto3
 
 s3 = boto3.client(
     's3',
-    endpoint_url='http://192.168.219.108:9000',
+    endpoint_url='http://<DESKTOP_IP>:9000',
     aws_access_key_id='minio',
-    aws_secret_access_key='minio123'
+    aws_secret_access_key='<your-password>'
 )
 
 # 파일 업로드
@@ -92,7 +92,7 @@ for obj in s3.list_objects_v2(Bucket='raw')['Contents']:
 
 ## 보안 개선 (TODO)
 
-1. **자격증명 변경**: 기본 `minio/minio123` → 강력한 비밀번호
+1. **자격증명 변경**: 기본 `minio/<your-password>` → 강력한 비밀번호
 2. **환경변수 관리**: `.env` 파일로 분리
 3. **네트워크 제한**: 내부망에서만 접근 가능하도록
 
@@ -109,7 +109,7 @@ MINIO_ROOT_PASSWORD=your_secure_password_here
 ### MinIO CLI (mc)
 ```bash
 # 별칭 설정
-mc alias set myminio http://192.168.219.108:9000 minio minio123
+mc alias set myminio http://<DESKTOP_IP>:9000 minio <your-password>
 
 # 버킷 목록
 mc ls myminio

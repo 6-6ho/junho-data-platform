@@ -36,7 +36,7 @@ except Exception as e:
     print(f"Warning: Could not connect to Kafka: {e}")
     producer = None
 
-JWT_SECRET = os.getenv("JWT_SECRET", "super-secret-admin-key")
+JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin")
 
 class LoginRequest(BaseModel):

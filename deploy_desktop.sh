@@ -5,7 +5,7 @@ set -e
 source .env
 
 # Configuration
-DESKTOP_HOST=${DESKTOP_HOST:-192.168.219.102}  # Default or from env
+DESKTOP_HOST=${DESKTOP_HOST:?Set DESKTOP_HOST in .env or export it}
 DESKTOP_USER=${DESKTOP_USER:-junhod}           # Default or from env
 PROJECT_DIR=${PROJECT_DIR:-~/junho-data-platform}
 

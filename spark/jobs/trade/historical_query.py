@@ -19,7 +19,7 @@ DB_CONFIG = {
     "port": int(os.getenv("POSTGRES_PORT", "5432")),
     "dbname": os.getenv("POSTGRES_DB", "pipeline"),
     "user": os.getenv("POSTGRES_USER", "pipeline"),
-    "password": os.getenv("POSTGRES_PASSWORD", "pipeline123"),
+    "password": os.getenv("POSTGRES_PASSWORD", "postgres"),
 }
 
 WIN_THRESHOLD_PCT = 1.0

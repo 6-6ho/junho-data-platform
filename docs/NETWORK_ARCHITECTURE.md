@@ -5,7 +5,7 @@ Junho Data Platform is a distributed system running on two physical nodes (Lapto
 They communicate via **WSL2 Port Forwarding** and **Windows Firewall Rules**.
 
 ## 💻 Laptop Node (Main Control)
-- **IP**: 192.168.219.xxx (Dynamic)
+- **IP**: <LAPTOP_IP> (Dynamic)
 - **Role**: Trade Pipeline, Web Server (Nginx), API, Monitor (Grafana)
 - **Services Exposed to Desktop**:
   - ` Postgres (5432)`: Desktop Spark/Airflow connects here to save data.
@@ -20,7 +20,7 @@ They communicate via **WSL2 Port Forwarding** and **Windows Firewall Rules**.
 ---
 
 ## 🖥️ Desktop Node (Storage & Batch)
-- **IP**: 192.168.219.108 (Static)
+- **IP**: <DESKTOP_IP> (Static)
 - **Role**: Shop Pipeline, Spark Cluster, Airflow, Metrics Exporters
 - **Services Exposed to Laptop**:
 

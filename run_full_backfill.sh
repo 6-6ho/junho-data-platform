@@ -26,7 +26,7 @@ from datetime import datetime, timezone
 BINANCE_API = 'https://fapi.binance.com'
 WIN_THRESHOLD_PCT = 1.0
 RATE_LIMIT_SLEEP = 0.15
-DB_CONFIG = {'host': '192.168.219.101', 'port': 5432, 'dbname': 'app', 'user': 'postgres', 'password': 'postgres'}
+DB_CONFIG = {'host': os.getenv('DB_HOST', 'localhost'), 'port': 5432, 'dbname': 'app', 'user': 'postgres', 'password': os.getenv('POSTGRES_PASSWORD', 'postgres')}
 
 def curl_get(url):
     r = subprocess.run(['curl', '-s', '--connect-timeout', '10', url], capture_output=True, text=True, timeout=20)
@@ -97,5 +97,5 @@ python3 /tmp/backfill_full.py
 echo ""
 echo "======================================"
 echo "Backfill Complete!"
-echo "Check: docker exec jdp-shop-api python3 -c \"import psycopg2; conn=psycopg2.connect(host='192.168.219.101',port=5432,database='app',user='postgres',password='postgres'); cur=conn.cursor(); cur.execute('SELECT COUNT(*) FROM trade_performance_timeseries'); print('Total records:', cur.fetchone()[0])\""
+echo "Check: docker exec jdp-shop-api python3 -c \"import psycopg2; conn=psycopg2.connect(host='\$DB_HOST',port=5432,database='app',user='postgres',password='\$POSTGRES_PASSWORD'); cur=conn.cursor(); cur.execute('SELECT COUNT(*) FROM trade_performance_timeseries'); print('Total records:', cur.fetchone()[0])\""
 echo "======================================"

@@ -2,7 +2,7 @@
 # 역할: Data Ingestion, Streaming, Batch, Shop Services
 #
 # 사용법:
-#   1. 환경변수 설정: export LAPTOP_IP=192.168.219.101
+#   1. 환경변수 설정: export LAPTOP_IP=<your-laptop-ip>
 #   2. 실행: docker compose -f docker-compose.desktop.yml up -d
 #
 # 서비스 목록:
@@ -139,7 +139,7 @@ services:
       - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
       - AIRFLOW__CORE__EXECUTOR=LocalExecutor
       - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@${LAPTOP_IP}:5432/app
-      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:-46BKJoQYlPPOexq0OhDZnIlNepKFf87WFwLbfzqDDho=}
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:?Set AIRFLOW_FERNET_KEY in .env}
       - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-jdp-secret}
       - _AIRFLOW_DB_MIGRATE=true
       - _AIRFLOW_WWW_USER_CREATE=true

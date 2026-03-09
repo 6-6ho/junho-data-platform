@@ -15,12 +15,12 @@ fi
 if [ -z "$LAPTOP_IP" ]; then
   echo "⚠️  LAPTOP_IP is not set."
   echo "   (노트북에서 'ipconfig' 또는 'ip a'로 확인된 WSL IP 또는 LAN IP를 입력하세요)"
-  read -p "Enter Laptop IP (Default: 192.168.219.101): " INPUT_IP
-  if [ ! -z "$INPUT_IP" ]; then
-    export LAPTOP_IP=$INPUT_IP
-  else
-    export LAPTOP_IP=192.168.219.101
+  read -p "Enter Laptop IP: " INPUT_IP
+  if [ -z "$INPUT_IP" ]; then
+    echo "LAPTOP_IP is required. Exiting."
+    exit 1
   fi
+  export LAPTOP_IP=$INPUT_IP
 fi
 
 echo "📡 Laptop Postgres: ${LAPTOP_IP}:5432"
@@ -79,7 +79,7 @@ echo ""
 echo "🔗 Access Points:"
 echo "   - ⚡ Spark Master:   http://localhost:8081"
 echo "   - 💨 Airflow:        https://airflow.6-6ho.com (admin/admin)"
-echo "   - 🗄️  MinIO Console:  http://localhost:9001 (minio/minio123)"
+echo "   - 🗄️  MinIO Console:  http://localhost:9001"
 echo "   - 🛍️  Shop App:       https://shop.6-6ho.com (or analytics.6-6ho.com)"
 echo "   - 📊 cAdvisor:       http://localhost:8086"
 echo ""
