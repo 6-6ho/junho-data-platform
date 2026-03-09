@@ -68,8 +68,10 @@ def compute_daily_correlation(**context):
     cur = conn.cursor()
 
     try:
-        # Determine target date
-        ds = context.get("ds")
+        # Determine target date: prefer conf["ds"] (backfill) over Airflow ds
+        dag_run = context.get("dag_run")
+        conf_ds = dag_run.conf.get("ds") if dag_run and dag_run.conf else None
+        ds = conf_ds or context.get("ds")
         if ds:
             target_date = datetime.strptime(ds, "%Y-%m-%d").date()
         else:
@@ -226,7 +228,9 @@ def build_clusters(**context):
         target_date_str = ti.xcom_pull(task_ids="compute_daily_correlation", key="target_date")
 
         if not target_date_str:
-            ds = context.get("ds")
+            dag_run = context.get("dag_run")
+            conf_ds = dag_run.conf.get("ds") if dag_run and dag_run.conf else None
+            ds = conf_ds or context.get("ds")
             target_date = datetime.strptime(ds, "%Y-%m-%d").date() if ds else (datetime.now(timezone.utc) - timedelta(days=1)).date()
         else:
             target_date = datetime.strptime(target_date_str, "%Y-%m-%d").date()
