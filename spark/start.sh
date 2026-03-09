@@ -14,7 +14,7 @@ if [ "$ENABLE_ICEBERG" == "true" ]; then
   --conf spark.sql.catalog.my_catalog.warehouse=s3a://iceberg-warehouse/data \
   --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
   --conf spark.hadoop.fs.s3a.access.key=minio \
-  --conf spark.hadoop.fs.s3a.secret.key=${MINIO_SECRET_KEY:-minio123} \
+  --conf spark.hadoop.fs.s3a.secret.key=${MINIO_SECRET_KEY} \
   --conf spark.hadoop.fs.s3a.path.style.access=true \
   --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
   --conf spark.hadoop.fs.s3a.connection.ssl.enabled=false"
@@ -36,4 +36,4 @@ spark-submit \
   --conf spark.sql.adaptive.coalescePartitions.enabled=true \
   --conf spark.locality.wait=3s \
   $ICEBERG_CONF \
-  jobs/${SPARK_JOB_NAME:-unified_streaming.py}
+  jobs/${SPARK_JOB_NAME:?Set SPARK_JOB_NAME}
