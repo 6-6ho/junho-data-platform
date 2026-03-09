@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, Flame, BarChart3, Layers, Zap, Clock } from 'lucide-react';
+import { TrendingUp, TrendingDown, ChevronDown, ChevronUp, Flame, BarChart3, Layers, Zap } from 'lucide-react';
 import { Tooltip } from '../components/Tooltip';
 
 const API_BASE = '/api/theme';
@@ -29,22 +29,22 @@ interface ThemeCoin {
     event_time: string | null;
 }
 
-// --- Dynamic Theme Types ---
+// --- Dynamic Theme Types (v2: correlation-based) ---
 interface DynamicCluster {
     cluster_id: number;
     created_date: string;
     coin_count: number;
     strength_score: number;
-    avg_high_time: string;
-    time_spread_minutes: number;
     avg_high_change_pct: number;
+    lead_symbol: string | null;
+    lead_change_pct: number | null;
+    avg_correlation: number | null;
 }
 
 interface DynamicMember {
     symbol: string;
-    high_time: string;
-    high_price: number;
-    high_change_pct: number;
+    daily_change_pct: number | null;
+    correlation_to_lead: number | null;
     change_pct_24h: number | null;
     vol_ratio: number | null;
 }
@@ -53,12 +53,6 @@ type TabType = 'static' | 'dynamic';
 
 const formatPct = (v: number | null) => v == null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`;
 const pctColor = (v: number | null) => v == null ? '#888' : v >= 0 ? '#00e676' : '#ff5252';
-const formatTime = (isoStr: string) => {
-    try {
-        return new Date(isoStr).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-    } catch { return isoStr; }
-};
-
 // ==================== Static Theme Tab ====================
 function StaticThemeTab() {
     const [themes, setThemes] = useState<ThemeRS[]>([]);
@@ -308,7 +302,7 @@ function StaticThemeTab() {
     );
 }
 
-// ==================== Dynamic Theme Tab ====================
+// ==================== Dynamic Theme Tab (v2: correlation-based) ====================
 function DynamicThemeTab() {
     const [clusters, setClusters] = useState<DynamicCluster[]>([]);
     const [loading, setLoading] = useState(true);
@@ -353,6 +347,8 @@ function DynamicThemeTab() {
         }
     };
 
+    const formatCorr = (v: number | null) => v == null ? '—' : v.toFixed(2);
+
     if (loading) {
         return (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '40vh' }}>
@@ -369,7 +365,7 @@ function DynamicThemeTab() {
                     <Zap size={20} style={{ color: '#82aaff' }} />
                     <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>동적 테마</span>
                     <div style={{ cursor: 'help', display: 'flex', alignItems: 'center' }}>
-                        <Tooltip content="같은 날 동시에 상승한 코인들을 자동 클러스터링합니다. 25~26년 신규 상장 코인 중 반복적으로 함께 움직이는 종목은 같은 세력이거나 숨겨진 테마일 가능성이 높습니다. 연관성을 누적해 새로운 테마를 발견하는 것이 목표입니다.">
+                        <Tooltip content="14일간 시장 중립(BTC 수익률 차감) 5분봉 상관관계 기반. BTC 효과를 제거하고 진짜 같이 움직이는 코인만 클러스터링(계층적 군집화, 상관 0.65+).">
                             <div style={{
                                 width: 14, height: 14, borderRadius: '50%', border: '1px solid #666',
                                 color: '#666', fontSize: 10, display: 'flex', justifyContent: 'center', alignItems: 'center'
@@ -381,6 +377,44 @@ function DynamicThemeTab() {
                     {dynamicDate ? `Date: ${dynamicDate}` : ''}
                 </span>
             </div>
+
+            {/* Today's TOP card — first cluster by strength */}
+            {clusters.length > 0 && (() => {
+                const top = clusters[0];
+                return (
+                    <div style={{
+                        background: 'linear-gradient(135deg, rgba(130,170,255,0.08) 0%, rgba(130,170,255,0.02) 100%)',
+                        border: '1px solid rgba(130,170,255,0.2)',
+                        borderRadius: 12,
+                        padding: '20px 24px',
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                            <Flame size={18} style={{ color: '#82aaff' }} />
+                            <span style={{ fontSize: 11, color: '#82aaff', fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+                                오늘의 TOP 클러스터
+                            </span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <div style={{ fontSize: 24, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+                                    {top.lead_symbol?.replace('USDT', '') || '—'}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#aaa' }}>
+                                    {top.coin_count}개 코인 · 평균 상관 {formatCorr(top.avg_correlation)}
+                                </div>
+                            </div>
+                            <div style={{ textAlign: 'right' }}>
+                                <div style={{ fontSize: 32, fontWeight: 800, color: pctColor(top.lead_change_pct) }}>
+                                    {formatPct(top.lead_change_pct)}
+                                </div>
+                                <div style={{ fontSize: 12, color: '#888', marginTop: 4 }}>
+                                    강도 {top.strength_score.toFixed(1)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            })()}
 
             {clusters.length === 0 ? (
                 <div style={{ padding: 40, textAlign: 'center', color: '#666', fontSize: 13 }}>
@@ -416,7 +450,7 @@ function DynamicThemeTab() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                                     <div style={{
                                         width: 32, height: 32, borderRadius: 8,
-                                        background: `rgba(130,170,255,${Math.min(0.3, c.strength_score / 50)})`,
+                                        background: `rgba(130,170,255,${Math.min(0.3, (c.avg_correlation || 0) * 0.35)})`,
                                         display: 'flex', justifyContent: 'center', alignItems: 'center',
                                         fontSize: 14, fontWeight: 800, color: '#82aaff',
                                     }}>
@@ -425,7 +459,7 @@ function DynamicThemeTab() {
                                     <div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                                             <span style={{ fontSize: 15, fontWeight: 700, color: '#fff' }}>
-                                                클러스터 #{c.cluster_id}
+                                                {c.lead_symbol?.replace('USDT', '') || `클러스터 #${c.cluster_id}`}
                                             </span>
                                             <span style={{
                                                 fontSize: 11, padding: '2px 8px', borderRadius: 4,
@@ -436,11 +470,8 @@ function DynamicThemeTab() {
                                             </span>
                                         </div>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#888' }}>
-                                            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                                                <Clock size={11} />
-                                                고점 {formatTime(c.avg_high_time)}
-                                            </span>
-                                            <span>분산 {c.time_spread_minutes.toFixed(0)}분</span>
+                                            <span>상관 {formatCorr(c.avg_correlation)}</span>
+                                            <span>대장 {c.lead_symbol?.replace('USDT', '') || '—'} ({formatPct(c.lead_change_pct)})</span>
                                         </div>
                                     </div>
                                 </div>
@@ -469,38 +500,51 @@ function DynamicThemeTab() {
                                     {membersLoading ? (
                                         <div style={{ color: '#666', fontSize: 12, padding: 8 }}>로딩 중...</div>
                                     ) : (
-                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>
+                                        <>
+                                            {/* Member table header */}
+                                            <div style={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '1fr 100px 100px',
+                                                padding: '6px 14px',
+                                                fontSize: 11,
+                                                color: '#666',
+                                                fontWeight: 600,
+                                                borderBottom: '1px solid #1a1a1a',
+                                                marginBottom: 4,
+                                            }}>
+                                                <span>심볼</span>
+                                                <span style={{ textAlign: 'right' }}>변동률</span>
+                                                <span style={{ textAlign: 'right' }}>대장주 상관</span>
+                                            </div>
                                             {clusterMembers.map((m) => (
                                                 <div key={m.symbol} style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
+                                                    display: 'grid',
+                                                    gridTemplateColumns: '1fr 100px 100px',
                                                     alignItems: 'center',
                                                     padding: '10px 14px',
                                                     background: '#0a0a0a',
                                                     borderRadius: 8,
                                                     border: '1px solid #1a1a1a',
+                                                    marginBottom: 4,
                                                 }}>
-                                                    <div>
-                                                        <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
-                                                            {m.symbol.replace('USDT', '')}
-                                                        </div>
-                                                        <div style={{ fontSize: 11, color: '#666', marginTop: 2 }}>
-                                                            고점 {formatTime(m.high_time)}
-                                                        </div>
+                                                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                                                        {m.symbol.replace('USDT', '')}
+                                                    </div>
+                                                    <div style={{ textAlign: 'right', fontSize: 13, fontWeight: 600, color: pctColor(m.daily_change_pct) }}>
+                                                        {formatPct(m.daily_change_pct)}
                                                     </div>
                                                     <div style={{ textAlign: 'right' }}>
-                                                        <div style={{ fontSize: 13, fontWeight: 600, color: pctColor(m.high_change_pct) }}>
-                                                            {formatPct(m.high_change_pct)}
-                                                        </div>
-                                                        {m.change_pct_24h != null && (
-                                                            <div style={{ fontSize: 11, color: pctColor(m.change_pct_24h) }}>
-                                                                24h {formatPct(m.change_pct_24h)}
-                                                            </div>
-                                                        )}
+                                                        <span style={{
+                                                            fontSize: 12,
+                                                            fontWeight: 600,
+                                                            color: (m.correlation_to_lead || 0) >= 0.85 ? '#82aaff' : '#aaa',
+                                                        }}>
+                                                            {formatCorr(m.correlation_to_lead)}
+                                                        </span>
                                                     </div>
                                                 </div>
                                             ))}
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             )}
@@ -525,7 +569,7 @@ export default function ThemePage() {
         {
             key: 'dynamic',
             label: '동적 테마',
-            tooltip: '같은 날 동시에 상승한 코인들을 자동 클러스터링(DBSCAN). 매일 KST 06:00 갱신.',
+            tooltip: '14일 시장 중립 상관관계 기반 계층적 클러스터링. BTC 효과를 제거하고 진짜 같이 움직이는 코인 그룹 발견. 매일 KST 06:00 갱신.',
         },
     ];
 

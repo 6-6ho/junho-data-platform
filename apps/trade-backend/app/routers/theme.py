@@ -88,13 +88,14 @@ async def get_theme_rs(mock: bool = False):
 
 @router.get("/dynamic")
 async def get_dynamic_themes():
-    """Get latest dynamic theme clusters, sorted by strength."""
+    """Get latest dynamic theme clusters (correlation-based), sorted by strength."""
     conn = get_db_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT cluster_id, created_date, coin_count, strength_score,
-                       avg_high_time, time_spread_minutes, avg_high_change_pct, created_at
+                       avg_high_change_pct, lead_symbol, lead_change_pct,
+                       avg_correlation, created_at
                 FROM dynamic_theme_cluster
                 WHERE created_date = (SELECT MAX(created_date) FROM dynamic_theme_cluster)
                 ORDER BY strength_score DESC
@@ -105,8 +106,6 @@ async def get_dynamic_themes():
                 for k, v in c.items():
                     if hasattr(v, '__float__'):
                         c[k] = float(v)
-                if c.get('avg_high_time'):
-                    c['avg_high_time'] = c['avg_high_time'].isoformat()
                 if c.get('created_at'):
                     c['created_at'] = c['created_at'].isoformat()
                 if c.get('created_date'):
@@ -126,14 +125,14 @@ async def get_dynamic_themes():
 
 @router.get("/dynamic/{cluster_id}")
 async def get_dynamic_theme_detail(cluster_id: int):
-    """Get coins in a specific dynamic theme cluster with market_snapshot data."""
+    """Get coins in a specific dynamic theme cluster with correlation data."""
     conn = get_db_conn()
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             # Cluster info
             cur.execute("""
                 SELECT cluster_id, created_date, coin_count, strength_score,
-                       avg_high_time, time_spread_minutes, avg_high_change_pct
+                       lead_symbol, lead_change_pct, avg_correlation
                 FROM dynamic_theme_cluster WHERE cluster_id = %s
             """, (cluster_id,))
             cluster = cur.fetchone()
@@ -143,25 +142,21 @@ async def get_dynamic_theme_detail(cluster_id: int):
             for k, v in cluster.items():
                 if hasattr(v, '__float__'):
                     cluster[k] = float(v)
-                if k == 'avg_high_time' and v:
-                    cluster[k] = v.isoformat() if not isinstance(v, str) else v
                 if k == 'created_date' and v:
                     cluster[k] = str(v) if not isinstance(v, str) else v
 
-            # Members joined with market_snapshot
+            # Members with correlation data
             cur.execute("""
-                SELECT m.symbol, m.high_time, m.high_price, m.high_change_pct,
+                SELECT m.symbol, m.daily_change_pct, m.correlation_to_lead,
                        ms.change_pct_24h, ms.vol_ratio
                 FROM dynamic_theme_member m
                 LEFT JOIN market_snapshot ms ON ms.symbol = m.symbol
                 WHERE m.cluster_id = %s
-                ORDER BY m.high_change_pct DESC
+                ORDER BY m.correlation_to_lead DESC
             """, (cluster_id,))
             members = cur.fetchall()
 
             for m in members:
-                if m.get('high_time'):
-                    m['high_time'] = m['high_time'].isoformat()
                 for k, v in m.items():
                     if hasattr(v, '__float__'):
                         m[k] = float(v)
