@@ -215,6 +215,22 @@ services:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     networks: [appnet]
 
+  # === Infrastructure Monitor ===
+  infra-monitor:
+    build: ./apps/infra-monitor
+    restart: unless-stopped
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    networks: [appnet]
+
   # === External Access ===
   cloudflared:
     image: cloudflare/cloudflared:latest

@@ -1,8 +1,9 @@
 """
 Theme RS (Relative Strength) Router
-- GET /api/theme/list    → all themes with coin counts
-- GET /api/theme/rs      → theme RS ranking (computed from movers_latest)
-- GET /api/theme/{id}/coins → coins in a specific theme with their changes
+- GET /api/theme/rs               → theme RS ranking (computed from movers_latest)
+- GET /api/theme/dynamic          → latest dynamic theme clusters (strength sorted)
+- GET /api/theme/dynamic/{id}     → specific cluster coins + market_snapshot join
+- GET /api/theme/{id}/coins       → coins in a specific theme with their changes
 """
 import logging
 import os
@@ -81,6 +82,100 @@ async def get_theme_rs(mock: bool = False):
     except Exception as e:
         logger.error(f"Failed to calculate theme RS: {e}")
         return {"themes": [], "total_themes": 0, "error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/dynamic")
+async def get_dynamic_themes():
+    """Get latest dynamic theme clusters, sorted by strength."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT cluster_id, created_date, coin_count, strength_score,
+                       avg_high_time, time_spread_minutes, avg_high_change_pct, created_at
+                FROM dynamic_theme_cluster
+                WHERE created_date = (SELECT MAX(created_date) FROM dynamic_theme_cluster)
+                ORDER BY strength_score DESC
+            """)
+            clusters = cur.fetchall()
+
+            for c in clusters:
+                for k, v in c.items():
+                    if hasattr(v, '__float__'):
+                        c[k] = float(v)
+                if c.get('avg_high_time'):
+                    c['avg_high_time'] = c['avg_high_time'].isoformat()
+                if c.get('created_at'):
+                    c['created_at'] = c['created_at'].isoformat()
+                if c.get('created_date'):
+                    c['created_date'] = str(c['created_date'])
+
+            return {
+                "clusters": clusters,
+                "total_clusters": len(clusters),
+                "date": clusters[0]["created_date"] if clusters else None,
+            }
+    except Exception as e:
+        logger.error(f"Failed to get dynamic themes: {e}")
+        return {"clusters": [], "total_clusters": 0, "error": str(e)}
+    finally:
+        conn.close()
+
+
+@router.get("/dynamic/{cluster_id}")
+async def get_dynamic_theme_detail(cluster_id: int):
+    """Get coins in a specific dynamic theme cluster with market_snapshot data."""
+    conn = get_db_conn()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Cluster info
+            cur.execute("""
+                SELECT cluster_id, created_date, coin_count, strength_score,
+                       avg_high_time, time_spread_minutes, avg_high_change_pct
+                FROM dynamic_theme_cluster WHERE cluster_id = %s
+            """, (cluster_id,))
+            cluster = cur.fetchone()
+            if not cluster:
+                raise HTTPException(status_code=404, detail="Cluster not found")
+
+            for k, v in cluster.items():
+                if hasattr(v, '__float__'):
+                    cluster[k] = float(v)
+                if k == 'avg_high_time' and v:
+                    cluster[k] = v.isoformat() if not isinstance(v, str) else v
+                if k == 'created_date' and v:
+                    cluster[k] = str(v) if not isinstance(v, str) else v
+
+            # Members joined with market_snapshot
+            cur.execute("""
+                SELECT m.symbol, m.high_time, m.high_price, m.high_change_pct,
+                       ms.change_pct_24h, ms.vol_ratio
+                FROM dynamic_theme_member m
+                LEFT JOIN market_snapshot ms ON ms.symbol = m.symbol
+                WHERE m.cluster_id = %s
+                ORDER BY m.high_change_pct DESC
+            """, (cluster_id,))
+            members = cur.fetchall()
+
+            for m in members:
+                if m.get('high_time'):
+                    m['high_time'] = m['high_time'].isoformat()
+                for k, v in m.items():
+                    if hasattr(v, '__float__'):
+                        m[k] = float(v)
+
+            return {
+                "cluster": cluster,
+                "members": members,
+                "member_count": len(members),
+            }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get dynamic theme detail: {e}")
+        return {"cluster": None, "members": [], "error": str(e)}
     finally:
         conn.close()
 
