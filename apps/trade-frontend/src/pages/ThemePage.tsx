@@ -95,12 +95,11 @@ export default function ThemePage() {
 
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                     <Layers size={20} style={{ color: '#82aaff' }} />
-                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#fff' }}>Theme RS</h2>
-                    <span style={{ fontSize: 12, color: '#888', marginLeft: 4 }}>테마별 상대강도</span>
-                    <div style={{ cursor: 'help', display: 'flex', alignItems: 'center', marginLeft: 4 }}>
-                        <Tooltip content="10분마다 갱신되어 시장 트렌드를 분석합니다.">
+                    <span style={{ fontSize: 16, fontWeight: 700, color: '#fff' }}>테마 RS</span>
+                    <div style={{ cursor: 'help', display: 'flex', alignItems: 'center' }}>
+                        <Tooltip content="사전 정의된 테마(밈코인, AI, 레이어1 등) 기반으로 상대강도(RS)를 계산합니다. 10분마다 갱신.">
                             <div style={{
                                 width: 14, height: 14, borderRadius: '50%', border: '1px solid #666',
                                 color: '#666', fontSize: 10, display: 'flex', justifyContent: 'center', alignItems: 'center'
@@ -108,7 +107,9 @@ export default function ThemePage() {
                         </Tooltip>
                     </div>
                 </div>
-                <span style={{ fontSize: 11, color: '#666' }}>Updated {lastUpdate}</span>
+                <span style={{ fontSize: 11, color: '#666' }}>
+                    Updated {lastUpdate}
+                </span>
             </div>
 
             {/* Today's Top Theme */}

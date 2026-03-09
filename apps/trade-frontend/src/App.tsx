@@ -6,6 +6,7 @@ import SymbolDetailsPage from './pages/SymbolDetailsPage';
 import SMCPage from './pages/SMCPage';
 import PerformancePage from './pages/PerformancePage';
 import ThemePage from './pages/ThemePage';
+import DynamicThemePage from './pages/DynamicThemePage';
 import MarketOverviewPage from './pages/MarketOverviewPage';
 import StocksPage from './pages/StocksPage';
 
@@ -71,6 +72,9 @@ function AppContent() {
           <NavLink to="/crypto/theme" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Theme
           </NavLink>
+          <NavLink to="/crypto/dynamic-theme" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Dynamic
+          </NavLink>
         </nav>
       )}
 
@@ -88,6 +92,7 @@ function AppContent() {
           <Route path="/crypto/smc" element={<SMCPage />} />
           <Route path="/crypto/performance" element={<PerformancePage />} />
           <Route path="/crypto/theme" element={<ThemePage />} />
+          <Route path="/crypto/dynamic-theme" element={<DynamicThemePage />} />
           <Route path="/crypto/symbol/:symbol" element={<SymbolDetailsPage />} />
 
           {/* Stocks */}
