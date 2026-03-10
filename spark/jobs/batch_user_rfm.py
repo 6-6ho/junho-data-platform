@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, count, sum, max, datediff, current_date, current_timestamp, lit, ntile, expr, to_date
+from pyspark.sql.functions import col, count, sum, max, datediff, current_timestamp, lit, ntile, expr, to_date
 from pyspark.sql.window import Window
+import argparse
+from datetime import date, datetime, timedelta
 import os
 
 from rfm_segment import classify_rfm  # noqa: F401 — re-export for backwards compat
@@ -15,6 +17,14 @@ DB_PROPERTIES = {
 }
 
 def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--target-date", type=str, default=None,
+                        help="Target date (YYYY-MM-DD). Defaults to today.")
+    args, _ = parser.parse_known_args()
+    target = datetime.strptime(args.target_date, "%Y-%m-%d").date() if args.target_date else date.today()
+    target_str = target.isoformat()
+    target_end = (target + timedelta(days=1)).isoformat()
+
     spark = SparkSession.builder \
         .appName("BatchUserRFM") \
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
@@ -24,7 +34,7 @@ def run():
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
 
-    # Read Raw Data - scan ALL available data (no date filter)
+    # Read Raw Data
     try:
         df = spark.read.parquet("s3a://raw/shop_events")
     except Exception as e:
@@ -33,23 +43,24 @@ def run():
         print(f"No data found: {e}")
         return
 
-    # Filter Purchase Events and add date column for Recency calculation
+    # Filter Purchase Events up to target_date, add date column for Recency calculation
     purchase_df = df.filter(col("event_type") == "purchase") \
+                    .filter(col("event_time") < lit(target_end)) \
                     .withColumn("purchase_date", to_date("event_time")) \
                     .repartition(8, "user_id")
 
     # RFM Calculation
-    # Recency: Days since last purchase
+    # Recency: Days since last purchase (relative to target_date)
     # Frequency: Count of orders
     # Monetary: Sum of total_amount
     rfm_agg = purchase_df.groupBy("user_id").agg(
-        datediff(current_date(), max("purchase_date")).alias("recency"),
+        datediff(lit(target_str), max("purchase_date")).alias("recency"),
         count("event_id").alias("frequency"),
         sum("total_amount").alias("monetary")
     )
 
     user_count = rfm_agg.count()
-    print(f"RFM analysis for {user_count} users")
+    print(f"RFM analysis for {user_count} users (target_date={target_str})")
 
     # Scoring (1-5) using Quantiles
     # Recency: Lower days = better = higher score (order DESC so lowest days get rank 5)

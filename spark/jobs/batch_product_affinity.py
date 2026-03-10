@@ -1,6 +1,8 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, collect_list, array_distinct, size, desc
+from pyspark.sql.functions import col, collect_list, array_distinct, size, desc, lit
 from pyspark.ml.fpm import FPGrowth
+import argparse
+from datetime import date, datetime, timedelta
 import os
 
 # Postgres Config
@@ -13,6 +15,13 @@ DB_PROPERTIES = {
 }
 
 def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--target-date", type=str, default=None,
+                        help="Target date (YYYY-MM-DD). Defaults to today.")
+    args, _ = parser.parse_known_args()
+    target = datetime.strptime(args.target_date, "%Y-%m-%d").date() if args.target_date else date.today()
+    target_end = (target + timedelta(days=1)).isoformat()
+
     spark = SparkSession.builder \
         .appName("BatchBasketAnalysis") \
         .config("spark.hadoop.fs.s3a.endpoint", "http://minio:9000") \
@@ -22,12 +31,15 @@ def run():
         .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem") \
         .getOrCreate()
 
-    # Read Raw Data - scan ALL available data (no date filter)
+    # Read Raw Data
     try:
         df = spark.read.parquet("s3a://raw/shop_events")
     except Exception as e:
         print(f"No data found: {e}")
         return
+
+    # Filter events up to target_date
+    df = df.filter(col("event_time") < lit(target_end))
 
     # 1. Prepare Transactions (Group by session_id)
     # Filter for 'purchase' events and group items by session
@@ -38,7 +50,7 @@ def run():
         .filter(size(col("items")) > 1)  # Only sessions with >= 2 items
 
     tx_count = transactions.count()
-    print(f"Analyzing {tx_count} transactions (session-based)...")
+    print(f"Analyzing {tx_count} transactions up to {target} (session-based)...")
 
     if tx_count == 0:
         print("No multi-item sessions found. Skipping FP-Growth.")

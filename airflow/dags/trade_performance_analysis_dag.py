@@ -22,7 +22,7 @@ WIN_THRESHOLD_PCT = 1.0
 default_args = {
     'owner': 'junho',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2026, 1, 1),
     'email_on_failure': False,
     'retries': 2,
     'retry_delay': timedelta(minutes=3),
@@ -190,6 +190,9 @@ def simulate_strategy(signals, take_profit, stop_loss):
 
 def run_performance_analysis(**context):
     """Main analysis task."""
+    ds = context.get("ds")
+    target_date = datetime.strptime(ds, "%Y-%m-%d").date()
+
     pg_hook = PostgresHook(postgres_conn_id="postgres_default")
     conn = pg_hook.get_conn()
     cur = conn.cursor()
@@ -199,8 +202,8 @@ def run_performance_analysis(**context):
         SELECT DISTINCT ON (symbol, event_time)
             symbol, event_time, change_pct_window, type, status
         FROM movers_latest
-        WHERE event_time >= NOW() - INTERVAL '24 hours'
-          AND event_time <= NOW() - INTERVAL '1 hour'
+        WHERE event_time >= %s::date
+          AND event_time < %s::date + INTERVAL '1 day' - INTERVAL '1 hour'
           AND type = 'rise'
           AND change_pct_window >= 3.0
           AND NOT EXISTS (
@@ -210,10 +213,10 @@ def run_performance_analysis(**context):
           )
         ORDER BY symbol, event_time, change_pct_window DESC
     """
-    cur.execute(query)
+    cur.execute(query, (target_date, target_date))
     new_alerts = cur.fetchall()
 
-    print(f"Found {len(new_alerts)} new alerts to collect")
+    print(f"Found {len(new_alerts)} new alerts to collect (date={target_date})")
     collected = 0
 
     for alert_row in new_alerts:
@@ -243,11 +246,11 @@ def run_performance_analysis(**context):
     conn.commit()
     print(f"Collected {collected} new timeseries records")
 
-    # 2. Analyze optimal strategies by tier (yesterday's data only)
+    # 2. Analyze optimal strategies by tier (target_date's data)
     cur.execute("""
         SELECT t.timeseries_data,
-               CASE WHEN m.status LIKE '[High]%' THEN 'High'
-                    WHEN m.status LIKE '[Mid]%' THEN 'Mid'
+               CASE WHEN m.status LIKE '[High]%%' THEN 'High'
+                    WHEN m.status LIKE '[Mid]%%' THEN 'Mid'
                     ELSE 'Small' END as tier
         FROM trade_performance_timeseries t
         JOIN (
@@ -255,9 +258,9 @@ def run_performance_analysis(**context):
             FROM movers_latest WHERE type = 'rise'
             ORDER BY symbol, event_time, change_pct_window DESC
         ) m ON m.symbol = t.symbol AND m.event_time = t.alert_time
-        WHERE t.alert_time >= (CURRENT_DATE - INTERVAL '1 day')
-          AND t.alert_time < CURRENT_DATE
-    """)
+        WHERE t.alert_time >= %s::date
+          AND t.alert_time < %s::date + INTERVAL '1 day'
+    """, (target_date, target_date))
     rows = cur.fetchall()
 
     if not rows or len(rows) < 3:
@@ -318,7 +321,7 @@ with DAG(
     default_args=default_args,
     description="Analyze optimal TP/SL strategies for trade signals",
     schedule_interval="0 0 * * *",  # 00:00 UTC = 09:00 KST
-    catchup=False,
+    catchup=True,
     tags=["trade", "analysis"],
 ) as dag:
 

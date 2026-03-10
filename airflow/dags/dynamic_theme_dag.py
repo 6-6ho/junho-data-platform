@@ -421,7 +421,7 @@ with DAG(
     default_args=default_args,
     description="Discover dynamic themes via market-neutral Agglomerative clustering (daily)",
     schedule_interval="0 21 * * *",
-    catchup=False,
+    catchup=True,
     tags=["theme", "analysis", "trade"],
 ) as dag:
 

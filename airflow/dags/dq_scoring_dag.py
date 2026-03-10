@@ -15,7 +15,7 @@ import os
 default_args = {
     'owner': 'junho',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2026, 1, 1),
     'email_on_failure': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
@@ -46,14 +46,16 @@ def compute_dq_score(**ctx):
     conn = _get_conn()
     cur = conn.cursor()
 
-    target_date = (ctx['logical_date']).strftime('%Y-%m-%d')
+    target_ts = ctx['logical_date']
+    target_date = target_ts.date()
 
     # --- Completeness ---
     cur.execute("""
         SELECT COUNT(DISTINCT (category, date_trunc('hour', hour)))
         FROM dq_category_hourly
-        WHERE hour >= NOW() - INTERVAL '24 hours'
-    """)
+        WHERE hour >= %s::timestamp - INTERVAL '24 hours'
+          AND hour < %s::timestamp
+    """, (target_ts, target_ts))
     actual_slots = cur.fetchone()[0] or 0
     expected_slots = 5 * 24  # 5 categories × 24 hours
     completeness = min(100, round(actual_slots / expected_slots * 100))
@@ -61,16 +63,17 @@ def compute_dq_score(**ctx):
     # --- Validity ---
     cur.execute("""
         SELECT COUNT(*) FROM dq_anomaly_raw
-        WHERE detected_at >= NOW() - INTERVAL '24 hours'
-    """)
+        WHERE detected_at >= %s::timestamp - INTERVAL '24 hours'
+          AND detected_at < %s::timestamp
+    """, (target_ts, target_ts))
     anomaly_count = cur.fetchone()[0] or 0
     validity = max(0, 100 - anomaly_count * 2)
 
     # --- Timeliness ---
     cur.execute("""
-        SELECT EXTRACT(EPOCH FROM (NOW() - MAX(created_at))) / 3600
+        SELECT EXTRACT(EPOCH FROM (%s::timestamp - MAX(created_at))) / 3600
         FROM dq_category_hourly
-    """)
+    """, (target_ts,))
     row = cur.fetchone()
     hours_late = row[0] if row and row[0] else 0
     if hours_late <= 2:
@@ -86,8 +89,8 @@ def compute_dq_score(**ctx):
             COUNT(*) FILTER (WHERE severity = 'critical') AS critical_count,
             COUNT(*) FILTER (WHERE severity = 'warning') AS warning_count
         FROM dq_anomaly_log
-        WHERE detected_at::date = CURRENT_DATE
-    """)
+        WHERE detected_at::date = %s
+    """, (target_date,))
     sev = cur.fetchone()
     critical_count = sev[0] if sev else 0
     warning_count = sev[1] if sev else 0
@@ -95,7 +98,7 @@ def compute_dq_score(**ctx):
     cur.execute("""
         INSERT INTO dq_daily_score (date, completeness_score, validity_score, timeliness_score,
             total_score, critical_count, warning_count, updated_at)
-        VALUES (CURRENT_DATE, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (date) DO UPDATE SET
             completeness_score = EXCLUDED.completeness_score,
             validity_score = EXCLUDED.validity_score,
@@ -103,8 +106,9 @@ def compute_dq_score(**ctx):
             total_score = EXCLUDED.total_score,
             critical_count = EXCLUDED.critical_count,
             warning_count = EXCLUDED.warning_count,
-            updated_at = NOW()
-    """, (completeness, validity, timeliness, total, critical_count, warning_count))
+            updated_at = %s
+    """, (target_date, completeness, validity, timeliness, total, critical_count, warning_count,
+          target_ts, target_ts))
     conn.commit()
 
     print(f"DQ Score [{target_date}] completeness={completeness} validity={validity} "
@@ -123,24 +127,27 @@ def detect_anomalies(**ctx):
     conn = _get_conn()
     cur = conn.cursor()
 
+    target_ts = ctx['logical_date']
+
     # Category drop detection
     cur.execute("""
         WITH recent AS (
             SELECT category, event_count
             FROM dq_category_hourly
-            WHERE hour = date_trunc('hour', NOW() - INTERVAL '1 hour')
+            WHERE hour = date_trunc('hour', %s::timestamp - INTERVAL '1 hour')
         ),
         avg7d AS (
             SELECT category, AVG(event_count) AS avg_count
             FROM dq_category_hourly
-            WHERE hour >= NOW() - INTERVAL '7 days'
+            WHERE hour >= %s::timestamp - INTERVAL '7 days'
+              AND hour < %s::timestamp
             GROUP BY category
         )
         SELECT r.category, a.avg_count, r.event_count
         FROM recent r
         JOIN avg7d a ON r.category = a.category
         WHERE a.avg_count > 0 AND r.event_count < a.avg_count * 0.3
-    """)
+    """, (target_ts, target_ts, target_ts))
     for row in cur.fetchall():
         cat, avg_val, actual = row
         cur.execute("""
@@ -154,19 +161,20 @@ def detect_anomalies(**ctx):
         WITH recent AS (
             SELECT payment_method, purchase_count
             FROM dq_payment_hourly
-            WHERE hour = date_trunc('hour', NOW() - INTERVAL '1 hour')
+            WHERE hour = date_trunc('hour', %s::timestamp - INTERVAL '1 hour')
         ),
         avg7d AS (
             SELECT payment_method, AVG(purchase_count) AS avg_count
             FROM dq_payment_hourly
-            WHERE hour >= NOW() - INTERVAL '7 days'
+            WHERE hour >= %s::timestamp - INTERVAL '7 days'
+              AND hour < %s::timestamp
             GROUP BY payment_method
         )
         SELECT r.payment_method, a.avg_count, r.purchase_count
         FROM recent r
         JOIN avg7d a ON r.payment_method = a.payment_method
         WHERE a.avg_count > 0 AND r.purchase_count < a.avg_count * 0.3
-    """)
+    """, (target_ts, target_ts, target_ts))
     for row in cur.fetchall():
         pm, avg_val, actual = row
         cur.execute("""
@@ -178,8 +186,9 @@ def detect_anomalies(**ctx):
     # Price anomaly count check
     cur.execute("""
         SELECT COUNT(*) FROM dq_anomaly_raw
-        WHERE detected_at >= NOW() - INTERVAL '1 hour'
-    """)
+        WHERE detected_at >= %s::timestamp - INTERVAL '1 hour'
+          AND detected_at < %s::timestamp
+    """, (target_ts, target_ts))
     price_anomaly_count = cur.fetchone()[0] or 0
     if price_anomaly_count > 10:
         cur.execute("""
@@ -203,17 +212,21 @@ def reconcile(**ctx):
     conn = _get_conn()
     cur = conn.cursor()
 
+    target_ts = ctx['logical_date']
+
     cur.execute("""
         WITH cat AS (
             SELECT hour, SUM(purchase_count) AS total
             FROM dq_category_hourly
-            WHERE hour >= NOW() - INTERVAL '24 hours'
+            WHERE hour >= %s::timestamp - INTERVAL '24 hours'
+              AND hour < %s::timestamp
             GROUP BY hour
         ),
         pay AS (
             SELECT hour, SUM(purchase_count) AS total
             FROM dq_payment_hourly
-            WHERE hour >= NOW() - INTERVAL '24 hours'
+            WHERE hour >= %s::timestamp - INTERVAL '24 hours'
+              AND hour < %s::timestamp
             GROUP BY hour
         )
         SELECT
@@ -222,7 +235,7 @@ def reconcile(**ctx):
             COALESCE(p.total, 0) AS payment_total
         FROM cat c
         FULL OUTER JOIN pay p ON c.hour = p.hour
-    """)
+    """, (target_ts, target_ts, target_ts, target_ts))
 
     mismatch_count = 0
     for row in cur.fetchall():

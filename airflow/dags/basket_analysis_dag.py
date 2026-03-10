@@ -6,7 +6,7 @@ import os
 default_args = {
     'owner': 'junho',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2026, 1, 1),
     'email_on_failure': False,
     'retries': 1,
     'retry_delay': timedelta(minutes=5),
@@ -45,6 +45,6 @@ with DAG(
             --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
             --name BasketAnalysis \
             --verbose \
-            /app/jobs/batch_product_affinity.py
+            /app/jobs/batch_product_affinity.py --target-date {{{{ ds }}}}
         '''
     )

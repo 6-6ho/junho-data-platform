@@ -26,7 +26,7 @@ VERIFY_MINUTE = 10  # 10분 시점 profit_pct 검증
 default_args = {
     'owner': 'junho',
     'depends_on_past': False,
-    'start_date': datetime(2024, 1, 1),
+    'start_date': datetime(2026, 1, 1),
     'email_on_failure': False,
     'retries': 2,
     'retry_delay': timedelta(minutes=3),
@@ -70,27 +70,31 @@ def fetch_klines(symbol, start_time_ms, interval="1m", limit=100):
 
 def run_signal_validation(**context):
     """Validate stored signal data against Binance prices."""
+    ds = context.get("ds")
+    target_date = datetime.strptime(ds, "%Y-%m-%d").date()
+
     pg_hook = PostgresHook(postgres_conn_id="postgres_default")
     conn = pg_hook.get_conn()
     cur = conn.cursor()
 
-    # 1. 최근 7일 시그널 중 랜덤 10개 선택
+    # 1. target_date 기준 7일 이내 시그널 중 랜덤 10개 선택
     cur.execute("""
         SELECT symbol, alert_time, entry_price, timeseries_data
         FROM trade_performance_timeseries
-        WHERE created_at >= NOW() - INTERVAL '%s days'
+        WHERE created_at >= %s::date - INTERVAL '7 days'
+          AND created_at < %s::date + INTERVAL '1 day'
         ORDER BY RANDOM()
         LIMIT %s
-    """, (LOOKBACK_DAYS, SAMPLE_SIZE))
+    """, (target_date, target_date, SAMPLE_SIZE))
     samples = cur.fetchall()
 
     if not samples:
-        print("No signals to validate")
+        print(f"No signals to validate (date={target_date})")
         cur.close()
         conn.close()
         return
 
-    print(f"Validating {len(samples)} signals")
+    print(f"Validating {len(samples)} signals (date={target_date})")
     fail_count = 0
     pass_count = 0
     error_count = 0
@@ -189,7 +193,7 @@ with DAG(
     default_args=default_args,
     description="Daily sample validation of stored signal profit against Binance",
     schedule_interval="0 1 * * *",  # 01:00 UTC = 10:00 KST
-    catchup=False,
+    catchup=True,
     tags=["trade", "validation", "dq"],
 ) as dag:
 
