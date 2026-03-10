@@ -59,5 +59,8 @@ CLAUDE.md
 .agent/
 install_claude.sh
 
-# Tunnel credentials
-infra/tunnel/credentials.json
+# Tunnel (credentials + config with internal IPs)
+infra/tunnel/
+
+# Code-server (personal dev tool)
+infra/code-server/
