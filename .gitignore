@@ -62,5 +62,6 @@ install_claude.sh
 # Tunnel (credentials + config with internal IPs)
 infra/tunnel/
 
-# Code-server (personal dev tool)
+# Dev tools (personal)
 infra/code-server/
+infra/ttyd/

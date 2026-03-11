@@ -350,6 +350,20 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
     networks: [appnet]
 
+  # === Dev Tools ===
+  ttyd:
+    build:
+      context: ./infra/ttyd
+      dockerfile: Dockerfile
+    container_name: jdp-ttyd
+    restart: unless-stopped
+    volumes:
+      - /home/junho/junho-data-platform:/home/junho/junho-data-platform
+      - /home/junho/.claude:/home/node/.claude
+    ports:
+      - "8443:8080"
+    command: ["ttyd", "-p", "8080", "-c", "junho:${CODE_SERVER_PASSWORD:-changeme}", "-W", "bash"]
+
 volumes:
   miniodata:
   airflow_logs:
