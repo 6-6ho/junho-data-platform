@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: movers-streaming
+  namespace: trade
+  labels:
+    app: movers-streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: movers-streaming
+  template:
+    metadata:
+      labels:
+        app: movers-streaming
+    spec:
+      nodeSelector:
+        role: control
+      securityContext:
+        runAsUser: 0
+      containers:
+      - name: movers
+        image: registry.local:5000/jdp/spark:latest
+        command: ["./start.sh"]
+        env:
+        - name: SPARK_JOB_NAME
+          value: "trade/movers_streaming.py"
+        - name: SPARK_MASTER_URL
+          value: "local[*]"
+        envFrom:
+        - configMapRef:
+            name: common-env
+        - secretRef:
+            name: db-secret
+        - secretRef:
+            name: telegram-secret
+        volumeMounts:
+        - name: checkpoints
+          mountPath: /app/checkpoints
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
+      volumes:
+      - name: checkpoints
+        hostPath:
+          path: /home/junho/junho-data-platform/checkpoints
+          type: DirectoryOrCreate

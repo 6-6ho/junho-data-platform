@@ -1,0 +1,93 @@
+# Shop Analytics Streaming — Spark on K8s (driver Pod)
+# executor Pod(2개)는 Spark이 K8s API로 자동 생성/삭제
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-streaming
+  namespace: shop
+  labels:
+    app: analytics-streaming
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: analytics-streaming
+  template:
+    metadata:
+      labels:
+        app: analytics-streaming
+    spec:
+      serviceAccountName: spark
+      nodeSelector:
+        role: worker
+      containers:
+      - name: analytics
+        image: registry.local:5000/jdp/spark:latest
+        command: ["spark-submit"]
+        args:
+        - "--master"
+        - "k8s://https://kubernetes.default.svc:443"
+        - "--deploy-mode"
+        - "client"
+        - "--conf"
+        - "spark.kubernetes.container.image=registry.local:5000/jdp/spark:latest"
+        - "--conf"
+        - "spark.kubernetes.namespace=shop"
+        - "--conf"
+        - "spark.executor.instances=2"
+        - "--conf"
+        - "spark.executor.cores=2"
+        - "--conf"
+        - "spark.executor.memory=1536m"
+        - "--conf"
+        - "spark.driver.memory=1024m"
+        - "--conf"
+        - "spark.cores.max=4"
+        - "--conf"
+        - "spark.scheduler.mode=FAIR"
+        - "--conf"
+        - "spark.sql.shuffle.partitions=8"
+        - "--conf"
+        - "spark.sql.adaptive.enabled=true"
+        - "--conf"
+        - "spark.sql.adaptive.skewJoin.enabled=true"
+        - "--conf"
+        - "spark.sql.adaptive.coalescePartitions.enabled=true"
+        - "--conf"
+        - "spark.streaming.kafka.maxRatePerPartition=500"
+        - "--conf"
+        - "spark.kubernetes.node.selector.role=worker"
+        - "--conf"
+        - "spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions"
+        - "--conf"
+        - "spark.sql.catalog.my_catalog=org.apache.iceberg.spark.SparkCatalog"
+        - "--conf"
+        - "spark.sql.catalog.my_catalog.type=hadoop"
+        - "--conf"
+        - "spark.sql.catalog.my_catalog.warehouse=s3a://iceberg-warehouse/data"
+        - "--conf"
+        - "spark.hadoop.fs.s3a.endpoint=http://minio.data.svc:9000"
+        - "--conf"
+        - "spark.hadoop.fs.s3a.path.style.access=true"
+        - "--conf"
+        - "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem"
+        - "--conf"
+        - "spark.hadoop.fs.s3a.connection.ssl.enabled=false"
+        - "/app/jobs/shop/analytics_streaming.py"
+        envFrom:
+        - configMapRef:
+            name: common-env
+        - secretRef:
+            name: db-secret
+        - secretRef:
+            name: minio-secret
+        env:
+        - name: ENABLE_ICEBERG
+          value: "true"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: "1"
+            memory: 2Gi

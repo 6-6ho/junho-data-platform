@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-generator
+  namespace: shop
+  labels:
+    app: shop-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shop-generator
+  template:
+    metadata:
+      labels:
+        app: shop-generator
+    spec:
+      nodeSelector:
+        role: worker
+      containers:
+      - name: generator
+        image: registry.local:5000/jdp/shop-generator:latest
+        env:
+        - name: MODE
+          value: "normal"
+        envFrom:
+        - configMapRef:
+            name: common-env
+        - secretRef:
+            name: db-secret
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi

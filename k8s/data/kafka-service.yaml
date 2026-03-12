@@ -1,0 +1,19 @@
+# Headless Service (StatefulSet)
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: data
+  labels:
+    app: kafka
+spec:
+  clusterIP: None
+  selector:
+    app: kafka
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: plaintext
+  - port: 9093
+    targetPort: 9093
+    name: controller

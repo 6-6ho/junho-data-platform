@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ttyd
+  namespace: infra
+  labels:
+    app: ttyd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ttyd
+  template:
+    metadata:
+      labels:
+        app: ttyd
+    spec:
+      nodeSelector:
+        role: worker
+      containers:
+      - name: ttyd
+        image: registry.local:5000/jdp/ttyd:latest
+        command: ["ttyd", "-p", "8080", "-W", "bash"]
+        args: []
+        ports:
+        - containerPort: 8080
+        env:
+        - name: CODE_SERVER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: ttyd-secret
+              key: CODE_SERVER_PASSWORD
+        volumeMounts:
+        - name: repo
+          mountPath: /home/junho/junho-data-platform
+        - name: claude-config
+          mountPath: /home/node/.claude
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: repo
+        hostPath:
+          path: /home/junho/junho-data-platform
+          type: Directory
+      - name: claude-config
+        hostPath:
+          path: /home/junho/.claude
+          type: DirectoryOrCreate

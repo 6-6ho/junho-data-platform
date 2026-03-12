@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trade-backend
+  namespace: trade
+  labels:
+    app: trade-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: trade-backend
+  template:
+    metadata:
+      labels:
+        app: trade-backend
+    spec:
+      nodeSelector:
+        role: control
+      containers:
+      - name: backend
+        image: registry.local:5000/jdp/trade-backend:latest
+        ports:
+        - containerPort: 8000
+        envFrom:
+        - configMapRef:
+            name: common-env
+        - secretRef:
+            name: db-secret
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://postgres:$(POSTGRES_PASSWORD)@postgres.database.svc:5432/app"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 512Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 60
