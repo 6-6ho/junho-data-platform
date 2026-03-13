@@ -8,6 +8,7 @@ import PerformancePage from './pages/PerformancePage';
 import ThemePage from './pages/ThemePage';
 import MarketOverviewPage from './pages/MarketOverviewPage';
 import StocksPage from './pages/StocksPage';
+import SettingsPage from './pages/SettingsPage';
 
 function LegacySymbolRedirect() {
   const { symbol } = useParams();
@@ -92,6 +93,9 @@ function AppContent() {
 
           {/* Stocks */}
           <Route path="/stocks" element={<StocksPage />} />
+
+          {/* Settings */}
+          <Route path="/settings" element={<SettingsPage />} />
 
           {/* Legacy redirects */}
           <Route path="/movers" element={<Navigate to="/crypto/movers" replace />} />

@@ -76,9 +76,46 @@ export const fetchSMCAnalysis = async (symbol: string, interval: string = '1h') 
 };
 
 // Analytics / Reports
+export const fetchAllSymbols = async () => {
+  const { data } = await api.get('/analysis/symbols');
+  return data;
+};
+
 export const fetchLatestReport = async (date?: string) => {
   const params = date ? { date } : {};
   const { data } = await api.get('/analytics/reports/latest', { params });
+  return data;
+};
+
+// Auth
+const authHeaders = () => {
+  const token = localStorage.getItem('settings_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+export const login = async (password: string) => {
+  const { data } = await api.post('/auth/login', { password });
+  return data;
+};
+
+export const verifyAuth = async () => {
+  const { data } = await api.get('/auth/verify', { headers: authHeaders() });
+  return data;
+};
+
+// Watchlist (auth required)
+export const fetchWatchlist = async () => {
+  const { data } = await api.get('/settings/watchlist', { headers: authHeaders() });
+  return data;
+};
+
+export const addWatchlistSymbol = async (symbol: string) => {
+  const { data } = await api.post('/settings/watchlist', { symbol }, { headers: authHeaders() });
+  return data;
+};
+
+export const removeWatchlistSymbol = async (symbol: string) => {
+  const { data } = await api.delete(`/settings/watchlist/${symbol}`, { headers: authHeaders() });
   return data;
 };
 

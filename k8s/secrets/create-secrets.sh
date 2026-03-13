@@ -80,4 +80,10 @@ else
   echo "  WARN: infra/tunnel/credentials.json not found — create cloudflared-creds manually"
 fi
 
+# Settings Auth — trade
+kubectl create secret generic settings-auth-secret \
+  --from-literal=SETTINGS_PASSWORD="${CODE_SERVER_PASSWORD:-changeme}" \
+  --from-literal=SETTINGS_JWT_SECRET="${SETTINGS_JWT_SECRET:-$(openssl rand -hex 32)}" \
+  -n trade --dry-run=client -o yaml | kubectl apply -f -
+
 echo "=== All Secrets Created ==="

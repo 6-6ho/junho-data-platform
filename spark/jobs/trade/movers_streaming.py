@@ -17,12 +17,12 @@ from pyspark.sql.types import (
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 try:
-    from common.db import save_movers_batch, save_market_snapshot
+    from common.db import save_movers_batch, save_market_snapshot, get_watchlist
     from common.trade_utils import send_telegram_alert, AlertManager, classify_status
 except ImportError:
     # Fallback for when running from different context
     sys.path.append(os.path.join(os.getcwd(), 'spark'))
-    from common.db import save_movers_batch, save_market_snapshot
+    from common.db import save_movers_batch, save_market_snapshot, get_watchlist
     from common.trade_utils import send_telegram_alert, AlertManager, classify_status
 
 # CONFIG
@@ -85,6 +85,7 @@ def process_movers_5m(batch_df, batch_id):
 
     # 2. Filter and save only significant RISE moves to movers_latest
     #    With symbol-level cooldown to prevent duplicates from overlapping windows
+    watchlist = get_watchlist()
     movers = []
     now_ts = time.time()
     for row in rows:
@@ -101,15 +102,16 @@ def process_movers_5m(batch_df, batch_id):
         _movers_cooldown_5m[row.symbol] = now_ts
 
         if "High" in status or "Mid" in status or (row.change_pct_window >= 5.0 and "Small" in status):
-            if am.should_send(row.symbol):
-                icon = "🚀"
-                msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
-                      f"Price: *{row.close_price}*\n" \
-                      f"Change: *{row.change_pct_window:.2f}%*\n" \
-                      f"Time: {row.latest_event_time}"
-                send_telegram_alert(msg)
-                am.update(row.symbol)
-                print(f"[Alert] Sent Telegram: {row.symbol}")
+            if watchlist and row.symbol in watchlist:
+                if am.should_send(row.symbol):
+                    icon = "🚀"
+                    msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
+                          f"Price: *{row.close_price}*\n" \
+                          f"Change: *{row.change_pct_window:.2f}%*\n" \
+                          f"Time: {row.latest_event_time}"
+                    send_telegram_alert(msg)
+                    am.update(row.symbol)
+                    print(f"[Alert] Sent Telegram: {row.symbol}")
 
         movers.append({
             "type": "rise",
@@ -136,6 +138,7 @@ def process_movers_10m(batch_df, batch_id):
     if not rows:
         return
 
+    watchlist = get_watchlist()
     movers = []
     now_ts = time.time()
     for row in rows:
@@ -152,15 +155,16 @@ def process_movers_10m(batch_df, batch_id):
         _movers_cooldown_10m[row.symbol] = now_ts
 
         if "High" in status or "Mid" in status:
-            if am.should_send(row.symbol, cooldown_override=MOVERS_COOLDOWN_10M):
-                icon = "🚀"
-                msg = f"{icon} *{status}: {row.symbol} (10m)*\n" \
-                      f"Price: *{row.close_price}*\n" \
-                      f"Change: *{row.change_pct_window:.2f}%*\n" \
-                      f"Time: {row.latest_event_time}"
-                send_telegram_alert(msg)
-                am.update(row.symbol)
-                print(f"[Alert] Sent Telegram: {row.symbol}")
+            if watchlist and row.symbol in watchlist:
+                if am.should_send(row.symbol, cooldown_override=MOVERS_COOLDOWN_10M):
+                    icon = "🚀"
+                    msg = f"{icon} *{status}: {row.symbol} (10m)*\n" \
+                          f"Price: *{row.close_price}*\n" \
+                          f"Change: *{row.change_pct_window:.2f}%*\n" \
+                          f"Time: {row.latest_event_time}"
+                    send_telegram_alert(msg)
+                    am.update(row.symbol)
+                    print(f"[Alert] Sent Telegram: {row.symbol}")
 
         movers.append({
             "type": "rise",

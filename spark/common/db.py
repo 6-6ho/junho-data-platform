@@ -111,6 +111,34 @@ def save_movers_batch(movers_data):
 
 
 
+_watchlist_cache = {"symbols": set(), "ts": 0}
+WATCHLIST_CACHE_TTL = 60
+
+
+def get_watchlist():
+    """favorite_items에서 워치리스트 심볼 조회. 60초 TTL 캐시."""
+    now = time.time()
+    if now - _watchlist_cache["ts"] < WATCHLIST_CACHE_TTL:
+        return _watchlist_cache["symbols"]
+
+    conn = DBConnection.get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT DISTINCT fi.symbol FROM favorite_items fi JOIN favorite_groups fg ON fi.group_id = fg.group_id WHERE fg.name = 'Watchlist'")
+            symbols = {row[0] for row in cur.fetchall()}
+        conn.commit()
+        _watchlist_cache.update({"symbols": symbols, "ts": now})
+        return symbols
+    except Exception as e:
+        print(f"[DB] Error fetching watchlist: {e}")
+        if conn and not conn.closed:
+            conn.rollback()
+        return _watchlist_cache["symbols"]
+    finally:
+        if conn:
+            DBConnection.return_connection(conn)
+
+
 def save_market_snapshot(data):
     """
     data: list of dicts {symbol, price, change_pct_24h, volume_24h, change_pct_window, vol_ratio, event_time}
