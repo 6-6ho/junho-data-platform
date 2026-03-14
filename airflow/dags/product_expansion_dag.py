@@ -1,6 +1,9 @@
 from airflow import DAG
-from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
+import os
+
+DB_HOST = os.getenv("DB_HOST", "postgres")
 
 default_args = {
     'owner': 'junho',
@@ -21,20 +24,7 @@ with DAG(
     tags=['shop', 'product', 'expansion'],
 ) as dag:
 
-    expand_products = KubernetesPodOperator(
+    expand_products = BashOperator(
         task_id='expand_products_faker',
-        name='product-expansion',
-        namespace='shop',
-        image='registry.local:5000/jdp/shop-backend:latest',
-        cmds=['python3'],
-        arguments=['/app/expand_products_faker.py'],
-        node_selector={'role': 'worker'},
-        env_vars={
-            'DB_HOST': 'postgres.database.svc',
-            'DB_PORT': '5432',
-            'DB_NAME': 'app',
-            'POSTGRES_USER': 'postgres',
-        },
-        is_delete_operator_pod=True,
-        get_logs=True,
+        bash_command=f'docker exec -e DB_HOST={DB_HOST} jdp-shop-api python3 /app/expand_products_faker.py',
     )

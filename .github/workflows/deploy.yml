@@ -1,14 +1,14 @@
-name: Deploy to K8s
+name: Deploy to Laptop
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+  workflow_dispatch:  # Allow manual trigger
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,68 +21,19 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
           script: |
-            set -e
             cd ${{ secrets.DEPLOY_PATH }}
-
+            
             # Pull latest changes
             git fetch origin main
             git reset --hard origin/main
-
-            REGISTRY="registry.local:5000/jdp"
-
-            # Build and push changed images
-            images=(
-              "spark:spark"
-              "trade-ingest:apps/trade-ingest"
-              "trade-backend:apps/trade-backend"
-              "trade-frontend:apps/trade-frontend"
-              "shop-backend:apps/shop-backend"
-              "shop-analytics:apps/shop-analytics"
-              "shop-admin:apps/shop-admin"
-              "shop-generator:apps/shop-generator"
-              "airflow:airflow"
-              "infra-monitor:apps/infra-monitor"
-              "ttyd:infra/ttyd"
-            )
-
-            for entry in "${images[@]}"; do
-              name="${entry%%:*}"
-              context="${entry#*:}"
-              echo "Building ${name} from ${context}..."
-              docker build -t "${REGISTRY}/${name}:latest" "./${context}"
-              docker push "${REGISTRY}/${name}:latest"
-            done
-
-            # Generate dynamic ConfigMaps
-            kubectl create configmap postgres-init-scripts \
-              --from-file=infra/postgres-init/ \
-              -n database --dry-run=client -o yaml | kubectl apply -f -
-
-            kubectl create configmap grafana-dashboards \
-              --from-file=infra/grafana/provisioning/dashboards/json/ \
-              -n monitoring --dry-run=client -o yaml | kubectl apply -f -
-
-            # Apply all K8s manifests
-            kubectl apply -f k8s/base/
-            kubectl apply -f k8s/configmaps/
-            kubectl apply -f k8s/database/
-            kubectl apply -f k8s/data/
-            kubectl apply -f k8s/trade/
-            kubectl apply -f k8s/shop/
-            kubectl apply -f k8s/airflow/
-            kubectl apply -f k8s/monitoring/
-            kubectl apply -f k8s/infra/
-
-            # Restart deployments to pick up new images
-            for ns in trade shop airflow; do
-              kubectl rollout restart deployment -n "$ns" 2>/dev/null || true
-            done
-            kubectl rollout restart deployment cloudflared -n default 2>/dev/null || true
-            kubectl rollout restart deployment infra-monitor -n default 2>/dev/null || true
-
-            # Wait for rollouts
-            kubectl rollout status deployment/trade-frontend -n trade --timeout=120s
-            kubectl rollout status deployment/trade-backend -n trade --timeout=120s
-            kubectl rollout status deployment/shop-backend -n shop --timeout=120s
-
-            echo "K8s deployment completed successfully!"
+            
+            # Rebuild and restart services (frontend is built inside Docker)
+            docker compose -f docker-compose.laptop.yml down
+            docker compose -f docker-compose.laptop.yml up -d --build
+            
+            # Deploy to Desktop (Unified CD)
+            echo "🚀 Triggering Desktop Deployment..."
+            chmod +x deploy_desktop.sh
+            ./deploy_desktop.sh
+            
+            echo "Deployment completed successfully!"

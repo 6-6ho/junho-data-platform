@@ -1,7 +1,7 @@
 from airflow import DAG
-from airflow.providers.cncf.kubernetes.operators.pod import KubernetesPodOperator
-from airflow.providers.cncf.kubernetes.secret import Secret
+from airflow.operators.bash import BashOperator
 from datetime import datetime, timedelta
+import os
 
 default_args = {
     'owner': 'junho',
@@ -12,27 +12,17 @@ default_args = {
     'retry_delay': timedelta(minutes=5),
 }
 
-SPARK_IMAGE = "registry.local:5000/jdp/spark:latest"
+LAPTOP_IP = os.getenv("LAPTOP_IP", "postgres")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minio")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minio123")
 
-# MinIO credentials — K8s Secret → Pod env vars (로그/describe에 노출 안 됨)
-MINIO_SECRETS = [
-    Secret('env', 'AWS_ACCESS_KEY_ID', 'minio-secret', 'MINIO_ACCESS_KEY'),
-    Secret('env', 'AWS_SECRET_ACCESS_KEY', 'minio-secret', 'MINIO_SECRET_KEY'),
-]
-
-S3A_ARGS = [
-    '--conf', 'spark.hadoop.fs.s3a.endpoint=http://minio.data.svc:9000',
-    '--conf', 'spark.hadoop.fs.s3a.aws.credentials.provider=com.amazonaws.auth.EnvironmentVariableCredentialsProvider',
-    '--conf', 'spark.hadoop.fs.s3a.path.style.access=true',
-    '--conf', 'spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem',
-]
-
-COMMON_ENV = {
-    'DB_HOST': 'postgres.database.svc',
-    'DB_PORT': '5432',
-    'DB_NAME': 'app',
-    'POSTGRES_USER': 'postgres',
-}
+S3A_CONF = (
+    f"--conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 "
+    f"--conf spark.hadoop.fs.s3a.access.key={MINIO_ACCESS_KEY} "
+    f"--conf spark.hadoop.fs.s3a.secret.key={MINIO_SECRET_KEY} "
+    f"--conf spark.hadoop.fs.s3a.path.style.access=true "
+    f"--conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem"
+)
 
 with DAG(
     'benchmark_distributed',
@@ -44,69 +34,43 @@ with DAG(
 ) as dag:
 
     # Task 1: Single executor baseline
-    single_executor = KubernetesPodOperator(
+    single_executor = BashOperator(
         task_id='benchmark_single',
-        name='benchmark-single',
-        namespace='data',
-        image=SPARK_IMAGE,
-        cmds=['spark-submit'],
-        arguments=[
-            '--master', 'k8s://https://kubernetes.default.svc:443',
-            '--deploy-mode', 'client',
-            '--conf', f'spark.kubernetes.container.image={SPARK_IMAGE}',
-            '--conf', 'spark.kubernetes.namespace=data',
-            '--conf', 'spark.executor.instances=1',
-            '--conf', 'spark.cores.max=1',
-            '--conf', 'spark.executor.cores=1',
-            '--conf', 'spark.driver.memory=1g',
-            '--conf', 'spark.executor.memory=1g',
-            '--conf', 'spark.sql.shuffle.partitions=1',
-            '--conf', 'spark.sql.adaptive.enabled=false',
-            '--conf', 'spark.kubernetes.node.selector.role=worker',
-        ] + S3A_ARGS + [
-            '--name', 'Benchmark-Single',
-            '/app/jobs/benchmark_distributed.py',
-        ],
-        service_account_name='spark',
-        node_selector={'role': 'worker'},
-        env_vars={**COMMON_ENV, 'BENCHMARK_CONFIG': 'single'},
-        secrets=MINIO_SECRETS,
-        is_delete_operator_pod=True,
-        get_logs=True,
+        bash_command=f'''
+            docker exec -e DB_HOST={LAPTOP_IP} -e BENCHMARK_CONFIG=single spark-master \
+            /opt/spark/bin/spark-submit \
+            --master spark://spark-master:7077 \
+            --conf spark.cores.max=1 \
+            --conf spark.executor.cores=1 \
+            --conf spark.driver.memory=1g \
+            --conf spark.executor.memory=1g \
+            --conf spark.sql.shuffle.partitions=1 \
+            --conf spark.sql.adaptive.enabled=false \
+            {S3A_CONF} \
+            --name Benchmark-Single \
+            /app/jobs/benchmark_distributed.py
+        ''',
         execution_timeout=timedelta(minutes=30),
     )
 
     # Task 2: Multi executor (distributed)
-    multi_executor = KubernetesPodOperator(
+    multi_executor = BashOperator(
         task_id='benchmark_multi',
-        name='benchmark-multi',
-        namespace='data',
-        image=SPARK_IMAGE,
-        cmds=['spark-submit'],
-        arguments=[
-            '--master', 'k8s://https://kubernetes.default.svc:443',
-            '--deploy-mode', 'client',
-            '--conf', f'spark.kubernetes.container.image={SPARK_IMAGE}',
-            '--conf', 'spark.kubernetes.namespace=data',
-            '--conf', 'spark.executor.instances=2',
-            '--conf', 'spark.cores.max=4',
-            '--conf', 'spark.executor.cores=2',
-            '--conf', 'spark.driver.memory=1g',
-            '--conf', 'spark.executor.memory=1536m',
-            '--conf', 'spark.sql.shuffle.partitions=8',
-            '--conf', 'spark.sql.adaptive.enabled=true',
-            '--conf', 'spark.sql.adaptive.skewJoin.enabled=true',
-            '--conf', 'spark.kubernetes.node.selector.role=worker',
-        ] + S3A_ARGS + [
-            '--name', 'Benchmark-Multi',
-            '/app/jobs/benchmark_distributed.py',
-        ],
-        service_account_name='spark',
-        node_selector={'role': 'worker'},
-        env_vars={**COMMON_ENV, 'BENCHMARK_CONFIG': 'multi'},
-        secrets=MINIO_SECRETS,
-        is_delete_operator_pod=True,
-        get_logs=True,
+        bash_command=f'''
+            docker exec -e DB_HOST={LAPTOP_IP} -e BENCHMARK_CONFIG=multi spark-master \
+            /opt/spark/bin/spark-submit \
+            --master spark://spark-master:7077 \
+            --conf spark.cores.max=4 \
+            --conf spark.executor.cores=2 \
+            --conf spark.driver.memory=1g \
+            --conf spark.executor.memory=1536m \
+            --conf spark.sql.shuffle.partitions=8 \
+            --conf spark.sql.adaptive.enabled=true \
+            --conf spark.sql.adaptive.skewJoin.enabled=true \
+            {S3A_CONF} \
+            --name Benchmark-Multi \
+            /app/jobs/benchmark_distributed.py
+        ''',
         execution_timeout=timedelta(minutes=30),
     )
 
