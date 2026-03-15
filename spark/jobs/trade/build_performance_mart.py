@@ -309,6 +309,91 @@ def build_time_performance(spark, joined_df, target_date=None):
     print(f"Wrote {row_count} rows to mart_trade_time_performance")
 
 
+def build_optimize_daily(spark, joined_df, target_date=None):
+    """Build mart_trade_optimize_daily: daily x tier x TP/SL pre-aggregation.
+
+    Replaces 134K-row GROUP BY at API time with ~1K-row daily summary.
+    """
+    # Build strategy results per signal (reuse logic from build_strategy_result)
+    signal_groups = joined_df.groupBy("symbol", "alert_time", "alert_date", "tier").agg(
+        collect_list(struct("time_min", "profit_pct")).alias("points")
+    )
+
+    rows = signal_groups.collect()
+    if not rows:
+        print("No signals for optimize_daily")
+        return
+
+    daily_rows = []
+    for row in rows:
+        points = sorted(row.points, key=lambda p: p.time_min)
+        if not points:
+            continue
+
+        for tp, sl in TPSL_GRID:
+            result_pct = None
+            for p in points:
+                if p.profit_pct >= tp:
+                    result_pct = tp
+                    break
+                elif p.profit_pct <= -sl:
+                    result_pct = -sl
+                    break
+            if result_pct is None:
+                result_pct = points[-1].profit_pct
+
+            is_win = result_pct > 0
+            is_loss = result_pct < 0
+            daily_rows.append(Row(
+                date=row.alert_date,
+                tier=row.tier,
+                take_profit=tp,
+                stop_loss=sl,
+                trades=1,
+                wins=1 if is_win else 0,
+                losses=1 if is_loss else 0,
+                total_pnl=round(result_pct, 4),
+                total_win_pnl=round(result_pct, 4) if is_win else 0.0,
+                total_loss_pnl=round(abs(result_pct), 4) if is_loss else 0.0,
+            ))
+
+    if not daily_rows:
+        return
+
+    raw_df = spark.createDataFrame(daily_rows)
+
+    # Aggregate per-signal rows to daily level
+    tier_agg = raw_df.groupBy("date", "tier", "take_profit", "stop_loss").agg(
+        spark_sum("trades").alias("trades"),
+        spark_sum("wins").alias("wins"),
+        spark_sum("losses").alias("losses"),
+        spark_sum("total_pnl").alias("total_pnl"),
+        spark_sum("total_win_pnl").alias("total_win_pnl"),
+        spark_sum("total_loss_pnl").alias("total_loss_pnl"),
+    )
+
+    # Also build 'all' tier aggregation
+    all_agg = raw_df.groupBy("date", "take_profit", "stop_loss").agg(
+        spark_sum("trades").alias("trades"),
+        spark_sum("wins").alias("wins"),
+        spark_sum("losses").alias("losses"),
+        spark_sum("total_pnl").alias("total_pnl"),
+        spark_sum("total_win_pnl").alias("total_win_pnl"),
+        spark_sum("total_loss_pnl").alias("total_loss_pnl"),
+    ).withColumn("tier", lit("all"))
+
+    combined = tier_agg.unionByName(all_agg)
+
+    if target_date:
+        _jdbc_delete(f"DELETE FROM mart_trade_optimize_daily WHERE date = '{target_date}'")
+    else:
+        _jdbc_delete("DELETE FROM mart_trade_optimize_daily WHERE TRUE")
+
+    combined.write.jdbc(DB_URL, "mart_trade_optimize_daily", mode="append", properties=DB_PROPERTIES)
+    row_count = combined.count()
+    print(f"Wrote {row_count} rows to mart_trade_optimize_daily")
+
+
 def _jdbc_delete(sql):
     """Execute a DELETE statement on Postgres via plain JDBC."""
     import psycopg2
@@ -351,6 +436,7 @@ def main():
         build_signal_detail(spark, joined, target)
         build_strategy_result(spark, joined, target)
         build_time_performance(spark, joined, target)
+        build_optimize_daily(spark, joined, target)
 
         print("Mart build completed successfully")
     except Exception as e:

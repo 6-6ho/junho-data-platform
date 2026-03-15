@@ -59,6 +59,21 @@ CREATE TABLE IF NOT EXISTS mart_trade_time_performance (
     PRIMARY KEY (date, tier, time_min)
 );
 
+-- E: Daily pre-aggregated TP/SL strategy stats (optimize endpoint)
+CREATE TABLE IF NOT EXISTS mart_trade_optimize_daily (
+    date DATE NOT NULL,
+    tier TEXT NOT NULL,
+    take_profit DOUBLE PRECISION NOT NULL,
+    stop_loss DOUBLE PRECISION NOT NULL,
+    trades INT DEFAULT 0,
+    wins INT DEFAULT 0,
+    losses INT DEFAULT 0,
+    total_pnl DOUBLE PRECISION DEFAULT 0,
+    total_win_pnl DOUBLE PRECISION DEFAULT 0,
+    total_loss_pnl DOUBLE PRECISION DEFAULT 0,
+    PRIMARY KEY (date, tier, take_profit, stop_loss)
+);
+
 -- D: DQ daily stats from signal_validation_log
 CREATE TABLE IF NOT EXISTS mart_signal_validation_daily (
     date DATE PRIMARY KEY,

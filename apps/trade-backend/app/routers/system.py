@@ -614,20 +614,20 @@ def _build_simulate_response(trades, daily_pnl, take_profit, stop_loss):
 
 @router.get("/performance/optimize")
 async def find_optimal_strategy(days: int = 15, tier: str = "all", db: Session = Depends(get_db)):
-    """Test TP=[3..10] x SL=[1..5] combinations from mart. days=0 returns all data."""
+    """Test TP=[3..10] x SL=[1..5] combinations from daily pre-aggregated mart. days=0 returns all data."""
     try:
-        date_filter = get_date_filter_sql(days)
-        tier_filter = _mart_tier_filter(tier)
+        date_filter = _mart_date_filter(days)
+        tier_filter = _mart_time_tier_filter(tier)
 
         rows = db.execute(text(f"""
             SELECT take_profit, stop_loss,
-                   COUNT(*)::int AS total_trades,
-                   SUM(CASE WHEN result_pct > 0 THEN 1 ELSE 0 END)::int AS wins,
-                   SUM(CASE WHEN result_pct < 0 THEN 1 ELSE 0 END)::int AS losses,
-                   SUM(CASE WHEN result_pct > 0 THEN result_pct ELSE 0 END) AS total_win_pnl,
-                   SUM(CASE WHEN result_pct < 0 THEN ABS(result_pct) ELSE 0 END) AS total_loss_pnl,
-                   SUM(result_pct) AS total_pnl
-            FROM mart_trade_strategy_result
+                   SUM(trades)::int AS total_trades,
+                   SUM(wins)::int AS wins,
+                   SUM(losses)::int AS losses,
+                   SUM(total_win_pnl) AS total_win_pnl,
+                   SUM(total_loss_pnl) AS total_loss_pnl,
+                   SUM(total_pnl) AS total_pnl
+            FROM mart_trade_optimize_daily
             WHERE take_profit IN (3,4,5,6,7,8,9,10)
               AND stop_loss IN (1,2,3,4,5)
               AND take_profit > stop_loss
