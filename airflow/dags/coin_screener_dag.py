@@ -210,6 +210,61 @@ def fetch_and_classify(**context):
     # 빗썸 종목은 업비트 주봉 공유 (같은 심볼이면 동일 데이터)
     # 빗썸-only 종목은 주봉 데이터 없음 → weekly_down_count = NULL
 
+    # --- 바이낸스 일봉: 신규상장 종목 상장가/최고가 ---
+    # symbol -> {listing_price, max_price}
+    binance_price_data = {}
+    new_symbols = set()
+    for exchange, symbol, market_code, first_seen in listings:
+        if first_seen and (today - first_seen).days < 180:
+            new_symbols.add(symbol)
+
+    # first_seen_date == today인 종목은 최초 수집일이지 실제 상장일이 아님 → 제외
+    new_symbols = {s for s in new_symbols
+                   if any(fs and fs != today for _, sym, _, fs in listings if sym == s)}
+    logger.info(f"New listings (<180d, excluding first-seen-today): {len(new_symbols)}")
+    for symbol in new_symbols:
+        try:
+            # first_seen_date에서 해당 심볼의 첫 coin_listing 레코드 가져오기
+            cur.execute(
+                "SELECT MIN(first_seen_date) FROM coin_listing WHERE symbol = %s AND on_binance = TRUE",
+                (symbol,),
+            )
+            row = cur.fetchone()
+            if not row or not row[0]:
+                continue
+            first_date = row[0]
+
+            # 바이낸스 일봉: startTime = first_seen_date 00:00 UTC (ms)
+            start_ms = int(datetime.combine(first_date, datetime.min.time()).timestamp() * 1000)
+            resp = requests.get(
+                "https://api.binance.com/api/v3/klines",
+                params={
+                    "symbol": f"{symbol}USDT",
+                    "interval": "1d",
+                    "startTime": start_ms,
+                    "limit": 180,
+                },
+                timeout=10,
+            )
+            if resp.status_code != 200:
+                continue
+            klines = resp.json()
+            if not klines:
+                continue
+
+            # 첫 캔들의 시가 = 상장가, 전체 캔들의 최고가 = max_price
+            listing_px = float(klines[0][1])  # open
+            max_px = max(float(k[2]) for k in klines)  # high
+            binance_price_data[symbol] = {
+                "listing_price": listing_px,
+                "max_price": max_px,
+            }
+            time.sleep(0.05)  # Binance 1200 req/min
+        except Exception as e:
+            logger.warning(f"Binance klines error for {symbol}: {e}")
+
+    logger.info(f"Binance listing prices fetched: {len(binance_price_data)} coins")
+
     # --- 분류 & INSERT ---
     insert_sql = """
         INSERT INTO coin_screener_daily
@@ -244,21 +299,18 @@ def fetch_and_classify(**context):
         # 상장일수
         listing_age = (today - first_seen).days if first_seen else None
 
-        # 신규상장 무펌핑: 현재는 first_seen 기반 추정만 가능
-        # max_price_since_listing / listing_price는 주봉 데이터에서 추출
-        max_price = None
-        listing_price_val = None
+        # 바이낸스 일봉 기반 상장가/최고가 (USDT 기준, 비율 판별이라 단위 무관)
+        bp = binance_price_data.get(symbol, {})
+        max_price = bp.get("max_price")
+        listing_price_val = bp.get("listing_price")
 
         # --- 분류 ---
         is_low_cap = bool(mc and mc < 300_000_000_000)  # 3000억원
         is_long_decline = bool(wd is not None and wd >= 8)
-        is_no_pump = False  # 상장가 데이터 부재 시 미분류
-
-        if listing_age is not None and listing_age < 180:
-            # 주봉에서 최고가/최저가 추출 시도 (업비트 종목)
-            # listing_price는 first_seen 기준이므로 정확한 상장가는 아님
-            # 향후 개선 가능
-            pass
+        is_no_pump = False
+        if (listing_age is not None and 0 < listing_age < 180
+                and listing_price_val and listing_price_val > 0 and max_price):
+            is_no_pump = (max_price / listing_price_val) < 1.5
 
         junk_score = int(is_low_cap) + int(is_long_decline) + int(is_no_pump)
 
