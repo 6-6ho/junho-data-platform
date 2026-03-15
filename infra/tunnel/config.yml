@@ -1,0 +1,23 @@
+tunnel: 05b88928-b53c-4ed6-aa52-6f1e0895f59d
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  - hostname: 6-6ho.com
+    service: http://frontend:80
+  - hostname: www.6-6ho.com
+    service: http://frontend:80
+  - hostname: trade.6-6ho.com
+    service: http://frontend:80
+  - hostname: shop.6-6ho.com
+    service: http://192.168.219.108:3001
+  - hostname: admin.6-6ho.com
+    service: http://192.168.219.108:3003
+  - hostname: analytics.6-6ho.com
+    service: http://192.168.219.108:3001
+  - hostname: airflow.6-6ho.com
+    service: http://192.168.219.108:8080
+  - hostname: monitor.6-6ho.com
+    service: http://grafana:3000
+  - hostname: code.6-6ho.com
+    service: http://192.168.219.108:8443
+  - service: http_status:404
