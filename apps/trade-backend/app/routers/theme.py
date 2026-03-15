@@ -40,21 +40,18 @@ async def get_theme_rs(mock: bool = False):
             # ... existing query logic ...
             # Query latest snapshot
             cur.execute("""
-                SELECT
-                    t.theme_id,
-                    t.theme_name,
-                    t.exclude_from_rs,
-                    s.avg_change_pct,
-                    s.market_avg_pct,
-                    s.rs_score,
-                    s.coin_count,
-                    s.top_coin,
-                    s.top_coin_pct as best_pct,
-                    s.snapshot_time
+                WITH latest AS (
+                    SELECT MAX(snapshot_time) AS ts FROM theme_rs_snapshot
+                )
+                SELECT t.theme_id, t.theme_name, t.exclude_from_rs,
+                       s.avg_change_pct, s.market_avg_pct, s.rs_score,
+                       s.coin_count, s.top_coin, s.top_coin_pct AS best_pct,
+                       s.snapshot_time
                 FROM theme_master t
-                LEFT JOIN theme_rs_snapshot s ON t.theme_id = s.theme_id
+                LEFT JOIN theme_rs_snapshot s
+                  ON s.theme_id = t.theme_id
+                 AND s.snapshot_time = (SELECT ts FROM latest)
                 WHERE t.exclude_from_rs = FALSE
-                  AND (s.snapshot_time = (SELECT MAX(snapshot_time) FROM theme_rs_snapshot) OR s.snapshot_time IS NULL)
                 ORDER BY s.avg_change_pct DESC NULLS LAST
             """)
             themes = cur.fetchall()
@@ -93,11 +90,14 @@ async def get_dynamic_themes():
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
+                WITH latest AS (
+                    SELECT MAX(created_date) AS dt FROM dynamic_theme_cluster
+                )
                 SELECT cluster_id, created_date, coin_count, strength_score,
                        avg_high_change_pct, lead_symbol, lead_change_pct,
                        avg_correlation, created_at
                 FROM dynamic_theme_cluster
-                WHERE created_date = (SELECT MAX(created_date) FROM dynamic_theme_cluster)
+                WHERE created_date = (SELECT dt FROM latest)
                 ORDER BY strength_score DESC
             """)
             clusters = cur.fetchall()
