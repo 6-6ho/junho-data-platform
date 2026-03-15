@@ -7,6 +7,7 @@ Trade Performance Analysis DAG
 """
 from airflow import DAG
 from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from datetime import datetime, timedelta
 import requests
@@ -16,6 +17,9 @@ import os
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+LAPTOP_IP = os.getenv("LAPTOP_IP", "postgres")
+MINIO_ACCESS_KEY = os.getenv("MINIO_ACCESS_KEY", "minio")
+MINIO_SECRET_KEY = os.getenv("MINIO_SECRET_KEY", "minio123")
 
 WIN_THRESHOLD_PCT = 1.0
 
@@ -329,3 +333,30 @@ with DAG(
         task_id="run_performance_analysis",
         python_callable=run_performance_analysis,
     )
+
+    export_to_iceberg = BashOperator(
+        task_id='export_to_iceberg',
+        bash_command=f'''
+            docker exec -e DB_HOST={LAPTOP_IP} spark-master /opt/spark/bin/spark-submit \
+            --master spark://spark-master:7077 \
+            --conf spark.cores.max=3 \
+            --conf spark.executor.cores=1 \
+            --conf spark.driver.memory=1g \
+            --conf spark.executor.memory=1g \
+            --conf spark.sql.shuffle.partitions=6 \
+            --conf spark.sql.adaptive.enabled=true \
+            --conf spark.sql.extensions=org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions \
+            --conf spark.sql.catalog.iceberg=org.apache.iceberg.spark.SparkCatalog \
+            --conf spark.sql.catalog.iceberg.type=hadoop \
+            --conf "spark.sql.catalog.iceberg.warehouse=s3a://iceberg-warehouse/data/" \
+            --conf spark.hadoop.fs.s3a.endpoint=http://minio:9000 \
+            --conf spark.hadoop.fs.s3a.access.key={MINIO_ACCESS_KEY} \
+            --conf spark.hadoop.fs.s3a.secret.key={MINIO_SECRET_KEY} \
+            --conf spark.hadoop.fs.s3a.path.style.access=true \
+            --conf spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem \
+            --name ExportTimeseries \
+            /app/jobs/trade/export_timeseries_to_iceberg.py --target-date {{{{ ds }}}}
+        ''',
+    )
+
+    analyze_task >> export_to_iceberg

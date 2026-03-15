@@ -175,11 +175,11 @@ def run():
     spark.sparkContext.setLogLevel("WARN")
     
     # Create Tables if not exist
-    spark.sql("CREATE NAMESPACE IF NOT EXISTS my_catalog.shop")
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS iceberg.shop")
     
     # Sales
     spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.hourly_sales (
+        CREATE TABLE IF NOT EXISTS iceberg.shop.hourly_sales (
             window_start TIMESTAMP,
             window_end TIMESTAMP,
             category STRING,
@@ -191,7 +191,7 @@ def run():
     
     # Funnel
     spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.funnel_stats (
+        CREATE TABLE IF NOT EXISTS iceberg.shop.funnel_stats (
             window_start TIMESTAMP,
             total_sessions LONG,
             view_count LONG,
@@ -203,7 +203,7 @@ def run():
     
     # KPI
     spark.sql("""
-        CREATE TABLE IF NOT EXISTS my_catalog.shop.realtime_metrics (
+        CREATE TABLE IF NOT EXISTS iceberg.shop.realtime_metrics (
             metric_name STRING,
             metric_value DOUBLE,
             last_updated TIMESTAMP
