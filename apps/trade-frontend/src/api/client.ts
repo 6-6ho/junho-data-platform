@@ -87,6 +87,21 @@ export const fetchLatestReport = async (date?: string) => {
   return data;
 };
 
+// Screener
+export const fetchScreenerOverview = async () => {
+  const { data } = await api.get('/screener/overview');
+  return data;
+};
+
+export const fetchScreenerCoins = async (params?: {
+  exchange?: string;
+  flag?: string;
+  sort?: string;
+}) => {
+  const { data } = await api.get('/screener/coins', { params });
+  return data;
+};
+
 // Auth
 const authHeaders = () => {
   const token = localStorage.getItem('settings_token');

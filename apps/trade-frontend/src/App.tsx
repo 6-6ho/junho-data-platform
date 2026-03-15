@@ -8,6 +8,7 @@ import PerformancePage from './pages/PerformancePage';
 import ThemePage from './pages/ThemePage';
 import MarketOverviewPage from './pages/MarketOverviewPage';
 import StocksPage from './pages/StocksPage';
+import ScreenerPage from './pages/ScreenerPage';
 import SettingsPage from './pages/SettingsPage';
 
 function LegacySymbolRedirect() {
@@ -72,6 +73,9 @@ function AppContent() {
           <NavLink to="/crypto/theme" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Theme
           </NavLink>
+          <NavLink to="/crypto/screener" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Screener
+          </NavLink>
         </nav>
       )}
 
@@ -89,6 +93,7 @@ function AppContent() {
           <Route path="/crypto/smc" element={<SMCPage />} />
           <Route path="/crypto/performance" element={<PerformancePage />} />
           <Route path="/crypto/theme" element={<ThemePage />} />
+          <Route path="/crypto/screener" element={<ScreenerPage />} />
           <Route path="/crypto/symbol/:symbol" element={<SymbolDetailsPage />} />
 
           {/* Stocks */}
