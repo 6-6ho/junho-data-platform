@@ -297,7 +297,7 @@ def update_latest(**context):
             is_low_cap, is_long_decline, is_no_pump, junk_score, NOW()
         FROM coin_screener_daily
         WHERE date = %s
-        ORDER BY symbol, exchange ASC
+        ORDER BY symbol, exchange DESC
         ON CONFLICT (exchange, symbol) DO UPDATE SET
             price_krw = EXCLUDED.price_krw,
             market_cap_krw = EXCLUDED.market_cap_krw,
