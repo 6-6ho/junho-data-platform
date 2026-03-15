@@ -31,3 +31,6 @@ CREATE TABLE IF NOT EXISTS theme_rs_snapshot (
     top_coin_pct DOUBLE PRECISION,
     PRIMARY KEY (snapshot_time, theme_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_theme_rs_theme_time
+  ON theme_rs_snapshot(theme_id, snapshot_time DESC);

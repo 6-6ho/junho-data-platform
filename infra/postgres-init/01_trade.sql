@@ -17,6 +17,10 @@ create table if not exists movers_latest (
 create index if not exists idx_movers_latest_type_time
   on movers_latest(type, event_time desc);
 
+create index if not exists idx_movers_rise_distinct
+  on movers_latest(symbol, event_time, change_pct_window desc)
+  where type = 'rise';
+
 
 
 -- Favorites (Watchlist) Config
