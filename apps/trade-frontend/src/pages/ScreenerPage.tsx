@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, TrendingDown, Zap, BarChart3, ChevronUp, ChevronDown, Search } from 'lucide-react';
 
 const API_BASE = '/api/screener';
@@ -27,7 +27,12 @@ interface ScreenerCoin {
   updated_at: string | null;
 }
 
-type FilterFlag = '' | 'junk' | 'low_cap' | 'long_decline' | 'no_pump';
+type FlagKey = 'low_cap' | 'long_decline' | 'no_pump';
+const FLAG_OPTIONS: { key: FlagKey; label: string }[] = [
+  { key: 'low_cap', label: '저시총' },
+  { key: 'long_decline', label: '장기하락' },
+  { key: 'no_pump', label: '무펌핑' },
+];
 type FilterExchange = '' | 'upbit' | 'bithumb';
 type SortKey = 'symbol' | 'exchange' | 'price_krw' | 'market_cap_krw' | 'volume_24h_krw' | 'weekly_down_count' | 'junk_score';
 type SortDir = 'asc' | 'desc';
@@ -87,7 +92,7 @@ export default function ScreenerPage() {
   const [coins, setCoins] = useState<ScreenerCoin[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterExchange, setFilterExchange] = useState<FilterExchange>('');
-  const [filterFlag, setFilterFlag] = useState<FilterFlag>('');
+  const [filterFlags, setFilterFlags] = useState<Set<FlagKey>>(new Set());
   const [filterScore, setFilterScore] = useState<'' | '0' | '1' | '2' | '3'>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('junk_score');
@@ -107,7 +112,6 @@ export default function ScreenerPage() {
     try {
       const params = new URLSearchParams();
       if (filterExchange) params.set('exchange', filterExchange);
-      if (filterFlag) params.set('flag', filterFlag);
       const qs = params.toString();
       const res = await fetch(`${API_BASE}/coins${qs ? `?${qs}` : ''}`);
       const data = await res.json();
@@ -117,7 +121,7 @@ export default function ScreenerPage() {
     } finally {
       setLoading(false);
     }
-  }, [filterExchange, filterFlag]);
+  }, [filterExchange]);
 
   useEffect(() => { fetchOverview(); }, [fetchOverview]);
   useEffect(() => { setLoading(true); fetchCoins(); }, [fetchCoins]);
@@ -131,18 +135,35 @@ export default function ScreenerPage() {
     }
   };
 
+  const toggleFlag = (key: FlagKey) => {
+    setFilterFlags(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   const sortedCoins = useMemo(() => {
     let filtered = coins;
     if (searchQuery) {
       const q = searchQuery.toUpperCase();
       filtered = filtered.filter(c => c.symbol.includes(q));
     }
+    if (filterFlags.size > 0) {
+      filtered = filtered.filter(c => {
+        if (filterFlags.has('low_cap') && c.is_low_cap) return true;
+        if (filterFlags.has('long_decline') && c.is_long_decline) return true;
+        if (filterFlags.has('no_pump') && c.is_no_pump) return true;
+        return false;
+      });
+    }
     if (filterScore !== '') {
       const score = Number(filterScore);
       filtered = filtered.filter(c => c.junk_score === score);
     }
     return [...filtered].sort((a, b) => compareValues(a[sortKey], b[sortKey], sortDir));
-  }, [coins, searchQuery, filterScore, sortKey, sortDir]);
+  }, [coins, searchQuery, filterFlags, filterScore, sortKey, sortDir]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -168,17 +189,7 @@ export default function ScreenerPage() {
             <option value="bithumb">빗썸</option>
           </select>
 
-          <select
-            value={filterFlag}
-            onChange={e => setFilterFlag(e.target.value as FilterFlag)}
-            style={selectStyle}
-          >
-            <option value="">분류: 전체</option>
-            <option value="junk">잡코인 (score&gt;0)</option>
-            <option value="low_cap">저시총</option>
-            <option value="long_decline">장기하락</option>
-            <option value="no_pump">무펌핑</option>
-          </select>
+          <FlagMultiSelect selected={filterFlags} onToggle={toggleFlag} />
 
           <select
             value={filterScore}
@@ -331,6 +342,82 @@ function SummaryCard({ label, value, icon, color }: {
           {value}
         </div>
       </div>
+    </div>
+  );
+}
+
+function FlagMultiSelect({ selected, onToggle }: { selected: Set<FlagKey>; onToggle: (k: FlagKey) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const label = selected.size === 0
+    ? '분류: 전체'
+    : `분류: ${selected.size}개`;
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        style={{
+          ...selectStyle,
+          textAlign: 'left',
+          minWidth: 120,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}
+      >
+        {label}
+        <ChevronDown size={12} style={{ opacity: 0.5 }} />
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          left: 0,
+          marginTop: 4,
+          background: '#1a1a1a',
+          border: '1px solid #333',
+          borderRadius: 6,
+          padding: '4px 0',
+          zIndex: 100,
+          minWidth: 140,
+        }}>
+          {FLAG_OPTIONS.map(({ key, label: optLabel }) => (
+            <label
+              key={key}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                cursor: 'pointer',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--text-primary)',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#252525')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(key)}
+                onChange={() => onToggle(key)}
+                style={{ accentColor: 'var(--accent-primary)' }}
+              />
+              {optLabel}
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
