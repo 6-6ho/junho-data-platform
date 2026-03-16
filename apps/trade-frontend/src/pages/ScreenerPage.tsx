@@ -71,12 +71,24 @@ function compareValues(a: unknown, b: unknown, dir: SortDir): number {
   return dir === 'asc' ? na - nb : nb - na;
 }
 
+const selectStyle: React.CSSProperties = {
+  background: '#1a1a1a',
+  border: '1px solid #333',
+  borderRadius: 6,
+  color: 'var(--text-primary)',
+  fontSize: 'var(--text-sm)',
+  padding: '6px 12px',
+  outline: 'none',
+  cursor: 'pointer',
+};
+
 export default function ScreenerPage() {
   const [overview, setOverview] = useState<ScreenerOverview | null>(null);
   const [coins, setCoins] = useState<ScreenerCoin[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterExchange, setFilterExchange] = useState<FilterExchange>('');
   const [filterFlag, setFilterFlag] = useState<FilterFlag>('');
+  const [filterScore, setFilterScore] = useState<'' | '0' | '1' | '2' | '3'>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('junk_score');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
@@ -123,10 +135,14 @@ export default function ScreenerPage() {
     let filtered = coins;
     if (searchQuery) {
       const q = searchQuery.toUpperCase();
-      filtered = coins.filter(c => c.symbol.includes(q));
+      filtered = filtered.filter(c => c.symbol.includes(q));
+    }
+    if (filterScore !== '') {
+      const score = Number(filterScore);
+      filtered = filtered.filter(c => c.junk_score === score);
     }
     return [...filtered].sort((a, b) => compareValues(a[sortKey], b[sortKey], sortDir));
-  }, [coins, searchQuery, sortKey, sortDir]);
+  }, [coins, searchQuery, filterScore, sortKey, sortDir]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -141,22 +157,42 @@ export default function ScreenerPage() {
 
       {/* Filters */}
       <div className="card">
-        <div className="card-body" style={{ padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontWeight: 600 }}>거래소</span>
-          <FilterButton active={filterExchange === ''} onClick={() => setFilterExchange('')}>전체</FilterButton>
-          <FilterButton active={filterExchange === 'upbit'} onClick={() => setFilterExchange('upbit')}>업비트</FilterButton>
-          <FilterButton active={filterExchange === 'bithumb'} onClick={() => setFilterExchange('bithumb')}>빗썸</FilterButton>
+        <div className="card-body" style={{ padding: '12px 16px', display: 'flex', gap: 12, alignItems: 'center' }}>
+          <select
+            value={filterExchange}
+            onChange={e => setFilterExchange(e.target.value as FilterExchange)}
+            style={selectStyle}
+          >
+            <option value="">거래소: 전체</option>
+            <option value="upbit">업비트</option>
+            <option value="bithumb">빗썸</option>
+          </select>
 
-          <span style={{ margin: '0 var(--space-2)', color: 'var(--border-color)' }}>|</span>
+          <select
+            value={filterFlag}
+            onChange={e => setFilterFlag(e.target.value as FilterFlag)}
+            style={selectStyle}
+          >
+            <option value="">분류: 전체</option>
+            <option value="junk">잡코인 (score&gt;0)</option>
+            <option value="low_cap">저시총</option>
+            <option value="long_decline">장기하락</option>
+            <option value="no_pump">무펌핑</option>
+          </select>
 
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', fontWeight: 600 }}>분류</span>
-          <FilterButton active={filterFlag === ''} onClick={() => setFilterFlag('')}>전체</FilterButton>
-          <FilterButton active={filterFlag === 'junk'} onClick={() => setFilterFlag('junk')}>잡코인</FilterButton>
-          <FilterButton active={filterFlag === 'low_cap'} onClick={() => setFilterFlag('low_cap')}>저시총</FilterButton>
-          <FilterButton active={filterFlag === 'long_decline'} onClick={() => setFilterFlag('long_decline')}>장기하락</FilterButton>
-          <FilterButton active={filterFlag === 'no_pump'} onClick={() => setFilterFlag('no_pump')}>무펌핑</FilterButton>
+          <select
+            value={filterScore}
+            onChange={e => setFilterScore(e.target.value as '' | '0' | '1' | '2' | '3')}
+            style={selectStyle}
+          >
+            <option value="">Score: 전체</option>
+            <option value="3">3</option>
+            <option value="2">2</option>
+            <option value="1">1</option>
+            <option value="0">0</option>
+          </select>
 
-          <span style={{ margin: '0 var(--space-2)', color: 'var(--border-color)' }}>|</span>
+          <div style={{ flex: 1 }} />
 
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
             <Search size={14} style={{ position: 'absolute', left: 8, color: 'var(--text-tertiary)' }} />
@@ -166,13 +202,13 @@ export default function ScreenerPage() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
-                padding: '4px 8px 4px 28px',
+                padding: '6px 12px 6px 28px',
                 borderRadius: 6,
-                border: '1px solid var(--border-color)',
-                fontSize: 'var(--text-xs)',
-                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid #333',
+                fontSize: 'var(--text-sm)',
+                backgroundColor: '#1a1a1a',
                 color: 'var(--text-primary)',
-                width: 120,
+                width: 140,
                 outline: 'none',
               }}
             />
@@ -296,31 +332,6 @@ function SummaryCard({ label, value, icon, color }: {
         </div>
       </div>
     </div>
-  );
-}
-
-function FilterButton({ active, onClick, children }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: '4px 12px',
-        borderRadius: 6,
-        border: 'none',
-        fontSize: 'var(--text-xs)',
-        fontWeight: active ? 600 : 400,
-        cursor: 'pointer',
-        backgroundColor: active ? 'var(--accent-color)' : 'var(--bg-secondary)',
-        color: active ? '#fff' : 'var(--text-secondary)',
-        transition: 'all 0.15s',
-      }}
-    >
-      {children}
-    </button>
   );
 }
 
