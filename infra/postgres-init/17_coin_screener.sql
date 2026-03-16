@@ -29,9 +29,11 @@ CREATE TABLE IF NOT EXISTS coin_screener_daily (
     is_low_cap BOOLEAN DEFAULT FALSE,
     is_long_decline BOOLEAN DEFAULT FALSE,
     is_no_pump BOOLEAN DEFAULT FALSE,
+    had_pump_20pct_30d BOOLEAN DEFAULT FALSE,  -- 최근 30일 일봉 20%+ 상승 여부
     junk_score SMALLINT DEFAULT 0,    -- 0~3
     PRIMARY KEY (date, exchange, symbol)
 );
+ALTER TABLE coin_screener_daily ADD COLUMN IF NOT EXISTS had_pump_20pct_30d BOOLEAN DEFAULT FALSE;
 
 -- C: 최신 스크리닝 결과 (서빙용)
 CREATE TABLE IF NOT EXISTS coin_screener_latest (
@@ -47,9 +49,11 @@ CREATE TABLE IF NOT EXISTS coin_screener_latest (
     is_low_cap BOOLEAN DEFAULT FALSE,
     is_long_decline BOOLEAN DEFAULT FALSE,
     is_no_pump BOOLEAN DEFAULT FALSE,
+    had_pump_20pct_30d BOOLEAN DEFAULT FALSE,
     junk_score SMALLINT DEFAULT 0,
     updated_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (exchange, symbol)
 );
+ALTER TABLE coin_screener_latest ADD COLUMN IF NOT EXISTS had_pump_20pct_30d BOOLEAN DEFAULT FALSE;
 CREATE INDEX IF NOT EXISTS idx_screener_latest_junk
     ON coin_screener_latest(junk_score DESC, exchange);

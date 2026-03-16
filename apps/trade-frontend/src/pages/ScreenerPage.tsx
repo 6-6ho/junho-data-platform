@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { AlertTriangle, TrendingDown, Zap, BarChart3, ChevronUp, ChevronDown, Search } from 'lucide-react';
+import { AlertTriangle, TrendingDown, Zap, BarChart3, ChevronUp, ChevronDown, Search, Flame } from 'lucide-react';
 
 const API_BASE = '/api/screener';
 
@@ -9,6 +9,7 @@ interface ScreenerOverview {
   low_cap_count: number;
   long_decline_count: number;
   no_pump_count: number;
+  pump_20pct_count: number;
   last_updated: string | null;
 }
 
@@ -23,15 +24,17 @@ interface ScreenerCoin {
   is_low_cap: boolean;
   is_long_decline: boolean;
   is_no_pump: boolean;
+  had_pump_20pct_30d: boolean;
   junk_score: number;
   updated_at: string | null;
 }
 
-type FlagKey = 'low_cap' | 'long_decline' | 'no_pump';
+type FlagKey = 'low_cap' | 'long_decline' | 'no_pump' | 'pump_20pct';
 const FLAG_OPTIONS: { key: FlagKey; label: string }[] = [
   { key: 'low_cap', label: '저시총' },
   { key: 'long_decline', label: '장기하락' },
   { key: 'no_pump', label: '무펌핑' },
+  { key: 'pump_20pct', label: '30일 20%+' },
 ];
 type FilterExchange = '' | 'upbit' | 'bithumb';
 type SortKey = 'symbol' | 'exchange' | 'price_krw' | 'market_cap_krw' | 'volume_24h_krw' | 'weekly_down_count' | 'junk_score';
@@ -155,6 +158,7 @@ export default function ScreenerPage() {
         if (filterFlags.has('low_cap') && c.is_low_cap) return true;
         if (filterFlags.has('long_decline') && c.is_long_decline) return true;
         if (filterFlags.has('no_pump') && c.is_no_pump) return true;
+        if (filterFlags.has('pump_20pct') && c.had_pump_20pct_30d) return true;
         return false;
       });
     }
@@ -174,6 +178,7 @@ export default function ScreenerPage() {
         <SummaryCard label="저시총" value={overview?.low_cap_count ?? 0} icon={<Zap size={16} />} color="#ff9800" />
         <SummaryCard label="장기하락" value={overview?.long_decline_count ?? 0} icon={<TrendingDown size={16} />} color="#ffd740" />
         <SummaryCard label="무펌핑" value={overview?.no_pump_count ?? 0} icon={<TrendingDown size={16} />} color="#90a4ae" />
+        <SummaryCard label="30일 20%+" value={overview?.pump_20pct_count ?? 0} icon={<Flame size={16} />} color="#4fc3f7" />
       </div>
 
       {/* Filters */}
@@ -190,6 +195,27 @@ export default function ScreenerPage() {
           </select>
 
           <FlagMultiSelect selected={filterFlags} onToggle={toggleFlag} />
+          {filterFlags.size > 0 && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {FLAG_OPTIONS.filter(o => filterFlags.has(o.key)).map(o => (
+                <span
+                  key={o.key}
+                  onClick={() => toggleFlag(o.key)}
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    backgroundColor: 'rgba(255,255,255,0.08)',
+                    color: 'var(--text-secondary)',
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {o.label} ×
+                </span>
+              ))}
+            </div>
+          )}
 
           <select
             value={filterScore}
@@ -299,6 +325,7 @@ export default function ScreenerPage() {
                         {coin.is_low_cap && <Tag color="#ff9800">저시총</Tag>}
                         {coin.is_long_decline && <Tag color="#ffd740">장기하락</Tag>}
                         {coin.is_no_pump && <Tag color="#90a4ae">무펌핑</Tag>}
+                        {coin.had_pump_20pct_30d && <Tag color="#4fc3f7">20%+</Tag>}
                       </div>
                     </Td>
                   </tr>

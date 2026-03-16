@@ -258,10 +258,29 @@ def fetch_and_classify(**context):
 
             ath = max(float(k[2]) for k in weekly_klines)  # high
 
+            # 3) 최근 30일봉: 20%+ 상승 여부
+            resp3 = requests.get(
+                "https://api.binance.com/api/v3/klines",
+                params={
+                    "symbol": f"{symbol}USDT",
+                    "interval": "1d",
+                    "limit": 30,
+                },
+                timeout=10,
+            )
+            had_pump_20pct = False
+            if resp3.status_code == 200 and resp3.json():
+                for k in resp3.json():
+                    open_p, high_p = float(k[1]), float(k[2])
+                    if open_p > 0 and (high_p - open_p) / open_p >= 0.20:
+                        had_pump_20pct = True
+                        break
+
             binance_price_data[symbol] = {
                 "listing_price": listing_price,
                 "listing_day_high": listing_day_high,
                 "ath": ath,
+                "had_pump_20pct_30d": had_pump_20pct,
             }
             time.sleep(0.05)  # Binance 1200 req/min
         except Exception as e:
@@ -274,8 +293,8 @@ def fetch_and_classify(**context):
         INSERT INTO coin_screener_daily
             (date, exchange, symbol, price_krw, market_cap_krw, volume_24h_krw,
              weekly_down_count, listing_age_days, max_price_since_listing, listing_price,
-             is_low_cap, is_long_decline, is_no_pump, junk_score)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             is_low_cap, is_long_decline, is_no_pump, had_pump_20pct_30d, junk_score)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (date, exchange, symbol) DO UPDATE SET
             price_krw = EXCLUDED.price_krw,
             market_cap_krw = EXCLUDED.market_cap_krw,
@@ -287,6 +306,7 @@ def fetch_and_classify(**context):
             is_low_cap = EXCLUDED.is_low_cap,
             is_long_decline = EXCLUDED.is_long_decline,
             is_no_pump = EXCLUDED.is_no_pump,
+            had_pump_20pct_30d = EXCLUDED.had_pump_20pct_30d,
             junk_score = EXCLUDED.junk_score
     """
 
@@ -315,6 +335,7 @@ def fetch_and_classify(**context):
         is_long_decline = bool(wd is not None and wd >= 8)
         # 무펌핑: ATH가 상장 첫날 고가를 넘긴 적 없음
         is_no_pump = bool(listing_day_high and ath and ath <= listing_day_high)
+        had_pump_20pct_30d = bp.get("had_pump_20pct_30d", False)
 
         junk_score = int(is_low_cap) + int(is_long_decline) + int(is_no_pump)
 
@@ -322,7 +343,7 @@ def fetch_and_classify(**context):
             today, exchange, symbol, price,
             mc, vol, wd, listing_age,
             max_price, listing_price_val,
-            is_low_cap, is_long_decline, is_no_pump, junk_score,
+            is_low_cap, is_long_decline, is_no_pump, had_pump_20pct_30d, junk_score,
         ))
         if junk_score > 0:
             classified_count += 1
@@ -346,11 +367,11 @@ def update_latest(**context):
         INSERT INTO coin_screener_latest
             (exchange, symbol, price_krw, market_cap_krw, volume_24h_krw,
              weekly_down_count, listing_age_days, max_price_since_listing, listing_price,
-             is_low_cap, is_long_decline, is_no_pump, junk_score, updated_at)
+             is_low_cap, is_long_decline, is_no_pump, had_pump_20pct_30d, junk_score, updated_at)
         SELECT DISTINCT ON (symbol)
             exchange, symbol, price_krw, market_cap_krw, volume_24h_krw,
             weekly_down_count, listing_age_days, max_price_since_listing, listing_price,
-            is_low_cap, is_long_decline, is_no_pump, junk_score, NOW()
+            is_low_cap, is_long_decline, is_no_pump, had_pump_20pct_30d, junk_score, NOW()
         FROM coin_screener_daily
         WHERE date = %s
         ORDER BY symbol, exchange DESC
@@ -365,6 +386,7 @@ def update_latest(**context):
             is_low_cap = EXCLUDED.is_low_cap,
             is_long_decline = EXCLUDED.is_long_decline,
             is_no_pump = EXCLUDED.is_no_pump,
+            had_pump_20pct_30d = EXCLUDED.had_pump_20pct_30d,
             junk_score = EXCLUDED.junk_score,
             updated_at = NOW()
     """, (today,))

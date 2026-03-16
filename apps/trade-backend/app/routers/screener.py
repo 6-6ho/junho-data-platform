@@ -26,6 +26,7 @@ def screener_overview(db: Session = Depends(get_db)):
             COUNT(*) FILTER (WHERE is_low_cap) AS low_cap_count,
             COUNT(*) FILTER (WHERE is_long_decline) AS long_decline_count,
             COUNT(*) FILTER (WHERE is_no_pump) AS no_pump_count,
+            COUNT(*) FILTER (WHERE had_pump_20pct_30d) AS pump_20pct_count,
             MAX(updated_at) AS last_updated
         FROM coin_screener_latest
     """)).fetchone()
@@ -37,6 +38,7 @@ def screener_overview(db: Session = Depends(get_db)):
             "low_cap_count": 0,
             "long_decline_count": 0,
             "no_pump_count": 0,
+            "pump_20pct_count": 0,
             "last_updated": None,
         }
 
@@ -46,7 +48,8 @@ def screener_overview(db: Session = Depends(get_db)):
         "low_cap_count": row[2],
         "long_decline_count": row[3],
         "no_pump_count": row[4],
-        "last_updated": row[5].isoformat() if row[5] else None,
+        "pump_20pct_count": row[5],
+        "last_updated": row[6].isoformat() if row[6] else None,
     }
 
 
@@ -90,7 +93,7 @@ def screener_coins(
         SELECT exchange, symbol, price_krw, market_cap_krw, volume_24h_krw,
                weekly_down_count, listing_age_days,
                max_price_since_listing, listing_price,
-               is_low_cap, is_long_decline, is_no_pump, junk_score,
+               is_low_cap, is_long_decline, is_no_pump, had_pump_20pct_30d, junk_score,
                updated_at
         FROM coin_screener_latest
         WHERE {where_clause}
@@ -114,8 +117,9 @@ def screener_coins(
             "is_low_cap": r[9],
             "is_long_decline": r[10],
             "is_no_pump": r[11],
-            "junk_score": r[12],
-            "updated_at": r[13].isoformat() if r[13] else None,
+            "had_pump_20pct_30d": r[12],
+            "junk_score": r[13],
+            "updated_at": r[14].isoformat() if r[14] else None,
         })
 
     return {"coins": coins, "count": len(coins)}
