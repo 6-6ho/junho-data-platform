@@ -30,11 +30,11 @@ interface ScreenerCoin {
 }
 
 type FlagKey = 'low_cap' | 'long_decline' | 'no_pump' | 'pump_20pct';
-const FLAG_OPTIONS: { key: FlagKey; label: string }[] = [
-  { key: 'low_cap', label: '저시총' },
-  { key: 'long_decline', label: '장기하락' },
-  { key: 'no_pump', label: '무펌핑' },
-  { key: 'pump_20pct', label: '30일 20%+' },
+const FLAG_OPTIONS: { key: FlagKey; label: string; color: string; desc: string }[] = [
+  { key: 'low_cap', label: '저시총', color: '#ff9800', desc: '시총 3000억 미만' },
+  { key: 'long_decline', label: '장기하락', color: '#ffd740', desc: '12주 중 8주 이상 음봉' },
+  { key: 'no_pump', label: '무펌핑', color: '#90a4ae', desc: '상장 후 ATH = 첫날 고가' },
+  { key: 'pump_20pct', label: '30일 20%+', color: '#4fc3f7', desc: '최근 30일 내 일봉 20%↑' },
 ];
 type FilterExchange = '' | 'upbit' | 'bithumb';
 type SortKey = 'symbol' | 'exchange' | 'price_krw' | 'market_cap_krw' | 'volume_24h_krw' | 'weekly_down_count' | 'junk_score';
@@ -195,27 +195,6 @@ export default function ScreenerPage() {
           </select>
 
           <FlagMultiSelect selected={filterFlags} onToggle={toggleFlag} />
-          {filterFlags.size > 0 && (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              {FLAG_OPTIONS.filter(o => filterFlags.has(o.key)).map(o => (
-                <span
-                  key={o.key}
-                  onClick={() => toggleFlag(o.key)}
-                  style={{
-                    fontSize: 'var(--text-xs)',
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    backgroundColor: 'rgba(255,255,255,0.08)',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {o.label} ×
-                </span>
-              ))}
-            </div>
-          )}
 
           <select
             value={filterScore}
@@ -228,6 +207,28 @@ export default function ScreenerPage() {
             <option value="1">1</option>
             <option value="0">0</option>
           </select>
+
+          {filterFlags.size > 0 && (
+            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+              {FLAG_OPTIONS.filter(o => filterFlags.has(o.key)).map(o => (
+                <span
+                  key={o.key}
+                  onClick={() => toggleFlag(o.key)}
+                  style={{
+                    fontSize: 'var(--text-xs)',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    backgroundColor: `${o.color}20`,
+                    color: o.color,
+                    cursor: 'pointer',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {o.label} ×
+                </span>
+              ))}
+            </div>
+          )}
 
           <div style={{ flex: 1 }} />
 
@@ -417,16 +418,16 @@ function FlagMultiSelect({ selected, onToggle }: { selected: Set<FlagKey>; onTog
           borderRadius: 6,
           padding: '4px 0',
           zIndex: 100,
-          minWidth: 140,
+          minWidth: 220,
         }}>
-          {FLAG_OPTIONS.map(({ key, label: optLabel }) => (
+          {FLAG_OPTIONS.map(({ key, label: optLabel, color, desc }) => (
             <label
               key={key}
               style={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 gap: 8,
-                padding: '6px 12px',
+                padding: '8px 12px',
                 cursor: 'pointer',
                 fontSize: 'var(--text-sm)',
                 color: 'var(--text-primary)',
@@ -438,9 +439,12 @@ function FlagMultiSelect({ selected, onToggle }: { selected: Set<FlagKey>; onTog
                 type="checkbox"
                 checked={selected.has(key)}
                 onChange={() => onToggle(key)}
-                style={{ accentColor: 'var(--accent-primary)' }}
+                style={{ accentColor: color, marginTop: 2 }}
               />
-              {optLabel}
+              <div>
+                <div style={{ color }}>{optLabel}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', marginTop: 1 }}>{desc}</div>
+              </div>
             </label>
           ))}
         </div>
