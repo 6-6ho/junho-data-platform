@@ -305,14 +305,14 @@ def run_performance_analysis(**context):
                     result = simulate_strategy(signals, tp, sl)
                     results.append(result)
 
-        results.sort(key=lambda x: x["total_pnl"], reverse=True)
+        results.sort(key=lambda x: x["avg_pnl"], reverse=True)
         best = results[0]
 
         emoji = tier_emoji[tier_name]
         msg += f"{emoji} *{tier_name}* — {len(signals)}개\n"
         msg += f"  추천: TP *+{best['take_profit']}%* / SL *-{best['stop_loss']}%*"
         msg += f" | 승률 {best['win_rate']}%"
-        msg += f" | PnL *{best['total_pnl']:+.1f}%*\n\n"
+        msg += f" | 평균 PnL *{best['avg_pnl']:+.2f}%*\n\n"
 
     send_telegram(msg)
 

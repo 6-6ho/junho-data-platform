@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { AlertTriangle, TrendingDown, Zap, BarChart3 } from 'lucide-react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { AlertTriangle, TrendingDown, Zap, BarChart3, ChevronUp, ChevronDown, Search } from 'lucide-react';
 
 const API_BASE = '/api/screener';
 
@@ -29,6 +29,8 @@ interface ScreenerCoin {
 
 type FilterFlag = '' | 'junk' | 'low_cap' | 'long_decline' | 'no_pump';
 type FilterExchange = '' | 'upbit' | 'bithumb';
+type SortKey = 'symbol' | 'exchange' | 'price_krw' | 'market_cap_krw' | 'volume_24h_krw' | 'weekly_down_count' | 'junk_score';
+type SortDir = 'asc' | 'desc';
 
 const formatKRW = (v: number | null) => {
   if (v == null) return '—';
@@ -58,12 +60,26 @@ const scoreBg = (score: number): string => {
   return 'transparent';
 };
 
+function compareValues(a: unknown, b: unknown, dir: SortDir): number {
+  if (a == null && b == null) return 0;
+  if (a == null) return 1;
+  if (b == null) return -1;
+  if (typeof a === 'string' && typeof b === 'string') {
+    return dir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+  }
+  const na = Number(a), nb = Number(b);
+  return dir === 'asc' ? na - nb : nb - na;
+}
+
 export default function ScreenerPage() {
   const [overview, setOverview] = useState<ScreenerOverview | null>(null);
   const [coins, setCoins] = useState<ScreenerCoin[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterExchange, setFilterExchange] = useState<FilterExchange>('');
   const [filterFlag, setFilterFlag] = useState<FilterFlag>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('junk_score');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   const fetchOverview = useCallback(async () => {
     try {
@@ -91,14 +107,26 @@ export default function ScreenerPage() {
     }
   }, [filterExchange, filterFlag]);
 
-  useEffect(() => {
-    fetchOverview();
-  }, [fetchOverview]);
+  useEffect(() => { fetchOverview(); }, [fetchOverview]);
+  useEffect(() => { setLoading(true); fetchCoins(); }, [fetchCoins]);
 
-  useEffect(() => {
-    setLoading(true);
-    fetchCoins();
-  }, [fetchCoins]);
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir(key === 'symbol' || key === 'exchange' ? 'asc' : 'desc');
+    }
+  };
+
+  const sortedCoins = useMemo(() => {
+    let filtered = coins;
+    if (searchQuery) {
+      const q = searchQuery.toUpperCase();
+      filtered = coins.filter(c => c.symbol.includes(q));
+    }
+    return [...filtered].sort((a, b) => compareValues(a[sortKey], b[sortKey], sortDir));
+  }, [coins, searchQuery, sortKey, sortDir]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -127,6 +155,28 @@ export default function ScreenerPage() {
           <FilterButton active={filterFlag === 'low_cap'} onClick={() => setFilterFlag('low_cap')}>저시총</FilterButton>
           <FilterButton active={filterFlag === 'long_decline'} onClick={() => setFilterFlag('long_decline')}>장기하락</FilterButton>
           <FilterButton active={filterFlag === 'no_pump'} onClick={() => setFilterFlag('no_pump')}>무펌핑</FilterButton>
+
+          <span style={{ margin: '0 var(--space-2)', color: 'var(--border-color)' }}>|</span>
+
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+            <Search size={14} style={{ position: 'absolute', left: 8, color: 'var(--text-tertiary)' }} />
+            <input
+              type="text"
+              placeholder="심볼 검색"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                padding: '4px 8px 4px 28px',
+                borderRadius: 6,
+                border: '1px solid var(--border-color)',
+                fontSize: 'var(--text-xs)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
+                width: 120,
+                outline: 'none',
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -137,26 +187,26 @@ export default function ScreenerPage() {
             <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
               로딩 중...
             </div>
-          ) : coins.length === 0 ? (
+          ) : sortedCoins.length === 0 ? (
             <div style={{ padding: 'var(--space-10)', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-              데이터 없음 — DAG 실행 후 확인하세요
+              {searchQuery ? `"${searchQuery}" 검색 결과 없음` : '데이터 없음 — DAG 실행 후 확인하세요'}
             </div>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <Th>종목</Th>
-                  <Th>거래소</Th>
-                  <Th align="right">현재가</Th>
-                  <Th align="right">시총</Th>
-                  <Th align="right">거래대금</Th>
-                  <Th align="center">음봉(12주)</Th>
-                  <Th align="center">Score</Th>
+                  <SortTh sortKey="symbol" currentKey={sortKey} dir={sortDir} onSort={handleSort}>종목</SortTh>
+                  <SortTh sortKey="exchange" currentKey={sortKey} dir={sortDir} onSort={handleSort}>거래소</SortTh>
+                  <SortTh sortKey="price_krw" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">현재가</SortTh>
+                  <SortTh sortKey="market_cap_krw" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">시총</SortTh>
+                  <SortTh sortKey="volume_24h_krw" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="right">거래대금</SortTh>
+                  <SortTh sortKey="weekly_down_count" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="center">음봉(12주)</SortTh>
+                  <SortTh sortKey="junk_score" currentKey={sortKey} dir={sortDir} onSort={handleSort} align="center">Score</SortTh>
                   <Th>분류</Th>
                 </tr>
               </thead>
               <tbody>
-                {coins.map((coin) => (
+                {sortedCoins.map((coin) => (
                   <tr
                     key={`${coin.exchange}-${coin.symbol}`}
                     style={{
@@ -210,16 +260,19 @@ export default function ScreenerPage() {
             </table>
           )}
         </div>
-        {overview?.last_updated && (
-          <div style={{
-            padding: 'var(--space-2) var(--space-4)',
-            fontSize: 'var(--text-xs)',
-            color: 'var(--text-tertiary)',
-            borderTop: '1px solid var(--border-color)',
-          }}>
-            마지막 업데이트: {new Date(overview.last_updated).toLocaleString('ko-KR')}
-          </div>
-        )}
+        <div style={{
+          padding: 'var(--space-2) var(--space-4)',
+          fontSize: 'var(--text-xs)',
+          color: 'var(--text-tertiary)',
+          borderTop: '1px solid var(--border-color)',
+          display: 'flex',
+          justifyContent: 'space-between',
+        }}>
+          <span>{sortedCoins.length}개 종목</span>
+          {overview?.last_updated && (
+            <span>마지막 업데이트: {new Date(overview.last_updated).toLocaleString('ko-KR')}</span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -287,11 +340,46 @@ function Tag({ color, children }: { color: string; children: React.ReactNode }) 
   );
 }
 
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: string }) {
+function SortTh({ children, sortKey, currentKey, dir, onSort, align = 'left' }: {
+  children: React.ReactNode;
+  sortKey: SortKey;
+  currentKey: SortKey;
+  dir: SortDir;
+  onSort: (key: SortKey) => void;
+  align?: string;
+}) {
+  const isActive = sortKey === currentKey;
+  return (
+    <th
+      onClick={() => onSort(sortKey)}
+      style={{
+        padding: 'var(--space-3) var(--space-4)',
+        textAlign: align as 'left' | 'right' | 'center',
+        fontWeight: 600,
+        fontSize: 'var(--text-xs)',
+        color: isActive ? 'var(--text-primary)' : 'var(--text-tertiary)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        cursor: 'pointer',
+        userSelect: 'none',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+      {isActive ? (
+        dir === 'asc'
+          ? <ChevronUp size={12} style={{ marginLeft: 2, verticalAlign: 'middle' }} />
+          : <ChevronDown size={12} style={{ marginLeft: 2, verticalAlign: 'middle' }} />
+      ) : null}
+    </th>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
   return (
     <th style={{
       padding: 'var(--space-3) var(--space-4)',
-      textAlign: align as 'left' | 'right' | 'center',
+      textAlign: 'left',
       fontWeight: 600,
       fontSize: 'var(--text-xs)',
       color: 'var(--text-tertiary)',
