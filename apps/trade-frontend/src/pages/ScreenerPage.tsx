@@ -155,11 +155,11 @@ export default function ScreenerPage() {
     }
     if (filterFlags.size > 0) {
       filtered = filtered.filter(c => {
-        if (filterFlags.has('low_cap') && c.is_low_cap) return true;
-        if (filterFlags.has('long_decline') && c.is_long_decline) return true;
-        if (filterFlags.has('no_pump') && c.is_no_pump) return true;
-        if (filterFlags.has('pump_20pct') && c.had_pump_20pct_30d) return true;
-        return false;
+        if (filterFlags.has('low_cap') && !c.is_low_cap) return false;
+        if (filterFlags.has('long_decline') && !c.is_long_decline) return false;
+        if (filterFlags.has('no_pump') && !c.is_no_pump) return false;
+        if (filterFlags.has('pump_20pct') && !c.had_pump_20pct_30d) return false;
+        return true;
       });
     }
     if (filterScore !== '') {
