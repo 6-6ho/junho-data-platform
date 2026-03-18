@@ -101,17 +101,19 @@ def process_movers_5m(batch_df, batch_id):
 
         _movers_cooldown_5m[row.symbol] = now_ts
 
-        if "High" in status or "Mid" in status or (row.change_pct_window >= 5.0 and "Small" in status):
-            if watchlist and row.symbol in watchlist:
-                if am.should_send(row.symbol):
-                    icon = "🚀"
-                    msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
-                          f"Price: *{row.close_price}*\n" \
-                          f"Change: *{row.change_pct_window:.2f}%*\n" \
-                          f"Time: {row.latest_event_time}"
-                    send_telegram_alert(msg)
-                    am.update(row.symbol)
-                    print(f"[Alert] Sent Telegram: {row.symbol}")
+        is_fav = bool(watchlist and row.symbol in watchlist)
+        # 즐겨찾기: 모든 Tier 알림 / 비즐겨찾기: High만
+        should_alert = is_fav or "High" in status
+
+        if should_alert and am.should_send(row.symbol):
+            icon = "⭐" if is_fav else "🚀"
+            msg = f"{icon} *{status}: {row.symbol} (5m)*\n" \
+                  f"Price: *{row.close_price}*\n" \
+                  f"Change: *{row.change_pct_window:.2f}%*\n" \
+                  f"Time: {row.latest_event_time}"
+            send_telegram_alert(msg)
+            am.update(row.symbol)
+            print(f"[Alert] Sent Telegram: {row.symbol}")
 
         movers.append({
             "type": "rise",
@@ -154,17 +156,19 @@ def process_movers_10m(batch_df, batch_id):
 
         _movers_cooldown_10m[row.symbol] = now_ts
 
-        if "High" in status or "Mid" in status:
-            if watchlist and row.symbol in watchlist:
-                if am.should_send(row.symbol, cooldown_override=MOVERS_COOLDOWN_10M):
-                    icon = "🚀"
-                    msg = f"{icon} *{status}: {row.symbol} (10m)*\n" \
-                          f"Price: *{row.close_price}*\n" \
-                          f"Change: *{row.change_pct_window:.2f}%*\n" \
-                          f"Time: {row.latest_event_time}"
-                    send_telegram_alert(msg)
-                    am.update(row.symbol)
-                    print(f"[Alert] Sent Telegram: {row.symbol}")
+        is_fav = bool(watchlist and row.symbol in watchlist)
+        # 즐겨찾기: 모든 Tier 알림 / 비즐겨찾기: High만
+        should_alert = is_fav or "High" in status
+
+        if should_alert and am.should_send(row.symbol, cooldown_override=MOVERS_COOLDOWN_10M):
+            icon = "⭐" if is_fav else "🚀"
+            msg = f"{icon} *{status}: {row.symbol} (10m)*\n" \
+                  f"Price: *{row.close_price}*\n" \
+                  f"Change: *{row.change_pct_window:.2f}%*\n" \
+                  f"Time: {row.latest_event_time}"
+            send_telegram_alert(msg)
+            am.update(row.symbol)
+            print(f"[Alert] Sent Telegram: {row.symbol}")
 
         movers.append({
             "type": "rise",
