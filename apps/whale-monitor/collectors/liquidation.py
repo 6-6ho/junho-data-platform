@@ -22,7 +22,7 @@ def run_liquidation_ws(conn, state):
                 on_error=lambda ws, err: logger.error(f"청산 WS 오류: {err}"),
                 on_close=lambda ws, code, msg: logger.info("청산 WS 닫힘"),
             )
-            ws.run_forever(ping_interval=30, ping_timeout=10)
+            ws.run_forever(ping_interval=60, ping_timeout=30)
             time.sleep(5)
         except Exception as e:
             logger.error(f"청산 WS 루프 오류: {e}")
