@@ -102,6 +102,50 @@ export const fetchScreenerCoins = async (params?: {
   return data;
 };
 
+// Listing
+export const fetchRecentListings = async (params?: {
+  limit?: number;
+  exchange?: string;
+}) => {
+  const { data } = await api.get('/listing/recent', { params });
+  return data;
+};
+
+export const fetchListingStats = async () => {
+  const { data } = await api.get('/listing/stats');
+  return data;
+};
+
+// Whale Monitor
+export const fetchWhaleDashboard = async () => {
+  const { data } = await api.get('/whale/dashboard');
+  return data;
+};
+
+export const fetchWhaleEpisodes = async (params?: {
+  limit?: number;
+  label?: string;
+  direction?: string;
+}) => {
+  const { data } = await api.get('/whale/episodes', { params });
+  return data;
+};
+
+export const fetchWhaleActiveEpisodes = async () => {
+  const { data } = await api.get('/whale/episodes/active');
+  return data;
+};
+
+export const fetchWhaleEpisodeDetail = async (id: number) => {
+  const { data } = await api.get(`/whale/episodes/${id}`);
+  return data;
+};
+
+export const fetchWhaleStats = async () => {
+  const { data } = await api.get('/whale/stats');
+  return data;
+};
+
 // Auth
 const authHeaders = () => {
   const token = localStorage.getItem('settings_token');

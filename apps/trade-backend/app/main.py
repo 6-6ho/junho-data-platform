@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routers import data, klines, favorites, analysis, smc, system, theme, settings, screener
+from .routers import data, klines, favorites, analysis, smc, system, theme, settings, screener, listing, whale
 from .auth import auth_router
 
 app = FastAPI(title="Trade Helper API")
@@ -22,6 +22,8 @@ app.include_router(system.router)
 app.include_router(theme.router)
 app.include_router(settings.router)
 app.include_router(screener.router)
+app.include_router(listing.router)
+app.include_router(whale.router)
 
 @app.get("/")
 def read_root():

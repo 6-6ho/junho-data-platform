@@ -237,6 +237,55 @@ services:
           memory: 64M
     networks: [appnet]
 
+  # === Listing Monitor ===
+  listing-monitor:
+    build: ./apps/listing-monitor
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - POLL_INTERVAL=60
+      - BOOTSTRAP_MODE=true
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [appnet]
+
+  # === Whale Monitor ===
+  whale-monitor:
+    build: ./apps/whale-monitor
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - WHALE_TRADE_THRESHOLD=100000
+      - EPISODE_TRIGGER_PCT=1.0
+      - WHALE_ALERT_API_KEY=${WHALE_ALERT_API_KEY:-}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [appnet]
+
   # === External Access ===
   cloudflared:
     image: cloudflare/cloudflared:latest
