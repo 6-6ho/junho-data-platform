@@ -18,7 +18,7 @@ def get_market_summary() -> str:
     # 최근 movers (변동률 상위)
     movers = execute_query("""
         SELECT DISTINCT ON (symbol)
-            symbol, change_pct_window, change_pct_24h, vol_ratio, window, event_time
+            symbol, change_pct_window, change_pct_24h, vol_ratio, "window", event_time
         FROM movers_latest
         WHERE type = 'rise'
         ORDER BY symbol, event_time DESC
@@ -79,7 +79,7 @@ def screen_coins(criteria_name: str | None = None) -> str:
     # 최근 movers (5분/2시간 윈도우 변동)
     movers = execute_query("""
         SELECT DISTINCT ON (symbol)
-            symbol, change_pct_window, change_pct_24h, vol_ratio, window
+            symbol, change_pct_window, change_pct_24h, vol_ratio, "window"
         FROM movers_latest
         WHERE type = 'rise' AND event_time > NOW() - INTERVAL '1 hour'
         ORDER BY symbol, event_time DESC
@@ -128,7 +128,7 @@ def get_coin_detail(symbol: str) -> str:
 
     # 최근 movers 이벤트
     movers = execute_query("""
-        SELECT type, window, change_pct_window, change_pct_24h, vol_ratio, event_time
+        SELECT type, "window", change_pct_window, change_pct_24h, vol_ratio, event_time
         FROM movers_latest
         WHERE symbol = %s
         ORDER BY event_time DESC
