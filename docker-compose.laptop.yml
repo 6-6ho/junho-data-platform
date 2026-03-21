@@ -133,7 +133,7 @@ services:
 
   # === Database ===
   postgres:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     restart: unless-stopped
     env_file: [.env]
     deploy:
