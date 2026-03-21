@@ -11,18 +11,18 @@ from matcher import find_similar_episodes
 logger = logging.getLogger(__name__)
 
 EPISODE_TRIGGER_PCT = float(os.getenv("EPISODE_TRIGGER_PCT", "1.0"))
-COOLDOWN_MINUTES = 10
+COOLDOWN_MINUTES = 20
 
 
 def detect_episode(conn, state, symbol):
-    """5분 내 +-1% 이상 움직임 감지 → 에피소드 생성."""
+    """15분 내 +-1% 이상 움직임 감지 → 에피소드 생성."""
     prices = state["price_history"]
-    if len(prices) < 30:  # 최소 5분 (10초 × 30)
+    if len(prices) < 90:  # 최소 15분 (10초 × 90)
         return
 
     current_price = prices[-1]["price"]
-    price_5m_ago = prices[-30]["price"]
-    change_pct = (current_price - price_5m_ago) / price_5m_ago * 100
+    price_15m_ago = prices[-90]["price"]
+    change_pct = (current_price - price_15m_ago) / price_15m_ago * 100
 
     if abs(change_pct) < EPISODE_TRIGGER_PCT:
         return
@@ -367,7 +367,7 @@ def _send_episode_alert(profile, similar):
     lines = [
         f"*가격 에피소드 감지 — BTC*",
         "",
-        f"• 움직임: {p['price_change_pct']:+.1f}% (5분) {direction_str}",
+        f"• 움직임: {p['price_change_pct']:+.1f}% (15분) {direction_str}",
         f"• 가격: ${p['trigger_price']:,.0f}",
         "",
         "*프로파일:*",
