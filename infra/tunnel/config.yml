@@ -1,5 +1,6 @@
 tunnel: 05b88928-b53c-4ed6-aa52-6f1e0895f59d
 credentials-file: /etc/cloudflared/credentials.json
+protocol: http2
 
 ingress:
   - hostname: 6-6ho.com

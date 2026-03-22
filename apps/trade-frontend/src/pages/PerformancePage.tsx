@@ -499,7 +499,7 @@ export default function PerformancePage() {
                             <span style={{ textAlign: 'right' }}>승률</span>
                             <span style={{ textAlign: 'right' }}>PnL</span>
                         </div>
-                        {optimizeData?.best_by_pnl.slice(0, 5).map((s, i) => (
+                        {(optimizeData?.best_by_pnl ?? []).slice(0, 5).map((s, i) => (
                             <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 4, fontSize: 12, alignItems: 'center' }}>
                                 <span style={{ color: '#00e676', fontWeight: 600 }}>+{s.take_profit}%</span>
                                 <span style={{ color: '#ff5252' }}>-{s.stop_loss}%</span>
