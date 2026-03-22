@@ -412,7 +412,7 @@ with DAG(
     default_args=default_args,
     description="잡코인 스크리너: 업비트/빗썸 × 바이낸스 교집합 분류",
     schedule_interval="0 5 * * *",  # 05:00 UTC = 14:00 KST
-    catchup=False,
+    catchup=True,
     tags=["trade", "screener"],
 ) as dag:
 

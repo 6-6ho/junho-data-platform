@@ -94,7 +94,7 @@ with DAG(
     default_args=default_args,
     description="Build trade performance mart from Iceberg flat tables",
     schedule_interval="30 0 * * *",  # 00:30 UTC = 09:30 KST
-    catchup=False,
+    catchup=True,
     tags=["trade", "mart", "spark"],
 ) as dag:
 
