@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS investment_memo (
     content TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT 'mcp',
     tags TEXT[],
-    embedding vector(1024),
+    embedding vector(512),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

@@ -261,6 +261,29 @@ services:
         condition: service_healthy
     networks: [appnet]
 
+  # === Journal Bot ===
+  journal-bot:
+    build: ./apps/journal-bot
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - JOURNAL_BOT_TOKEN=${JOURNAL_BOT_TOKEN}
+      - JOURNAL_CHAT_ID=${JOURNAL_CHAT_ID:-}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [appnet]
+
   # === Whale Monitor ===
   whale-monitor:
     build: ./apps/whale-monitor
