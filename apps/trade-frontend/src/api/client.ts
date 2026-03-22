@@ -178,3 +178,34 @@ export const removeWatchlistSymbol = async (symbol: string) => {
   return data;
 };
 
+// Agent (auth required for mutations)
+export const fetchAgentStats = async () => {
+  const { data } = await api.get('/agent/stats');
+  return data;
+};
+
+export const fetchAgentCriteria = async () => {
+  const { data } = await api.get('/agent/criteria');
+  return data;
+};
+
+export const fetchAgentRecentMemos = async (limit = 10) => {
+  const { data } = await api.get('/agent/memos/recent', { params: { limit } });
+  return data;
+};
+
+export const addAgentMemo = async (content: string, tags?: string[]) => {
+  const { data } = await api.post('/agent/memo', { content, tags }, { headers: authHeaders() });
+  return data;
+};
+
+export const searchAgentMemos = async (query: string, limit = 5) => {
+  const { data } = await api.post('/agent/memo/search', { query, limit }, { headers: authHeaders() });
+  return data;
+};
+
+export const screenCoins = async () => {
+  const { data } = await api.post('/agent/screen', {}, { headers: authHeaders() });
+  return data;
+};
+

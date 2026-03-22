@@ -10,6 +10,7 @@ import MarketOverviewPage from './pages/MarketOverviewPage';
 import StocksPage from './pages/StocksPage';
 import ScreenerPage from './pages/ScreenerPage';
 import SettingsPage from './pages/SettingsPage';
+import AgentPage from './pages/AgentPage';
 
 function LegacySymbolRedirect() {
   const { symbol } = useParams();
@@ -26,7 +27,9 @@ function AppContent() {
       ? 'stocks'
       : path.startsWith('/market')
         ? 'market'
-        : 'crypto';
+        : path.startsWith('/agent')
+          ? 'agent'
+          : 'crypto';
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -52,6 +55,9 @@ function AppContent() {
           </NavLink>
           <NavLink to="/stocks" className={() => `domain-tab ${activeDomain === 'stocks' ? 'active' : ''}`}>
             주식
+          </NavLink>
+          <NavLink to="/agent" className={() => `domain-tab ${activeDomain === 'agent' ? 'active' : ''}`}>
+            Agent
           </NavLink>
         </nav>
 
@@ -98,6 +104,9 @@ function AppContent() {
 
           {/* Stocks */}
           <Route path="/stocks" element={<StocksPage />} />
+
+          {/* Agent */}
+          <Route path="/agent" element={<AgentPage />} />
 
           {/* Settings */}
           <Route path="/settings" element={<SettingsPage />} />
