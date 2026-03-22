@@ -17,7 +17,7 @@ import os
 default_args = {
     'owner': 'junho',
     'depends_on_past': False,
-    'start_date': datetime(2026, 1, 1),
+    'start_date': datetime(2026, 3, 1),
     'email_on_failure': False,
     'retries': 2,
     'retry_delay': timedelta(minutes=3),
