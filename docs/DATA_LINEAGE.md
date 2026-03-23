@@ -46,7 +46,7 @@ Binance WebSocket (trade_ingest)
 Kafka [raw.ticker.usdtm]
   │
   ▼
-movers_streaming.py (Spark Structured Streaming, 5m sliding window)
+movers_streaming.py (Spark Structured Streaming, 5m/10m 슬라이딩 윈도우)
   │
   ├──▶ PostgreSQL
   │      ├── movers_latest  (급등락 종목)
@@ -55,84 +55,60 @@ movers_streaming.py (Spark Structured Streaming, 5m sliding window)
   └──▶ Telegram Alert (급등락 감지 시 자동 발송)
          │
          ▼
-trade_performance_analysis.py (Airflow, daily 09:00 KST)
-  │  movers_latest에서 새 시그널 수집 → Binance API로 1분봉 60개 조회
+[Airflow 배치]
+  ├── trade_performance_analysis (09:00 KST) → timeseries + snapshot + TP/SL
+  ├── signal_validation (10:00 KST) → 랜덤 재검증
+  ├── dynamic_theme (06:00 KST) → 상관 클러스터링
+  ├── coin_screener (14:00 KST) → 3거래소 잡코인 분류
+  └── trade_performance_mart → 신호×TP/SL 사전집계
+```
+
+## Whale Monitor Domain
+
+```
+Binance WebSocket (whale-monitor)
+  ├── btcusdt@aggTrade ($1M+ 필터) ──→ whale_trade
+  └── !forceOrder@arr ──→ liquidation_event
   │
-  ├──▶ trade_performance_timeseries (JSONB timeseries, 1~60분)
-  │      └── TP/SL 최적 전략 분석 → Telegram 리포트
+Binance REST (whale-monitor, 폴링)
+  ├── /fapi/v1/depth (30초) ──→ orderbook_depth
+  ├── /fapi/v1/openInterest (1분) ──→ 메모리 (oi_history)
+  ├── /fapi/v1/fundingRate (1분) ──→ 메모리
+  ├── /futures/data/globalLongShortAccountRatio (5분) ──→ 메모리
+  └── /fapi/v1/ticker/price (10초) ──→ 메모리 (price_history)
   │
-  └──▶ signal_raw_snapshot (원본 캔들 OHLCV 보존)
-         │
-         ▼
-signal_validation_dag.py (Airflow, daily 10:00 KST)
-  │  랜덤 10개 샘플 → Binance API로 재검증
+에피소드 감지 (10초마다 체크)
+  15분 내 ±1% 움직임 → 프로파일 스냅샷 → move_episode
   │
-  └──▶ signal_validation_log (pass/fail/error)
-         └── fail 시 Telegram 알림
+  ├── 아웃컴 추적: 5m/15m/1h/4h/24h 후 가격 기록 (비동기)
+  ├── 자동 라벨링: squeeze_reversal, genuine_rally, fakeout 등
+  ├── 유사 에피소드 매칭 (프로파일 가중 유사도)
+  └── Telegram Alert (에피소드 감지 + 1h 업데이트)
 ```
 
-### Trade Domain — Validation Loop (검증 체계)
+## Listing Monitor
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                     Data Collection                         │
-│  movers_latest → fetch_klines() → timeseries + snapshot     │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Daily Validation                        │
-│  signal_validation_dag: 랜덤 샘플링 → Binance 재조회       │
-│  stored_profit vs recalc_profit → |diff| > 1% = fail       │
-└──────────────────────────┬──────────────────────────────────┘
-                           │
-                           ▼
-┌─────────────────────────────────────────────────────────────┐
-│                     Historical Replay                       │
-│  historical_query.py --date YYYY-MM-DD                      │
-│  시그널 + 스냅샷 + 검증로그 + TP/SL 시뮬레이션 재실행      │
-└─────────────────────────────────────────────────────────────┘
+Upbit API + Bithumb API (1분 폴링)
+  │
+  └── listing-monitor
+        ├── coin_listing (UPSERT)
+        ├── listing_event (INSERT)
+        └── Telegram Alert (신규 상장 감지)
 ```
 
-### trade_performance_timeseries — 컬럼 상세
+## Investment Agent (MCP + Telegram)
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| `symbol` | TEXT | 종목 (e.g., BTCUSDT) |
-| `alert_type` | TEXT | 시그널 유형 (rise) |
-| `alert_time` | TIMESTAMPTZ | 시그널 발생 시각 |
-| `entry_price` | DOUBLE | 진입 시점 close price |
-| `timeseries_data` | JSONB | 1~60분 시계열 데이터 |
-
-**timeseries_data JSONB 구조:**
-```json
-{
-  "1":  {"price": 100.5, "profit_pct": 0.12, "is_win": false},
-  "2":  {"price": 101.0, "profit_pct": 0.62, "is_win": false},
-  ...
-  "60": {"price": 103.2, "profit_pct": 2.82, "is_win": true}
-}
 ```
-
-### signal_raw_snapshot — 컬럼 상세
-
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| `symbol` | TEXT | 종목 |
-| `alert_time` | TIMESTAMPTZ | 시그널 발생 시각 |
-| `entry_price` | DOUBLE | 진입 가격 |
-| `klines_1m` | JSONB | 원본 1분봉 OHLCV 데이터 (최대 61개) |
-
-### signal_validation_log — 컬럼 상세
-
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| `symbol` | TEXT | 검증 대상 종목 |
-| `alert_time` | TIMESTAMPTZ | 원본 시그널 시각 |
-| `stored_profit_pct` | DOUBLE | DB에 저장된 10분 시점 수익률 |
-| `recalc_profit_pct` | DOUBLE | Binance에서 재계산한 수익률 |
-| `diff_pct` | DOUBLE | 오차 절대값 |
-| `status` | TEXT | pass / fail / error |
+Claude Code 대화 (MCP)  ──→ investment-agent
+Telegram (journal-bot) ──→ journal-bot
+  │
+  ├── investment_criteria (투자 기준 CRUD)
+  ├── investment_memo (메모 + Voyage AI 임베딩 → pgvector)
+  └── agent_query_log (질의 로그)
+  │
+  └── 시장 데이터 조회 (movers_latest, coin_screener_latest, orderbook_depth 등)
+```
 
 ---
 
@@ -140,23 +116,32 @@ signal_validation_dag.py (Airflow, daily 10:00 KST)
 
 | Table | Writer | Source | Update 주기 |
 |-------|--------|-------|:-----------:|
-| `shop_hourly_sales_log` | analytics_streaming | Kafka → Spark | Real-time (10m window) |
-| `shop_brand_stats_log` | analytics_streaming | Kafka → Spark | Real-time (10m window) |
-| `shop_funnel_stats_log` | analytics_streaming | Kafka → Spark | Real-time (10m window) |
-| `dq_category_hourly` | analytics_streaming | Kafka → Spark | Real-time (1h window) |
-| `dq_payment_hourly` | analytics_streaming | Kafka → Spark | Real-time (1h window) |
-| `mart_product_association` | batch_product_affinity | MinIO Parquet | Daily (Airflow 03:00 UTC) |
-| `mart_user_rfm` | batch_user_rfm | MinIO Parquet | Daily (Airflow 03:30 UTC) |
-| `movers_latest` | movers_streaming | Kafka → Spark | Real-time (5m window) |
-| `market_snapshot` | movers_streaming | Kafka → Spark | Real-time (5m window) |
-| `trade_performance_timeseries` | trade_performance_analysis | Binance API | Daily (Airflow 00:00 UTC) |
-| `signal_raw_snapshot` | trade_performance_analysis | Binance API | Daily (Airflow 00:00 UTC) |
-| `signal_validation_log` | signal_validation_dag | Binance API | Daily (Airflow 01:00 UTC) |
+| `movers_latest` | movers_streaming | Kafka → Spark | 10초 |
+| `market_snapshot` | movers_streaming | Kafka → Spark | 10초 |
+| `trade_performance_timeseries` | trade_performance_analysis | Binance API | Daily |
+| `signal_raw_snapshot` | trade_performance_analysis | Binance API | Daily |
+| `signal_validation_log` | signal_validation_dag | Binance API | Daily |
+| `whale_trade` | whale-monitor | Binance WS aggTrade | 실시간 ($1M+) |
+| `orderbook_depth` | whale-monitor | Binance REST | 30초 |
+| `liquidation_event` | whale-monitor | Binance WS forceOrder | 실시간 |
+| `move_episode` | whale-monitor | 에피소드 감지 | 이벤트 기반 |
+| `coin_listing` | listing-monitor | Upbit/Bithumb API | 1분 |
+| `listing_event` | listing-monitor | Upbit/Bithumb API | 이벤트 기반 |
+| `investment_memo` | journal-bot / MCP / Web | 사용자 입력 | 수동 |
+| `investment_criteria` | MCP / Web | 사용자 입력 | 수동 |
+| `shop_hourly_sales_log` | analytics_streaming | Kafka → Spark | 1h 윈도우 |
+| `shop_funnel_stats_log` | analytics_streaming | Kafka → Spark | 1h 윈도우 |
+| `dq_category_hourly` | analytics_streaming | Kafka → Spark | 1h 윈도우 |
+| `dq_payment_hourly` | analytics_streaming | Kafka → Spark | 1h 윈도우 |
+| `mart_product_association` | batch_product_affinity | MinIO Parquet | Daily |
+| `mart_user_rfm` | batch_user_rfm | MinIO Parquet | Daily |
+| `mart_trade_optimize_daily` | trade_performance_mart | Iceberg/Postgres | Daily |
 
 ## Storage Layers
 
 | Layer | Technology | 용도 |
 |-------|-----------|------|
-| **Raw** | MinIO `s3a://raw/` | Parquet 원본 이벤트 (Iceberg optional) |
+| **Raw** | MinIO `s3a://raw/` | Parquet 원본 이벤트, Iceberg |
 | **Serving** | PostgreSQL | 대시보드 / API 조회용 집계 테이블 |
-| **Mart** | PostgreSQL | 배치 분석 결과 (RFM, Association Rules) |
+| **Mart** | PostgreSQL | 배치 분석 결과 (RFM, TP/SL, DQ) |
+| **Vector** | PostgreSQL + pgvector | 투자 메모 임베딩 벡터 검색 |
