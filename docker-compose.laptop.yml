@@ -314,7 +314,13 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: jdp-tunnel
     restart: unless-stopped
-    command: tunnel --protocol http2 --config /etc/cloudflared/config.yml run
+    command: tunnel --config /etc/cloudflared/config.yml run
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://frontend:80/ || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     volumes:
       - ./infra/tunnel:/etc/cloudflared:ro
     networks: [appnet]
