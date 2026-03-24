@@ -315,15 +315,9 @@ services:
     container_name: jdp-tunnel
     restart: unless-stopped
     command: tunnel --config /etc/cloudflared/config.yml run
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://frontend:80/ || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+    network_mode: host
     volumes:
       - ./infra/tunnel:/etc/cloudflared:ro
-    networks: [appnet]
 
 volumes:
   pgdata:
