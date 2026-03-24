@@ -195,6 +195,15 @@ body {
     background: rgba(254, 176, 25, 0.1);
 }
 
+.ops-card.catalog:hover {
+    border-color: rgba(167, 139, 250, 0.4);
+}
+
+.ops-card.catalog .service-tag {
+    color: #A78BFA;
+    background: rgba(167, 139, 250, 0.1);
+}
+
 .icon {
     font-size: 2rem;
 }

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Catalog | Junho Data Platform</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <a href="https://6-6ho.com" class="logo">JUNHO DATA PLATFORM</a>
+        <nav class="tabs">
+            <button class="tab active" data-tab="architecture">Architecture</button>
+            <button class="tab" data-tab="dags">DAGs</button>
+            <button class="tab" data-tab="tables">Tables</button>
+            <button class="tab" data-tab="lineage">Lineage</button>
+        </nav>
+    </header>
+
+    <!-- Main -->
+    <main class="main">
+        <!-- Graph Area -->
+        <div class="graph-area">
+            <!-- Architecture Tab -->
+            <div class="tab-content active" id="tab-architecture">
+                <div class="graph-header">
+                    <h2>System Architecture</h2>
+                    <div class="legend">
+                        <span class="legend-item" style="--color: #00E396">Trade</span>
+                        <span class="legend-item" style="--color: #775DD0">Shop</span>
+                        <span class="legend-item" style="--color: #FEB019">Infra</span>
+                        <span class="legend-item" style="--color: #A78BFA">Agent</span>
+                    </div>
+                </div>
+                <div id="cy-architecture" class="cy-container"></div>
+            </div>
+
+            <!-- DAGs Tab -->
+            <div class="tab-content" id="tab-dags">
+                <div class="graph-header">
+                    <h2>Airflow DAGs</h2>
+                    <div class="filter-bar">
+                        <button class="filter-btn active" data-filter="all">All</button>
+                        <button class="filter-btn" data-filter="trade">Trade</button>
+                        <button class="filter-btn" data-filter="shop">Shop</button>
+                        <button class="filter-btn" data-filter="infra">Infra</button>
+                    </div>
+                </div>
+                <div id="dag-list" class="dag-list"></div>
+            </div>
+
+            <!-- Tables Tab -->
+            <div class="tab-content" id="tab-tables">
+                <div class="graph-header">
+                    <h2>Table Catalog</h2>
+                    <input type="text" id="table-search" class="search-input" placeholder="Search tables...">
+                </div>
+                <div id="table-list" class="table-list"></div>
+            </div>
+
+            <!-- Lineage Tab -->
+            <div class="tab-content" id="tab-lineage">
+                <div class="graph-header">
+                    <h2>Data Lineage</h2>
+                    <span class="hint">Click a node to highlight upstream/downstream</span>
+                </div>
+                <div id="cy-lineage" class="cy-container"></div>
+            </div>
+        </div>
+
+        <!-- Detail Panel -->
+        <aside class="detail-panel" id="detail-panel">
+            <div class="detail-placeholder">
+                <div class="detail-icon">&#8594;</div>
+                <p>Click a node or item to see details</p>
+            </div>
+        </aside>
+    </main>
+
+    <!-- CDN -->
+    <script src="https://unpkg.com/cytoscape@3.30.4/dist/cytoscape.min.js"></script>
+    <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+    <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+    <script src="data/catalog.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

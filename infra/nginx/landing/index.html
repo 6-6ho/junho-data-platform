@@ -110,171 +110,37 @@
                 </p>
                 <div class="action-btn">CHECK STATUS</div>
             </a>
-        </main>
 
-        <div class="scroll-indicator">
-            <span>SCROLL FOR ARCHITECTURE</span>
-            <div class="arrow">↓</div>
-        </div>
+            <!-- Card 4: Data Catalog -->
+            <a href="https://docs.6-6ho.com" class="ops-card catalog" target="_blank">
+                <div class="card-header">
+                    <span class="service-tag">DATA CATALOG</span>
+                    <div class="icon">&#128209;</div>
+                </div>
+                <h2>Architecture & Lineage</h2>
+                <div class="card-stats">
+                    <div class="stat">
+                        <span class="label">TABLES</span>
+                        <span class="val">40+</span>
+                    </div>
+                    <div class="stat">
+                        <span class="label">DAGs</span>
+                        <span class="val">12</span>
+                    </div>
+                </div>
+                <p class="card-desc">
+                    데이터 리니지, DAG 스케줄, 테이블 스키마를 인터랙티브하게 탐색합니다.
+                </p>
+                <div class="action-btn">EXPLORE</div>
+            </a>
+        </main>
     </div>
 
-    <!-- Engineering Blueprint Section -->
-    <section id="architecture" class="blueprint-section">
-        <div class="container">
-            <h2 class="section-title">SYSTEM BLUEPRINT</h2>
-
-            <div class="blueprint-container">
-                <!-- CSS-based Architecture Diagram -->
-                <div class="arch-diagram">
-                    <!-- Column 1: Source -->
-                    <div class="arch-col source">
-                        <div class="arch-header">SOURCE</div>
-                        <div class="arch-card-group">
-                            <div class="arch-card">
-                                <span class="arch-icon">🔶</span>
-                                <span class="arch-text">Binance WS</span>
-                                <span class="arch-sub">Real-time Trade/Order</span>
-                            </div>
-                            <div class="arch-card">
-                                <span class="arch-icon">👤</span>
-                                <span class="arch-text">User Logs</span>
-                                <span class="arch-sub">Mock (Random Gen)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Arrow -->
-                    <div class="arch-flow-arrow">
-                        <div class="line"></div>
-                        <div class="arrow-head"></div>
-                    </div>
-
-                    <!-- Column 2: Ingestion -->
-                    <div class="arch-col ingest">
-                        <div class="arch-header">INGESTION</div>
-                        <div class="arch-card highlight">
-                            <span class="arch-icon">🔗</span>
-                            <span class="arch-text">Kafka</span>
-                            <span class="arch-sub">Stream Buffer / Decoupling</span>
-                        </div>
-                    </div>
-
-                    <!-- Arrow -->
-                    <div class="arch-flow-arrow">
-                        <div class="line"></div>
-                        <div class="arrow-head"></div>
-                    </div>
-
-                    <!-- Column 3: Processing -->
-                    <div class="arch-col process">
-                        <div class="arch-header">PROCESSING</div>
-                        <div class="arch-card spark lg">
-                            <div class="card-icon-row">
-                                <span class="arch-icon">⚡</span>
-                                <span class="arch-title">Spark</span>
-                            </div>
-                            <span class="arch-sub">Structured Streaming</span>
-                            <div class="arch-details">
-                                <span>• 1-min Window Agg</span>
-                                <span>• Technicals (SMC)</span>
-                            </div>
-                        </div>
-                        <div class="arch-card airflow">
-                            <div class="card-icon-row">
-                                <span class="arch-icon">🌪️</span>
-                                <span class="arch-title">Airflow</span>
-                            </div>
-                            <span class="arch-sub">Daily Batch ETL</span>
-                            <div class="arch-details">
-                                <span>• Shop User Stats</span>
-                                <span>• Behavior Funnel</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Arrow -->
-                    <div class="arch-flow-arrow">
-                        <div class="line"></div>
-                        <div class="arrow-head"></div>
-                    </div>
-
-                    <!-- Column 4: Storage -->
-                    <div class="arch-col storage">
-                        <div class="arch-header">STORAGE</div>
-                        <div class="arch-card-group">
-                            <div class="arch-card">
-                                <span class="arch-icon">🐘</span>
-                                <span class="arch-text">PostgreSQL</span>
-                                <span class="arch-sub">Mart / User DB</span>
-                            </div>
-                            <div class="arch-card">
-                                <span class="arch-icon">📦</span>
-                                <span class="arch-text">MinIO</span>
-                                <span class="arch-sub">Data Lake (Iceberg)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Arrow -->
-                    <div class="arch-flow-arrow">
-                        <div class="line"></div>
-                        <div class="arrow-head"></div>
-                    </div>
-
-                    <!-- Column 5: Serving -->
-                    <div class="arch-col serve">
-                        <div class="arch-header">SERVING</div>
-                        <div class="arch-card react">
-                            <span class="arch-icon">⚛️</span>
-                            <span class="arch-text">React / API</span>
-                            <span class="arch-sub">Interactive Dashboard</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="tech-grid">
-                <div class="tech-card">
-                    <h3>Ingestion & Orchestration</h3>
-                    <ul>
-                        <li>Apache Kafka</li>
-                        <li>Apache Airflow</li>
-                        <li>Binance WebSocket</li>
-                    </ul>
-                </div>
-                <div class="tech-card">
-                    <h3>Processing & Analytics</h3>
-                    <ul>
-                        <li>Spark Streaming</li>
-                        <li>PySpark</li>
-                    </ul>
-                </div>
-                <div class="tech-card">
-                    <h3>Storage</h3>
-                    <ul>
-                        <li>PostgreSQL</li>
-                        <li>MinIO (Iceberg)</li>
-                    </ul>
-                </div>
-                <div class="tech-card">
-                    <h3>Serving & Ops</h3>
-                    <ul>
-                        <li>FastAPI & React</li>
-                        <li>Nginx Proxy</li>
-                        <li>Grafana / Prometheus</li>
-                    </ul>
-                </div>
-            </div>
-
-            <footer class="blueprint-footer">
-                <p>ENGINEERED BY JUNHO SONG © 2026</p>
-                <div class="footer-links">
-                    <a href="https://github.com/6-6ho/junho-data-platform" target="_blank">GITHUB REPO</a>
-                    <a href="https://monitor.6-6ho.com" target="_blank">LIVE STATUS</a>
-                </div>
-            </footer>
-        </div>
-    </section>
+    <!-- Footer -->
+    <footer style="text-align:center;padding:24px;color:#444;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:1px;">
+        ENGINEERED BY JUNHO SONG &copy; 2026 &nbsp;|&nbsp;
+        <a href="https://github.com/6-6ho/junho-data-platform" target="_blank" style="color:#555;text-decoration:none;">GITHUB</a>
+    </footer>
 
     <script>
         // Simple Clock
