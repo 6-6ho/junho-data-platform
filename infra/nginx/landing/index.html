@@ -27,8 +27,8 @@
                 <span class="value glitch" data-text="0.4s">0.4s</span>
             </div>
             <div class="status-item">
-                <span class="label">ACTIVE WORKERS</span>
-                <span class="value">4</span>
+                <span class="label">SERVICES</span>
+                <span class="value">21</span>
             </div>
         </div>
 
@@ -42,25 +42,25 @@
 
         <!-- Main Operations Grid -->
         <main class="ops-grid">
-            <!-- Card 1: Trade Engine -->
+            <!-- Card 1: Trade Pipeline -->
             <a href="https://trade.6-6ho.com" class="ops-card trade" target="_blank">
                 <div class="card-header">
-                    <span class="service-tag">REAL-TIME</span>
+                    <span class="service-tag">REAL-TIME STREAMING</span>
                     <div class="icon">📈</div>
                 </div>
-                <h2>Market Signal Core</h2>
+                <h2>Trade Pipeline</h2>
                 <div class="card-stats">
                     <div class="stat">
                         <span class="label">SOURCE</span>
                         <span class="val">Binance WS</span>
                     </div>
                     <div class="stat">
-                        <span class="label">LATENCY</span>
-                        <span class="val">&lt; 1s</span>
+                        <span class="label">WINDOW</span>
+                        <span class="val">5m / 10m</span>
                     </div>
                 </div>
                 <p class="card-desc">
-                    실시간 변동성을 감지하고, SMC 기법을 활용하여 기술적 분석을 자동으로 수행합니다.
+                    Binance 전종목 실시간 가격을 Kafka &rarr; Spark Streaming으로 급등/급락 자동 탐지. BTC $1M+ 대형 체결, 청산, 호가 깊이를 에피소드로 축적 분석.
                 </p>
                 <div class="action-btn">LAUNCH CONSOLE</div>
             </a>
@@ -68,22 +68,22 @@
             <!-- Card 2: Shop Analytics -->
             <a href="https://shop.6-6ho.com" class="ops-card shop" target="_blank">
                 <div class="card-header">
-                    <span class="service-tag">BATCH / ML</span>
+                    <span class="service-tag">STREAMING + BATCH</span>
                     <div class="icon">🛍️</div>
                 </div>
                 <h2>Shop Analytics</h2>
                 <div class="card-stats">
                     <div class="stat">
-                        <span class="label">DATA</span>
-                        <span class="val">User Behavior</span>
+                        <span class="label">STREAMS</span>
+                        <span class="val">6 Parallel</span>
                     </div>
                     <div class="stat">
-                        <span class="label">MODE</span>
-                        <span class="val">Interactive</span>
+                        <span class="label">DQ</span>
+                        <span class="val">3-Dim Score</span>
                     </div>
                 </div>
                 <p class="card-desc">
-                    실시간 데이터 품질(DQ) 모니터링 및 데이터 마트(Batch) 분석을 통해 인사이트를 도출합니다.
+                    Spark 6개 병렬 쿼리로 매출/퍼널/DQ를 1시간 윈도우 실시간 집계. Airflow 배치로 일/주/월 마트 생성. Chaos Engineering으로 DQ 탐지 검증.
                 </p>
                 <div class="action-btn">VIEW DASHBOARD</div>
             </a>
@@ -91,22 +91,22 @@
             <!-- Card 3: System Monitor -->
             <a href="https://monitor.6-6ho.com" class="ops-card monitor" target="_blank">
                 <div class="card-header">
-                    <span class="service-tag">INFRASTRUCTURE</span>
+                    <span class="service-tag">OBSERVABILITY</span>
                     <div class="icon">🔍</div>
                 </div>
                 <h2>System Monitor</h2>
                 <div class="card-stats">
                     <div class="stat">
-                        <span class="label">METRICS</span>
-                        <span class="val">Prometheus</span>
+                        <span class="label">CONTAINERS</span>
+                        <span class="val">21</span>
                     </div>
                     <div class="stat">
-                        <span class="label">VISUAL</span>
-                        <span class="val">Grafana</span>
+                        <span class="label">ALERTS</span>
+                        <span class="val">Telegram</span>
                     </div>
                 </div>
                 <p class="card-desc">
-                    Spark 스트리밍 지연과 클러스터 리소스를 실시간으로 관제하여 시스템 안정성을 유지합니다.
+                    Prometheus + Grafana로 21개 컨테이너 리소스 모니터링. 파이프라인 지연/장애 자동 감지 시 Telegram 알림.
                 </p>
                 <div class="action-btn">CHECK STATUS</div>
             </a>
@@ -163,8 +163,8 @@
                 lagElement.innerText = data.pipeline_lag;
                 lagElement.setAttribute('data-text', data.pipeline_lag);
 
-                // Update Workers
-                document.querySelectorAll('.value')[1].innerText = data.active_workers;
+                // Update Services count
+                document.querySelectorAll('.value')[1].innerText = data.active_services;
             } catch (e) {
                 console.error("Failed to fetch metrics", e);
             }

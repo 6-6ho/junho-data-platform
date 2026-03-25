@@ -32,30 +32,34 @@ def read_root():
 
 @app.get("/api/system/status")
 async def system_status():
-    import httpx
-    import os
-    
+    from sqlalchemy import text
+    from app.database import SessionLocal
+
     status = "OPERATIONAL"
-    active_workers = 0
     pipeline_lag = "N/A"
-    
-    # Spark Master API (Default to env or internal hostname)
-    spark_api = os.getenv("SPARK_MASTER_API", "http://spark-master:8080")
-    
+    active_services = 0
+
     try:
-        async with httpx.AsyncClient(timeout=2.0, follow_redirects=True) as client:
-            spark_resp = await client.get(f"{spark_api}/json/")
-            if spark_resp.status_code == 200:
-                data = spark_resp.json()
-                active_workers = data.get("aliveworkers", 0)
-                # 활성 앱 수로 lag 근사치 계산 (앱이 많을수록 바쁨)
-                active_apps = len(data.get("activeapps", []))
-                pipeline_lag = f"{0.1 + active_apps * 0.1:.2f}s"
+        db = SessionLocal()
+        # movers_latest 최신 이벤트로 파이프라인 lag 계산
+        row = db.execute(text(
+            "SELECT EXTRACT(EPOCH FROM (NOW() - MAX(event_time)))::int FROM movers_latest"
+        )).scalar()
+        db.close()
+
+        if row is not None:
+            pipeline_lag = f"{row}s" if row < 120 else f"{row // 60}m"
+            if row > 300:
+                status = "DEGRADED"
+        else:
+            status = "DEGRADED"
+
+        active_services = 21  # laptop compose 서비스 수
     except Exception:
         status = "DEGRADED"
-    
+
     return {
         "status": status,
         "pipeline_lag": pipeline_lag,
-        "active_workers": active_workers,
+        "active_services": active_services,
     }
