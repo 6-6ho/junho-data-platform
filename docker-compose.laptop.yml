@@ -315,9 +315,9 @@ services:
     container_name: jdp-tunnel
     restart: unless-stopped
     command: tunnel --config /etc/cloudflared/config.yml run
-    network_mode: host
     volumes:
       - ./infra/tunnel:/etc/cloudflared:ro
+    networks: [appnet]
 
 volumes:
   pgdata:
