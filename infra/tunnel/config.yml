@@ -9,13 +9,13 @@ ingress:
   - hostname: trade.6-6ho.com
     service: http://frontend:80
   - hostname: shop.6-6ho.com
-    service: http://192.168.219.108:3001
+    service: http://shop-analytics:80
   - hostname: admin.6-6ho.com
-    service: http://192.168.219.108:3003
+    service: http://shop-admin:80
   - hostname: analytics.6-6ho.com
-    service: http://192.168.219.108:3001
+    service: http://shop-analytics:80
   - hostname: airflow.6-6ho.com
-    service: http://192.168.219.108:8080
+    service: http://airflow:8080
   - hostname: docs.6-6ho.com
     service: http://frontend:80
   - hostname: monitor.6-6ho.com

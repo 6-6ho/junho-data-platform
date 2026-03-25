@@ -1,25 +1,42 @@
-# Laptop Node (항상 켜짐 / Trade 풀 파이프라인 + 웹 서빙)
-# 역할: Trade 데이터 수집 → 처리 → 저장 → 서빙 (독립 동작)
+# Laptop Node (24/7 독립 운영 — Trade + Shop 실시간 + 경량 배치)
 #
 # 사용법: docker compose -f docker-compose.laptop.yml up -d
 #
-# 서비스 목록 (8개):
-#   kafka              - 9092 (메시지 브로커)
-#   ingest             - Binance WebSocket → Kafka
-#   trade-movers       - Spark local mode (Movers 감지)
-#   frontend (nginx)   - 3000
-#   api (trade-backend) - 8000 (internal)
-#   postgres           - 5432 (LAN 접근 허용)
-#   grafana            - 3002
+# 서비스 목록 (21개):
+#   === Infra ===
+#   kafka              - 9092 (메시지 브로커, Trade + Shop 토픽 통합)
+#   postgres           - 5432 (pgvector, LAN 접근 허용)
+#   minio + minio-init - 9000/9001 (오브젝트 스토리지)
+#   airflow            - 8080 (배치 오케스트레이션)
 #   cloudflared        - Cloudflare Tunnel
 #
-# 메모리 예상: ~4G / 8G
+#   === Trade ===
+#   ingest             - Binance WebSocket → Kafka
+#   trade-movers       - Spark local (5m/10m 윈도우)
+#   trade-spark        - Trade 배치용 Spark 컨테이너
+#   whale-monitor      - BTC 에피소드 분석
+#   listing-monitor    - 업비트/빗썸 상장 감지
+#   journal-bot        - 텔레그램 저널 봇
+#
+#   === Shop ===
+#   shop-generator     - 이벤트 생성 (24/7)
+#   shop-streaming     - Shop Spark Streaming (local mode, 6쿼리)
+#   shop-api           - Shop FastAPI
+#   shop-analytics     - Shop 대시보드
+#   shop-admin         - Generator 제어
+#
+#   === Monitoring ===
+#   grafana            - 3002
+#   prometheus         - 9090
+#   node-exporter / cadvisor / infra-monitor
+#   frontend (nginx)   - 3000
+#
+# 리소스 예산: ~7G / 16G RAM, ~7 / 8 CPU
 
-# 메모리 예상: ~4G / 8G
 name: jdp
 
 services:
-  # === Messaging ===
+  # === Messaging (Trade + Shop 토픽 통합) ===
   kafka:
     image: confluentinc/cp-kafka:latest
     hostname: kafka
@@ -46,7 +63,7 @@ services:
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
     networks: [appnet]
 
-  # === Data Ingestion ===
+  # === Trade: Data Ingestion ===
   ingest:
     build: ./apps/trade-ingest
     restart: unless-stopped
@@ -60,10 +77,10 @@ services:
     depends_on: [kafka]
     networks: [appnet]
 
-  # === Trade Streaming (Spark Local Mode) ===
+  # === Trade: Movers Streaming (Spark Local) ===
   trade-movers:
     build: ./spark
-    user: root  # Fix checkpoint permission on WSL
+    user: root
     restart: unless-stopped
     depends_on: [kafka, postgres]
     env_file: [.env]
@@ -78,7 +95,6 @@ services:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - DB_HOST=postgres
-      # No SPARK_MASTER_URL → defaults to local[*]
     networks: [appnet]
     volumes:
       - ./spark/jobs:/app/jobs
@@ -86,6 +102,27 @@ services:
       - ./checkpoints:/app/checkpoints
     command: ./start.sh
 
+  # === Trade: Batch Spark (local mode, Airflow에서 호출) ===
+  trade-spark:
+    build: ./spark
+    container_name: jdp-trade-spark
+    user: root
+    restart: unless-stopped
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    environment:
+      - DB_HOST=postgres
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+    networks: [appnet]
+    volumes:
+      - ./spark/jobs:/app/jobs
+      - ./spark/common:/app/common
+    command: ["tail", "-f", "/dev/null"]  # Airflow가 docker exec로 spark-submit 실행
 
   # === Frontend & Routing ===
   frontend:
@@ -96,7 +133,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.3'
           memory: 256M
     volumes:
       - ./infra/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
@@ -112,13 +149,12 @@ services:
     env_file: [.env]
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
-      - SPARK_MASTER_API=http://${DESKTOP_IP:-spark-master}:8081
     volumes:
       - ./apps/trade-backend/app:/app/app
     deploy:
       resources:
         limits:
-          cpus: '1.0'
+          cpus: '0.8'
           memory: 512M
     networks: [appnet]
     depends_on:
@@ -154,7 +190,204 @@ services:
       retries: 5
     networks: [appnet]
     ports:
-      - "5432:5432"   # LAN 접근 허용 (데스크탑 → 노트북 Postgres)
+      - "5432:5432"
+
+  # === Object Storage ===
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    container_name: jdp-minio
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER:-minio}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123}
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks: [appnet]
+
+  minio-init:
+    image: minio/mc
+    container_name: jdp-minio-init
+    depends_on: [minio]
+    environment:
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:-minio123}
+    entrypoint: >
+      /bin/sh -c "
+      until mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minio} $MINIO_ROOT_PASSWORD; do
+        echo 'Waiting for MinIO...'; sleep 5;
+      done;
+      mc mb myminio/raw --ignore-existing;
+      mc mb myminio/processed --ignore-existing;
+      mc mb myminio/aggregated --ignore-existing;
+      mc mb myminio/iceberg-warehouse --ignore-existing;
+      echo 'Buckets created';
+      exit 0;
+      "
+    networks: [appnet]
+
+  # === Batch Orchestration (Trade + Shop 경량 DAG) ===
+  airflow:
+    build: ./airflow
+    container_name: jdp-airflow
+    restart: unless-stopped
+    user: root
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    environment:
+      - AIRFLOW__CORE__PARALLELISM=4
+      - AIRFLOW__CORE__DAG_CONCURRENCY=4
+      - AIRFLOW__CORE__MAX_ACTIVE_TASKS_PER_DAG=2
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
+      - AIRFLOW__CORE__FERNET_KEY=${AIRFLOW_FERNET_KEY:?Set AIRFLOW_FERNET_KEY in .env}
+      - AIRFLOW__WEBSERVER__SECRET_KEY=${AIRFLOW_SECRET_KEY:-jdp-secret}
+      - _AIRFLOW_DB_MIGRATE=true
+      - _AIRFLOW_WWW_USER_CREATE=true
+      - _AIRFLOW_WWW_USER_USERNAME=admin
+      - _AIRFLOW_WWW_USER_PASSWORD=${AIRFLOW_PASSWORD:-admin}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - AIRFLOW__WEBSERVER__BASE_URL=https://airflow.6-6ho.com
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+      - AIRFLOW__WEBSERVER__ENABLE_PROXY_FIX=True
+      - AIRFLOW_CONN_POSTGRES_DEFAULT=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
+      - LAPTOP_IP=postgres
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - airflow_logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /usr/bin/docker:/usr/bin/docker
+      - .:/opt/jdp
+    ports:
+      - "8080:8080"
+    networks: [appnet]
+    command: >
+      bash -c "airflow db migrate && airflow users create --username admin --password $${AIRFLOW_PASSWORD:-admin} --firstname Admin --lastname User --role Admin --email admin@example.com || true && airflow webserver & airflow scheduler"
+
+  # === Shop: Event Generator (24/7) ===
+  shop-generator:
+    build: ./apps/shop-generator
+    container_name: shop-generator
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    depends_on: [kafka, shop-api]
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - MODE=normal
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_HOST=postgres
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+    networks: [appnet]
+
+  # === Shop: Spark Streaming (local mode, 6 parallel queries) ===
+  shop-streaming:
+    build: ./spark
+    container_name: jdp-shop-streaming
+    user: root
+    restart: unless-stopped
+    depends_on: [kafka, minio, postgres]
+    env_file: [.env]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+    environment:
+      - SPARK_JOB_NAME=shop/analytics_streaming.py
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - ENABLE_ICEBERG=true
+      - DB_HOST=postgres
+      - SPARK_CORES_MAX=2
+      - SPARK_EXECUTOR_CORES=1
+      - SPARK_EXECUTOR_MEMORY=512m
+      - SPARK_SHUFFLE_PARTITIONS=4
+    networks: [appnet]
+    volumes:
+      - ./spark/jobs:/app/jobs
+      - ./spark/common:/app/common
+    command: ./start.sh
+
+  # === Shop: Backend API ===
+  shop-api:
+    build: ./apps/shop-backend
+    container_name: jdp-shop-api
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DB_HOST=postgres
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+    volumes:
+      - ./apps/shop-backend:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+    networks: [appnet]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8000/').getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # === Shop: Analytics Dashboard ===
+  shop-analytics:
+    build: ./apps/shop-analytics
+    container_name: jdp-shop-analytics
+    restart: unless-stopped
+    ports:
+      - "3001:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    depends_on:
+      shop-api:
+        condition: service_healthy
+    networks: [appnet]
+
+  # === Shop: Admin (Generator Control) ===
+  shop-admin:
+    build: ./apps/shop-admin
+    container_name: jdp-shop-admin
+    restart: unless-stopped
+    ports:
+      - "3003:80"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    depends_on:
+      shop-api:
+        condition: service_healthy
+    networks: [appnet]
 
   # === Monitoring UI ===
   grafana:
@@ -163,7 +396,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
+          cpus: '0.3'
           memory: 256M
     environment:
       - GF_SECURITY_ADMIN_USER=admin
@@ -204,7 +437,7 @@ services:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: jdp-cadvisor
     ports:
-      - "8080:8080"
+      - "8086:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -302,7 +535,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.3'
+          cpus: '0.2'
           memory: 256M
     depends_on:
       postgres:
@@ -322,6 +555,8 @@ services:
 volumes:
   pgdata:
   grafana-data:
+  miniodata:
+  airflow_logs:
 
 networks:
   appnet:
