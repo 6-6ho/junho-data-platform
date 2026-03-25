@@ -178,6 +178,35 @@ export default function PerformancePage() {
         );
     }
 
+    const hasData = optimizeData && optimizeData.summary?.total_signals > 0;
+
+    if (!hasData) {
+        return (
+            <div>
+                {/* Period / Tier selector */}
+                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[7, 15, 30, 0].map(d => (
+                        <button key={d} onClick={() => { setSelectedDays(d); setLoading(true); }}
+                            style={{ padding: '6px 16px', borderRadius: 8, border: selectedDays === d ? '1px solid #00e676' : '1px solid #1c2333', background: selectedDays === d ? 'rgba(0,230,118,0.1)' : '#0d1117', color: selectedDays === d ? '#00e676' : '#888', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                            {d === 0 ? 'ALL' : `${d}D`}
+                        </button>
+                    ))}
+                    <span style={{ color: '#444', margin: '0 4px' }}>|</span>
+                    {['all', 'high', 'mid', 'small'].map(t => (
+                        <button key={t} onClick={() => { setSelectedTier(t); setLoading(true); }}
+                            style={{ padding: '6px 16px', borderRadius: 8, border: selectedTier === t ? '1px solid #00e676' : '1px solid #1c2333', background: selectedTier === t ? 'rgba(0,230,118,0.1)' : '#0d1117', color: selectedTier === t ? '#00e676' : '#888', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}>
+                            {t === 'all' ? 'ALL' : t.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '40vh', flexDirection: 'column', gap: 12 }}>
+                    <div style={{ color: '#666', fontSize: 14 }}>선택한 기간에 시그널 데이터가 없습니다</div>
+                    <div style={{ color: '#444', fontSize: 12 }}>기간을 늘리거나 ALL을 선택해보세요</div>
+                </div>
+            </div>
+        );
+    }
+
     // TP/SL levels for heatmap
     const tpLevels = [3, 4, 5, 6, 7, 8, 9, 10];
     const slLevels = [1, 2, 3, 4, 5];
