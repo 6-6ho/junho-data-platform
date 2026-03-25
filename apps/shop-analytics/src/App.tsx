@@ -241,7 +241,7 @@ const OverviewPage = ({ data }: { data: DashboardData }) => {
               <Tooltip
                 contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px' }}
                 itemStyle={{ color: '#fff', fontSize: '12px' }}
-                formatter={(value: number) => [value.toLocaleString(), '주문 건수']}
+                formatter={(value: number | undefined) => [(value ?? 0).toLocaleString(), '주문 건수']}
                 labelFormatter={(h) => {
                   try { return new Date(h).toLocaleString('ko-KR') }
                   catch { return h }
