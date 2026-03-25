@@ -16,13 +16,13 @@ const SERVICES = [
   { id: 'cloudflared', name: 'Cloudflare Tunnel', node: 'laptop', domain: 'infra', type: 'network', desc: '9개 서브도메인 → 내부 서비스 라우팅. QUIC.' },
   // Shop (Desktop)
   { id: 'kafka-desktop', name: 'Kafka (Desktop)', node: 'desktop', domain: 'infra', type: 'messaging', desc: 'KRaft 모드. Shop 토픽 5개.', cpu: '1.0', mem: '768M' },
-  { id: 'shop-generator', name: 'Shop Generator', node: 'desktop', domain: 'shop', type: 'source', desc: '3 persona × 5 category 이벤트 생성. TPS 10~2000. Chaos Mode.' },
-  { id: 'analytics-streaming', name: 'Analytics Streaming', node: 'desktop', domain: 'shop', type: 'streaming', desc: 'Spark 클러스터. 6개 병렬 쿼리 (FAIR). 매출/퍼널/DQ.', cpu: '1.0', mem: '2G' },
+  { id: 'shop-generator', name: 'Shop Generator', node: 'laptop', domain: 'shop', type: 'source', desc: '3 persona × 5 category 이벤트 생성. TPS 10~2000. Chaos Mode.', cpu: '0.2', mem: '256M' },
+  { id: 'analytics-streaming', name: 'Shop Streaming', node: 'laptop', domain: 'shop', type: 'streaming', desc: 'Spark local. 6개 병렬 쿼리. 매출/퍼널/DQ 1h 윈도우 집계.', cpu: '0.5', mem: '1G' },
   { id: 'spark-cluster', name: 'Spark Cluster', node: 'desktop', domain: 'infra', type: 'compute', desc: 'Master + Worker×2 (7cores/7GB). Standalone.', cpu: '6.5', mem: '8.5G' },
   { id: 'airflow', name: 'Airflow', node: 'desktop', domain: 'infra', type: 'orchestrator', desc: 'LocalExecutor. 12 DAG. parallelism=4.', cpu: '1.0', mem: '1.5G' },
   { id: 'minio', name: 'MinIO', node: 'desktop', domain: 'infra', type: 'storage', desc: 'S3 호환. raw/checkpoints/iceberg-warehouse.', cpu: '0.5', mem: '512M' },
-  { id: 'shop-backend', name: 'Shop Backend', node: 'desktop', domain: 'shop', type: 'serving', desc: 'FastAPI. Analytics + DQ + Admin API.' },
-  { id: 'shop-frontend', name: 'Shop Analytics', node: 'desktop', domain: 'shop', type: 'serving', desc: 'React 19. Overview + DQ 대시보드.' },
+  { id: 'shop-backend', name: 'Shop Backend', node: 'laptop', domain: 'shop', type: 'serving', desc: 'FastAPI. Analytics + DQ + Admin API.', cpu: '0.3', mem: '256M' },
+  { id: 'shop-frontend', name: 'Shop Analytics', node: 'laptop', domain: 'shop', type: 'serving', desc: 'React 19. Overview + DQ 대시보드.', cpu: '0.2', mem: '128M' },
 ];
 
 // === Kafka 토픽 ===
@@ -155,7 +155,26 @@ const TABLES = [
 
 // === 리니지 엣지 ===
 const EDGES = [
-  // Trade ingestion
+  // === 인프라 연결 (Architecture 탭용) ===
+  { source: 'kafka-laptop', target: 'trade-movers', label: 'raw.ticker.usdtm' },
+  { source: 'kafka-laptop', target: 'analytics-streaming', label: 'shopping-events' },
+  { source: 'shop-generator', target: 'kafka-laptop', label: 'produce' },
+  { source: 'trade-ingest', target: 'kafka-laptop', label: 'produce' },
+  { source: 'trade-movers', target: 'postgres', label: 'movers_latest' },
+  { source: 'whale-monitor', target: 'postgres', label: 'whale/depth/episode' },
+  { source: 'listing-monitor', target: 'postgres', label: 'coin_listing' },
+  { source: 'analytics-streaming', target: 'postgres', label: 'sales/funnel/DQ' },
+  { source: 'analytics-streaming', target: 'minio', label: 'Parquet archive' },
+  { source: 'postgres', target: 'trade-backend', label: 'SQL' },
+  { source: 'postgres', target: 'shop-backend', label: 'SQL' },
+  { source: 'trade-backend', target: 'trade-frontend', label: 'REST API' },
+  { source: 'shop-backend', target: 'shop-frontend', label: 'REST API' },
+  { source: 'airflow', target: 'postgres', label: 'DAG 실행' },
+  { source: 'journal-bot', target: 'postgres', label: 'memo insert' },
+  { source: 'investment-agent', target: 'postgres', label: 'MCP query' },
+  { source: 'trade-frontend', target: 'cloudflared', label: '*.6-6ho.com' },
+  { source: 'grafana', target: 'postgres', label: 'dashboard query' },
+  // === Trade ingestion (Lineage 탭용) ===
   { source: 'binance-ws', target: 'trade-ingest', label: 'WS ticker' },
   { source: 'trade-ingest', target: 'topic-ticker', label: 'produce' },
   { source: 'topic-ticker', target: 'trade-movers', label: 'consume' },

@@ -129,14 +129,14 @@ function initArchGraph() {
         elements,
         style: cyStyles(),
         layout: {
-            name: 'cose',
+            name: 'dagre',
+            rankDir: 'LR',
+            nodeSep: 50,
+            rankSep: 100,
+            padding: 30,
             animate: false,
-            nodeRepulsion: 8000,
-            idealEdgeLength: 120,
-            gravity: 0.3,
-            padding: 40,
         },
-        minZoom: 0.3, maxZoom: 3,
+        minZoom: 0.2, maxZoom: 3,
     });
 
     cyArch.on('tap', 'node', e => {
