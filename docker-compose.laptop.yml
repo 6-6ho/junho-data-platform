@@ -118,6 +118,8 @@ services:
       - DB_HOST=postgres
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minio}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minio123}
+      - AWS_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:-minio}
+      - AWS_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY:-minio123}
     networks: [appnet]
     volumes:
       - ./spark/jobs:/app/jobs
