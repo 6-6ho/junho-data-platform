@@ -29,12 +29,9 @@ with DAG(
     submit_job = BashOperator(
         task_id='run_basket_analysis',
         bash_command=f'''
-            docker exec -e DB_HOST={LAPTOP_IP} spark-master /opt/spark/bin/spark-submit \
-            --master spark://spark-master:7077 \
-            --conf spark.cores.max=3 \
-            --conf spark.executor.cores=1 \
-            --conf spark.driver.memory=1g \
-            --conf spark.executor.memory=1g \
+            docker exec -e DB_HOST=postgres jdp-trade-spark /opt/spark/bin/spark-submit \
+            --master local[2] \
+            --conf spark.driver.memory=512m \
             --conf spark.sql.shuffle.partitions=6 \
             --conf spark.sql.adaptive.enabled=true \
             --conf spark.sql.adaptive.skewJoin.enabled=true \
