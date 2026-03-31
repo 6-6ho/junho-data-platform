@@ -1,348 +1,118 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell,
-} from 'recharts';
-import { CalendarDays, Users, Link2, TrendingUp } from 'lucide-react';
-import {
-  fetchMartDailySales, fetchMartRFM, fetchMartAssociation, fetchMartWeeklyTrend,
-} from '../api/client';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { TrendingUp, Users, Link2, CalendarDays } from 'lucide-react';
+import { fetchMartDailySales, fetchMartRFM, fetchMartAssociation, fetchMartWeeklyTrend } from '../api/client';
 
-/* ── helpers ─────────────────────────────── */
-
-const CHART_COLORS = ['#22C55E', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444'];
-
-const TOOLTIP_STYLE = {
-  contentStyle: {
-    backgroundColor: '#1E1E1E',
-    border: '1px solid #2A2A2A',
-    borderRadius: '6px',
-    fontSize: '12px',
-  },
-  itemStyle: { color: '#fff', fontSize: '12px' },
+const C = ['#22C55E','#3B82F6','#A855F7','#F59E0B','#EF4444'];
+const TIP = {
+  contentStyle:{backgroundColor:'#101010',border:'1px solid #2E2E2E',borderRadius:3,fontSize:11,fontFamily:"'IBM Plex Mono',monospace",padding:'6px 8px'},
+  itemStyle:{color:'#E0E0E0',fontSize:11,fontFamily:"'IBM Plex Mono',monospace"},
 };
+const AX = {fill:'#454545',fontSize:10,fontFamily:"'IBM Plex Mono',monospace"};
+const GR = {strokeDasharray:'2 6',stroke:'rgba(255,255,255,.03)',vertical:false as const};
 
-const fmtKRW = (n: number | null | undefined): string => {
-  if (n == null) return '--';
-  if (n >= 1_000_000_000_000) return `${(n / 1_000_000_000_000).toFixed(1)}조`;
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
-  if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만`;
-  return `₩${n.toLocaleString()}`;
-};
+const krw = (n:number|null|undefined) => { if(n==null) return '--'; if(n>=1e12) return `${(n/1e12).toFixed(1)}조`; if(n>=1e8) return `${(n/1e8).toFixed(1)}억`; if(n>=1e4) return `${(n/1e4).toFixed(0)}만`; return `₩${n.toLocaleString()}`; };
+const fN = (n:number|null|undefined) => { if(n==null) return '--'; if(n>=1e9) return `${(n/1e9).toFixed(1)}B`; if(n>=1e6) return `${(n/1e6).toFixed(1)}M`; if(n>=1e3) return `${(n/1e3).toFixed(1)}K`; return n.toLocaleString(); };
+const fD = (d:string) => { try{return new Date(d).toLocaleDateString('ko-KR',{month:'short',day:'numeric'})}catch{return d} };
 
-const fmtNum = (n: number | null | undefined): string => {
-  if (n == null) return '--';
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-};
+function Sk({h=240}:{h?:number}){return <div className="sk" style={{width:'100%',height:h}}/>}
 
-const fmtDate = (d: string) => {
-  try {
-    return new Date(d).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-  } catch {
-    return d;
-  }
-};
-
-/* ── types (exact API shapes) ────────────── */
-
-interface DailySalesRow {
-  date: string;
-  category: string;
-  revenue: number;
-  orders: number;
-  avg_value: number;
-}
-
-interface RFMRow {
-  segment: string;
-  user_count: number;
-}
-
-interface AssociationRow {
-  antecedents: string;
-  consequents: string;
-  confidence: number;
-  lift: number;
-  support: number;
-}
-
-interface WeeklyRow {
-  week: string;
-  revenue: number;
-  orders: number;
-}
-
-/* ── component ───────────────────────────── */
+interface Sales { date:string; category:string; revenue:number; orders:number; avg_value:number }
+interface RFM { segment:string; user_count:number }
+interface Assoc { antecedents:string; consequents:string; confidence:number; lift:number; support:number }
+interface Weekly { week:string; revenue:number; orders:number }
 
 export default function MartPage() {
-  const { data: dailySales = [] } = useQuery<DailySalesRow[]>({
-    queryKey: ['mart-daily-sales'],
-    queryFn: () => fetchMartDailySales(7),
-    staleTime: 300_000,
-  });
+  const {data:sales=[],isLoading:sL} = useQuery<Sales[]>({queryKey:['mart-sales'],queryFn:()=>fetchMartDailySales(7),staleTime:300_000});
+  const {data:rfm=[],isLoading:rL} = useQuery<RFM[]>({queryKey:['mart-rfm'],queryFn:fetchMartRFM,staleTime:300_000});
+  const {data:assoc=[],isLoading:aL} = useQuery<Assoc[]>({queryKey:['mart-assoc'],queryFn:()=>fetchMartAssociation(10),staleTime:300_000});
+  const {data:weekly=[],isLoading:wL} = useQuery<Weekly[]>({queryKey:['mart-weekly'],queryFn:()=>fetchMartWeeklyTrend(8),staleTime:300_000});
 
-  const { data: rfm = [] } = useQuery<RFMRow[]>({
-    queryKey: ['mart-rfm'],
-    queryFn: fetchMartRFM,
-    staleTime: 300_000,
-  });
-
-  const { data: association = [] } = useQuery<AssociationRow[]>({
-    queryKey: ['mart-association'],
-    queryFn: () => fetchMartAssociation(10),
-    staleTime: 300_000,
-  });
-
-  const { data: weeklyTrend = [] } = useQuery<WeeklyRow[]>({
-    queryKey: ['mart-weekly-trend'],
-    queryFn: () => fetchMartWeeklyTrend(8),
-    staleTime: 300_000,
-  });
-
-  /* group daily sales by date */
-  const dateGroups = new Map<string, DailySalesRow[]>();
-  dailySales.forEach((row) => {
-    const existing = dateGroups.get(row.date) || [];
-    existing.push(row);
-    dateGroups.set(row.date, existing);
-  });
-  const sortedDates = Array.from(dateGroups.keys()).sort().reverse();
-
-  /* sort weekly trend chronologically for chart */
-  const weeklyChartData = [...weeklyTrend].sort(
-    (a, b) => new Date(a.week).getTime() - new Date(b.week).getTime(),
-  );
+  const groups = new Map<string,Sales[]>();
+  sales.forEach(r=>{const e=groups.get(r.date)||[];e.push(r);groups.set(r.date,e)});
+  const dates = Array.from(groups.keys()).sort().reverse();
+  const wData = [...weekly].sort((a,b)=>new Date(a.week).getTime()-new Date(b.week).getTime());
+  const totalUsers = rfm.reduce((s,r)=>s+(r.user_count??0),0);
 
   return (
     <div>
-      {/* ── Daily Sales Table ── */}
-      <div className="card" style={{ padding: 0 }}>
-        <div className="card-title" style={{ padding: '20px 20px 0 20px' }}>
-          <CalendarDays size={16} />
-          일별 매출 (카테고리별)
-          <span className="card-subtitle">최근 7일</span>
-        </div>
-        <div style={{ padding: '12px 0 0 0', overflow: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>날짜</th>
-                <th>카테고리</th>
-                <th className="right">매출</th>
-                <th className="right">주문수</th>
-                <th className="right">객단가</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedDates.length > 0 ? (
-                sortedDates.map((date) => {
-                  const rows = dateGroups.get(date)!;
-                  return rows.map((row, idx) => (
-                    <tr key={`${date}-${row.category}`}>
-                      {idx === 0 && (
-                        <td
-                          className="primary"
-                          rowSpan={rows.length}
-                          style={{ verticalAlign: 'top', fontWeight: 600 }}
-                        >
-                          {(() => {
-                            try {
-                              return new Date(date).toLocaleDateString('ko-KR', {
-                                month: 'short',
-                                day: 'numeric',
-                                weekday: 'short',
-                              });
-                            } catch {
-                              return date;
-                            }
-                          })()}
-                        </td>
-                      )}
-                      <td>{row.category}</td>
-                      <td className="right">{fmtKRW(row.revenue ?? 0)}</td>
-                      <td className="right">{fmtNum(row.orders ?? 0)}</td>
-                      <td className="right">{fmtKRW(row.avg_value ?? 0)}</td>
-                    </tr>
-                  ));
-                })
-              ) : (
-                <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: '#666', padding: 40 }}>
-                    데이터 없음
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      <div className="pn">
+        <div className="ph"><TrendingUp size={13}/><span className="pt">Weekly Trend</span><span className="pm">8w · revenue + orders</span></div>
+        <div className="pb">
+          {wL ? <Sk/> : wData.length>0 ? (
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={wData}>
+                <CartesianGrid {...GR}/>
+                <XAxis dataKey="week" tick={AX} tickLine={false} axisLine={false} tickFormatter={fD}/>
+                <YAxis yAxisId="l" tick={AX} tickLine={false} axisLine={false} tickFormatter={(v:number)=>krw(v)}/>
+                <YAxis yAxisId="r" orientation="right" tick={AX} tickLine={false} axisLine={false} tickFormatter={(v:number)=>fN(v)}/>
+                <Tooltip {...TIP} formatter={(v:number|undefined,name?:string)=>{if(name==='매출')return[krw(v??0),name];return[fN(v??0),name??'']}} labelFormatter={(d)=>{try{return`${new Date(d as string).toLocaleDateString('ko-KR')} 주차`}catch{return String(d)}}}/>
+                <Line yAxisId="l" type="monotone" dataKey="revenue" stroke="#22C55E" strokeWidth={2} name="매출" dot={{r:3,fill:'#22C55E',stroke:'#0E0E0E',strokeWidth:2}} activeDot={{r:4,fill:'#22C55E',stroke:'#0E0E0E',strokeWidth:2}}/>
+                <Line yAxisId="r" type="monotone" dataKey="orders" stroke="#3B82F6" strokeWidth={2} name="주문수" dot={{r:3,fill:'#3B82F6',stroke:'#0E0E0E',strokeWidth:2}} activeDot={{r:4,fill:'#3B82F6',stroke:'#0E0E0E',strokeWidth:2}}/>
+              </LineChart>
+            </ResponsiveContainer>
+          ) : <div className="empty">데이터 없음</div>}
         </div>
       </div>
 
-      {/* ── 2-col: RFM + Association ── */}
-      <div className="chart-grid">
-        {/* RFM Distribution BarChart */}
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="card-title">
-            <Users size={16} />
-            RFM 세그먼트 분포
+      <div className="g2">
+        <div className="pn">
+          <div className="ph"><Users size={13}/><span className="pt">RFM Segments</span><span className="pm">{totalUsers.toLocaleString()} users</span></div>
+          <div className="pb">
+            {rL ? <Sk h={220}/> : rfm.length>0 ? (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={rfm} layout="vertical" margin={{left:4}}>
+                  <CartesianGrid strokeDasharray="2 6" stroke="rgba(255,255,255,.03)" horizontal={false}/>
+                  <XAxis type="number" tick={AX} tickLine={false} axisLine={false} tickFormatter={(v:number)=>fN(v)}/>
+                  <YAxis type="category" dataKey="segment" width={56} tick={{fill:'#7A7A7A',fontSize:11,fontFamily:"'IBM Plex Sans'"}} tickLine={false} axisLine={false}/>
+                  <Tooltip {...TIP} formatter={(v:number|undefined)=>[(v??0).toLocaleString(),'고객 수']}/>
+                  <Bar dataKey="user_count" name="고객 수" radius={[0,3,3,0]} barSize={18}>
+                    {rfm.map((_,i)=><Cell key={i} fill={C[i%C.length]} fillOpacity={.85}/>)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : <div className="empty">데이터 없음</div>}
           </div>
-          {rfm.length > 0 ? (
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={rfm} layout="vertical" margin={{ left: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" horizontal={false} />
-                <XAxis
-                  type="number"
-                  stroke="#666"
-                  tick={{ fill: '#666', fontSize: 11 }}
-                  tickLine={false}
-                  tickFormatter={(v: number) => fmtNum(v)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="segment"
-                  stroke="#666"
-                  tick={{ fill: '#A3A3A3', fontSize: 12 }}
-                  tickLine={false}
-                  axisLine={false}
-                  width={70}
-                />
-                <Tooltip
-                  {...TOOLTIP_STYLE}
-                  formatter={(value: number | undefined) => [(value ?? 0).toLocaleString(), '고객 수']}
-                />
-                <Bar dataKey="user_count" name="고객 수" radius={[0, 4, 4, 0]}>
-                  {rfm.map((_entry, idx) => (
-                    <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="empty-state">데이터 없음</div>
+        </div>
+        <div className="pn">
+          <div className="ph"><Link2 size={13}/><span className="pt">Association Rules</span><span className="pm">Top 10</span></div>
+          <div className="pb f">
+            {aL ? <div style={{padding:12}}><Sk h={180}/></div> : (
+              <table className="dt"><thead><tr><th>선행</th><th>후행</th><th className="r">Conf.</th><th className="r">Lift</th></tr></thead>
+              <tbody>{assoc.length>0 ? assoc.map((r,i)=>(
+                <tr key={i}>
+                  <td style={{fontSize:11}}>{r.antecedents}</td>
+                  <td style={{fontSize:11}}>{r.consequents}</td>
+                  <td className="r">{((r.confidence??0)*100).toFixed(1)}%</td>
+                  <td className="r" style={{color:r.lift>2?'#22C55E':'#7A7A7A',fontWeight:r.lift>2?600:400}}>{r.lift.toFixed(2)}</td>
+                </tr>
+              )) : <tr><td colSpan={4} className="empty">데이터 없음</td></tr>}</tbody></table>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="pn">
+        <div className="ph"><CalendarDays size={13}/><span className="pt">Daily Sales</span><span className="pm">7d · by category</span></div>
+        <div className="pb f">
+          {sL ? <div style={{padding:12}}><Sk h={200}/></div> : (
+            <div className="tscr">
+              <table className="dt"><thead><tr><th>날짜</th><th>카테고리</th><th className="r">매출</th><th className="r">주문수</th><th className="r">객단가</th></tr></thead>
+              <tbody>{dates.length>0 ? dates.map(d=>{
+                const rows=groups.get(d)!;
+                return rows.map((r,i)=>(
+                  <tr key={`${d}-${r.category}`}>
+                    {i===0 && <td className="n" rowSpan={rows.length} style={{verticalAlign:'top',whiteSpace:'nowrap'}}>{(()=>{try{return new Date(d).toLocaleDateString('ko-KR',{month:'short',day:'numeric',weekday:'short'})}catch{return d}})()}</td>}
+                    <td className="n">{r.category}</td>
+                    <td className="r">{krw(r.revenue)}</td>
+                    <td className="r">{fN(r.orders)}</td>
+                    <td className="r">{krw(r.avg_value)}</td>
+                  </tr>
+                ));
+              }) : <tr><td colSpan={5} className="empty">데이터 없음</td></tr>}</tbody></table>
+            </div>
           )}
         </div>
-
-        {/* Product Association Table */}
-        <div className="card" style={{ marginBottom: 0, padding: 0 }}>
-          <div className="card-title" style={{ padding: '20px 20px 0 20px' }}>
-            <Link2 size={16} />
-            연관 규칙
-            <span className="card-subtitle">Top 10</span>
-          </div>
-          <div style={{ padding: '12px 0 0 0', overflow: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>선행 상품</th>
-                  <th>후행 상품</th>
-                  <th className="right">Confidence</th>
-                  <th className="right">Lift</th>
-                </tr>
-              </thead>
-              <tbody>
-                {association.length > 0 ? (
-                  association.map((row, idx) => (
-                    <tr key={idx}>
-                      <td style={{ fontSize: 12 }}>{row.antecedents}</td>
-                      <td style={{ fontSize: 12 }}>{row.consequents}</td>
-                      <td className="right">{((row.confidence ?? 0) * 100).toFixed(1)}%</td>
-                      <td
-                        className="right"
-                        style={{
-                          color: (row.lift ?? 0) > 2 ? '#22C55E' : '#A3A3A3',
-                          fontWeight: (row.lift ?? 0) > 2 ? 600 : 400,
-                        }}
-                      >
-                        {(row.lift ?? 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', color: '#666', padding: 40 }}>
-                      데이터 없음
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Weekly Sales Trend ── */}
-      <div className="card">
-        <div className="card-title">
-          <TrendingUp size={16} />
-          주별 매출 추이
-          <span className="card-subtitle">최근 8주</span>
-        </div>
-        {weeklyChartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={weeklyChartData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis
-                dataKey="week"
-                stroke="#666"
-                tick={{ fill: '#666', fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={fmtDate}
-              />
-              <YAxis
-                yAxisId="left"
-                stroke="#666"
-                tick={{ fill: '#666', fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => fmtKRW(v)}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                stroke="#666"
-                tick={{ fill: '#666', fontSize: 11 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => fmtNum(v)}
-              />
-              <Tooltip
-                {...TOOLTIP_STYLE}
-                formatter={(value: number | undefined, name?: string) => {
-                  if (name === '매출') return [fmtKRW(value ?? 0), name];
-                  return [fmtNum(value ?? 0), name ?? ''];
-                }}
-                labelFormatter={(d) => {
-                  try { return `${new Date(d as string).toLocaleDateString('ko-KR')} 주차`; }
-                  catch { return String(d); }
-                }}
-              />
-              <Line
-                yAxisId="left"
-                type="monotone"
-                dataKey="revenue"
-                stroke="#22C55E"
-                strokeWidth={2}
-                name="매출"
-                dot={{ r: 4, fill: '#22C55E' }}
-              />
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="orders"
-                stroke="#3B82F6"
-                strokeWidth={2}
-                name="주문수"
-                dot={{ r: 3, fill: '#3B82F6' }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="empty-state">데이터 없음</div>
-        )}
       </div>
     </div>
   );

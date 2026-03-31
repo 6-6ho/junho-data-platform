@@ -4,303 +4,126 @@ import {
   LineChart, Line, ReferenceLine,
 } from 'recharts';
 import { Layers, Zap, DollarSign, Clock, Activity, TrendingUp } from 'lucide-react';
-import {
-  fetchSummary, fetchHourlyTraffic, fetchHourlyThroughput, fetchFunnel,
-} from '../api/client';
+import { fetchSummary, fetchHourlyTraffic, fetchHourlyThroughput, fetchFunnel } from '../api/client';
 
-/* ── helpers ─────────────────────────────── */
-
-const CHART_COLORS = ['#22C55E', '#3B82F6', '#8B5CF6', '#F59E0B', '#EF4444', '#06B6D4', '#EC4899', '#F97316'];
-
-const TOOLTIP_STYLE = {
-  contentStyle: {
-    backgroundColor: '#1E1E1E',
-    border: '1px solid #2A2A2A',
-    borderRadius: '6px',
-    fontSize: '12px',
-  },
-  itemStyle: { color: '#fff', fontSize: '12px' },
+const C = ['#22C55E','#3B82F6','#A855F7','#F59E0B','#EF4444','#06B6D4','#EC4899','#F97316'];
+const TIP = {
+  contentStyle: { backgroundColor:'#101010', border:'1px solid #2E2E2E', borderRadius:3, fontSize:11, fontFamily:"'IBM Plex Mono',monospace", padding:'6px 8px' },
+  itemStyle: { color:'#E0E0E0', fontSize:11, fontFamily:"'IBM Plex Mono',monospace" },
 };
+const AX = { fill:'#454545', fontSize:10, fontFamily:"'IBM Plex Mono',monospace" };
+const GR = { strokeDasharray:'2 6', stroke:'rgba(255,255,255,.03)', vertical:false as const };
 
-const fmt = (n: number | null | undefined): string => {
-  if (n == null) return '--';
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`;
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-};
+const fmt = (n: number|null|undefined) => { if(n==null) return '--'; if(n>=1e9) return `${(n/1e9).toFixed(1)}B`; if(n>=1e6) return `${(n/1e6).toFixed(1)}M`; if(n>=1e3) return `${(n/1e3).toFixed(1)}K`; return n.toLocaleString(); };
+const krw = (n: number|null|undefined) => { if(n==null) return '--'; if(n>=1e8) return `${(n/1e8).toFixed(1)}억`; if(n>=1e4) return `${(n/1e4).toFixed(0)}만`; return `₩${n.toLocaleString()}`; };
+const fresh = (s: number|null|undefined) => { if(s==null) return '--'; if(s<60) return `${s}s`; if(s<3600) return `${Math.floor(s/60)}m`; return `${Math.floor(s/3600)}h`; };
+const hm = (t: string) => { try{ return new Date(t).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); }catch{ return t; } };
 
-const fmtKRW = (n: number | null | undefined): string => {
-  if (n == null) return '--';
-  if (n >= 100_000_000) return `${(n / 100_000_000).toFixed(1)}억`;
-  if (n >= 10_000) return `${(n / 10_000).toFixed(0)}만`;
-  return `₩${n.toLocaleString()}`;
-};
-
-const fmtFresh = (sec: number | null | undefined): string => {
-  if (sec == null) return '--';
-  if (sec < 60) return `${sec}초`;
-  if (sec < 3600) return `${Math.floor(sec / 60)}분`;
-  return `${Math.floor(sec / 3600)}시간`;
-};
-
-const fmtTime = (t: string) => {
-  try {
-    return new Date(t).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-  } catch {
-    return t;
-  }
-};
-
-/* ── component ───────────────────────────── */
+function Sk({ h=240 }: { h?: number }) { return <div className="sk" style={{ width:'100%', height:h }} />; }
 
 export default function OverviewPage() {
-  const { data: summary } = useQuery({
-    queryKey: ['summary'],
-    queryFn: fetchSummary,
-    refetchInterval: 30_000,
-  });
+  const { data: sum, isLoading: sl } = useQuery({ queryKey:['summary'], queryFn:fetchSummary, refetchInterval:30_000 });
+  const { data: traffic=[], isLoading: tl } = useQuery<Record<string,unknown>[]>({ queryKey:['hourly-traffic'], queryFn:fetchHourlyTraffic, refetchInterval:30_000 });
+  const { data: thru=[], isLoading: hl } = useQuery<{hour:string;total_orders:number}[]>({ queryKey:['hourly-throughput'], queryFn:fetchHourlyThroughput, refetchInterval:30_000 });
+  const { data: fun, isLoading: fl } = useQuery<{page_view:number;add_to_cart:number;purchase:number;conversion_rate:number}>({ queryKey:['funnel'], queryFn:fetchFunnel, refetchInterval:30_000 });
 
-  const { data: hourlyTraffic = [] } = useQuery<Record<string, unknown>[]>({
-    queryKey: ['hourly-traffic'],
-    queryFn: fetchHourlyTraffic,
-    refetchInterval: 30_000,
-  });
-
-  const { data: hourlyThroughput = [] } = useQuery<{ hour: string; total_orders: number }[]>({
-    queryKey: ['hourly-throughput'],
-    queryFn: fetchHourlyThroughput,
-    refetchInterval: 30_000,
-  });
-
-  const { data: funnelRaw } = useQuery<{
-    page_view: number;
-    add_to_cart: number;
-    purchase: number;
-    conversion_rate: number;
-  }>({
-    queryKey: ['funnel'],
-    queryFn: fetchFunnel,
-    refetchInterval: 30_000,
-  });
-
-  /* derive categories from traffic data (dynamic keys) */
-  const categories = Array.from(
-    new Set(
-      hourlyTraffic.flatMap((row) =>
-        Object.keys(row).filter((k) => k !== 'time'),
-      ),
-    ),
-  );
-
-  /* major categories only (hide tiny ones like "Accessories", "Shoes" etc.) */
-  const majorCategories = categories.filter((cat) => {
-    const total = hourlyTraffic.reduce(
-      (sum, row) => sum + ((row[cat] as number) ?? 0),
-      0,
-    );
-    return total > 1000;
-  });
-
-  /* throughput average */
-  const avgOrders =
-    hourlyThroughput.length > 0
-      ? Math.round(
-          hourlyThroughput.reduce((s, r) => s + (r.total_orders ?? 0), 0) /
-            hourlyThroughput.length,
-        )
-      : 0;
-
-  /* funnel steps */
-  const funnel = funnelRaw
-    ? [
-        { step: '페이지 조회', count: funnelRaw.page_view ?? 0, color: '#22C55E' },
-        { step: '장바구니', count: funnelRaw.add_to_cart ?? 0, color: '#3B82F6' },
-        { step: '구매', count: funnelRaw.purchase ?? 0, color: '#8B5CF6' },
-      ]
-    : [];
-  const maxFunnel = funnel.length > 0 ? Math.max(...funnel.map((f) => f.count)) : 1;
+  const cats = Array.from(new Set(traffic.flatMap(r=>Object.keys(r).filter(k=>k!=='time'))));
+  const major = cats.filter(c=>traffic.reduce((s,r)=>s+((r[c] as number)??0),0)>1000);
+  const avg = thru.length>0 ? Math.round(thru.reduce((s,r)=>s+(r.total_orders??0),0)/thru.length) : 0;
+  const funnel = fun ? [
+    {step:'페이지 조회',count:fun.page_view??0,color:'#22C55E'},
+    {step:'장바구니',count:fun.add_to_cart??0,color:'#3B82F6'},
+    {step:'구매',count:fun.purchase??0,color:'#A855F7'},
+  ] : [];
+  const maxF = funnel.length>0 ? Math.max(...funnel.map(f=>f.count)) : 1;
 
   return (
     <div>
-      {/* ── KPI ── */}
-      <div className="kpi-grid">
-        <div className="stat-card">
-          <div className="stat-label"><Layers size={14} /> 총 처리 이벤트</div>
-          <div className="stat-value">{fmt(summary?.total_events)}</div>
-          <div className="stat-sub">전체 누적</div>
+      {sl ? (
+        <div className="m4">{[0,1,2,3].map(i=><div key={i} className="mc"><Sk h={48}/></div>)}</div>
+      ) : (
+        <div className="m4">
+          <div className="mc bl">
+            <div className="ml"><Layers size={12}/> TOTAL EVENTS</div>
+            <div className="mv">{fmt(sum?.total_events)}</div>
+            <div className="ms">전체 누적</div>
+          </div>
+          <div className="mc">
+            <div className="ml"><Zap size={12}/> 24H THROUGHPUT</div>
+            <div className="mv g">{fmt(sum?.today_events)}</div>
+            <div className="ms">오늘 이벤트</div>
+          </div>
+          <div className="mc yl">
+            <div className="ml"><DollarSign size={12}/> 24H REVENUE</div>
+            <div className="mv">{krw(sum?.today_revenue)}</div>
+            <div className="ms">오늘 매출</div>
+          </div>
+          <div className="mc cy">
+            <div className="ml"><Clock size={12}/> FRESHNESS</div>
+            <div className="mv g">{fresh(sum?.data_freshness_sec)}</div>
+            <div className="ms">최신 이벤트 기준</div>
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label"><Zap size={14} /> 24h 처리량</div>
-          <div className="stat-value accent">{fmt(summary?.today_events)}</div>
-          <div className="stat-sub">오늘 이벤트</div>
+      )}
+
+      <div className="g2">
+        <div className="pn">
+          <div className="ph"><Activity size={13}/><span className="pt">Category Traffic</span><span className="pm">24h</span></div>
+          <div className="pb">
+            {tl ? <Sk/> : traffic.length>0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={traffic}>
+                  <defs>{major.map((c,i)=>(<linearGradient key={c} id={`g-${c}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={C[i%C.length]} stopOpacity={.3}/><stop offset="100%" stopColor={C[i%C.length]} stopOpacity={0}/></linearGradient>))}</defs>
+                  <CartesianGrid {...GR}/>
+                  <XAxis dataKey="time" tick={AX} tickLine={false} axisLine={false} tickFormatter={hm}/>
+                  <YAxis tick={AX} tickLine={false} axisLine={false} tickFormatter={(v:number)=>fmt(v)}/>
+                  <Tooltip {...TIP} labelFormatter={(t)=>{try{return new Date(t as string).toLocaleString('ko-KR')}catch{return String(t)}}}/>
+                  {major.map((c,i)=>(<Area key={c} type="monotone" dataKey={c} stackId="1" stroke={C[i%C.length]} strokeWidth={1.5} fill={`url(#g-${c})`}/>))}
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : <div className="empty">데이터 없음</div>}
+          </div>
         </div>
-        <div className="stat-card">
-          <div className="stat-label"><DollarSign size={14} /> 24h 매출</div>
-          <div className="stat-value">{fmtKRW(summary?.today_revenue)}</div>
-          <div className="stat-sub">오늘 매출</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-label"><Clock size={14} /> 데이터 신선도</div>
-          <div className="stat-value accent">{fmtFresh(summary?.data_freshness_sec)}</div>
-          <div className="stat-sub">최신 이벤트 기준</div>
+        <div className="pn">
+          <div className="ph"><TrendingUp size={13}/><span className="pt">Hourly Throughput</span><span className="pm">avg {fmt(avg)}/h</span></div>
+          <div className="pb">
+            {hl ? <Sk/> : thru.length>0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={thru}>
+                  <CartesianGrid {...GR}/>
+                  <XAxis dataKey="hour" tick={AX} tickLine={false} axisLine={false} tickFormatter={hm}/>
+                  <YAxis tick={AX} tickLine={false} axisLine={false} tickFormatter={(v:number)=>fmt(v)}/>
+                  <Tooltip {...TIP} formatter={(v:number|undefined)=>[(v??0).toLocaleString(),'주문']} labelFormatter={(h)=>{try{return new Date(h as string).toLocaleString('ko-KR')}catch{return String(h)}}}/>
+                  {avg>0 && <ReferenceLine y={avg} stroke="#F59E0B" strokeDasharray="4 4" strokeOpacity={.5} label={{value:`avg ${fmt(avg)}`,fill:'#F59E0B',fontSize:10,fontFamily:"'IBM Plex Mono'"}}/>}
+                  <Line type="monotone" dataKey="total_orders" stroke="#22C55E" strokeWidth={2} dot={false} activeDot={{r:3,fill:'#22C55E',stroke:'#0E0E0E',strokeWidth:2}}/>
+                </LineChart>
+              </ResponsiveContainer>
+            ) : <div className="empty">데이터 없음</div>}
+          </div>
         </div>
       </div>
 
-      {/* ── Charts 2-col ── */}
-      <div className="chart-grid">
-        {/* Category Traffic AreaChart */}
-        <div className="card">
-          <div className="card-title">
-            <Activity size={16} />
-            카테고리별 트래픽 (24h)
+      {fl ? <div className="pn"><div className="ph"><span className="pt">Conversion Funnel</span></div><div className="pb"><Sk h={80}/></div></div>
+      : funnel.length>0 && (
+        <div className="pn">
+          <div className="ph">
+            <span className="pt">Conversion Funnel</span>
+            {fun?.conversion_rate!=null && <span className="pm" style={{color:'var(--accent)',fontWeight:600}}>CVR {fun.conversion_rate.toFixed(2)}%</span>}
           </div>
-          {hourlyTraffic.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={hourlyTraffic}>
-                <defs>
-                  {majorCategories.map((cat, i) => (
-                    <linearGradient key={cat} id={`grad-${cat}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0.4} />
-                      <stop offset="95%" stopColor={CHART_COLORS[i % CHART_COLORS.length]} stopOpacity={0} />
-                    </linearGradient>
-                  ))}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis
-                  dataKey="time"
-                  stroke="#666"
-                  tick={{ fill: '#666', fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={fmtTime}
-                />
-                <YAxis
-                  stroke="#666"
-                  tick={{ fill: '#666', fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v: number) => fmt(v)}
-                />
-                <Tooltip
-                  {...TOOLTIP_STYLE}
-                  labelFormatter={(t) => {
-                    try { return new Date(t as string).toLocaleString('ko-KR'); }
-                    catch { return String(t); }
-                  }}
-                />
-                {majorCategories.map((cat, i) => (
-                  <Area
-                    key={cat}
-                    type="monotone"
-                    dataKey={cat}
-                    stackId="1"
-                    stroke={CHART_COLORS[i % CHART_COLORS.length]}
-                    strokeWidth={1.5}
-                    fill={`url(#grad-${cat})`}
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="empty-state">데이터 없음</div>
-          )}
-        </div>
-
-        {/* Throughput LineChart */}
-        <div className="card">
-          <div className="card-title">
-            <TrendingUp size={16} />
-            시간별 처리량 (24h)
-          </div>
-          {hourlyThroughput.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={hourlyThroughput}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-                <XAxis
-                  dataKey="hour"
-                  stroke="#666"
-                  tick={{ fill: '#666', fontSize: 10 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={fmtTime}
-                />
-                <YAxis
-                  stroke="#666"
-                  tick={{ fill: '#666', fontSize: 11 }}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v: number) => fmt(v)}
-                />
-                <Tooltip
-                  {...TOOLTIP_STYLE}
-                  formatter={(value: number | undefined) => [
-                    (value ?? 0).toLocaleString(),
-                    '주문 건수',
-                  ]}
-                  labelFormatter={(h) => {
-                    try { return new Date(h as string).toLocaleString('ko-KR'); }
-                    catch { return String(h); }
-                  }}
-                />
-                {avgOrders > 0 && (
-                  <ReferenceLine
-                    y={avgOrders}
-                    stroke="#F59E0B"
-                    strokeDasharray="5 5"
-                    label={{ value: `평균 ${fmt(avgOrders)}`, fill: '#F59E0B', fontSize: 11 }}
-                  />
-                )}
-                <Line
-                  type="monotone"
-                  dataKey="total_orders"
-                  stroke="#22C55E"
-                  strokeWidth={2}
-                  name="주문 건수"
-                  dot={{ r: 2, fill: '#22C55E' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="empty-state">데이터 없음</div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Funnel ── */}
-      {funnel.length > 0 && (
-        <div className="card">
-          <div className="card-title">전환 퍼널</div>
-          <div className="funnel-bar-wrapper">
-            {funnel.map((step, idx) => {
-              const pct = maxFunnel > 0 ? (step.count / maxFunnel) * 100 : 0;
-              const convRate =
-                idx > 0 && funnel[idx - 1].count > 0
-                  ? ((step.count / funnel[idx - 1].count) * 100).toFixed(1)
-                  : null;
+          <div className="pb">
+            {funnel.map((f,i)=>{
+              const pct = maxF>0 ? (f.count/maxF)*100 : 0;
+              const cr = i>0&&funnel[i-1].count>0 ? ((f.count/funnel[i-1].count)*100).toFixed(1) : null;
               return (
-                <div className="funnel-row" key={step.step}>
-                  <span className="funnel-label">{step.step}</span>
-                  <div className="funnel-track">
-                    <div
-                      className="funnel-fill"
-                      style={{
-                        width: `${pct}%`,
-                        background: step.color,
-                      }}
-                    />
-                  </div>
-                  <span className="funnel-value">{fmt(step.count)}</span>
-                  <span className="funnel-pct">{convRate ? `${convRate}%` : ''}</span>
+                <div className="fn" key={f.step}>
+                  <span className="fn-l">{f.step}</span>
+                  <div className="fn-t"><div className="fn-f" style={{width:`${pct}%`,background:`linear-gradient(90deg,${f.color},${f.color}bb)`,boxShadow:`0 0 8px ${f.color}22`}}/></div>
+                  <span className="fn-v">{fmt(f.count)}</span>
+                  <span className="fn-p">{cr?`${cr}%`:''}</span>
                 </div>
               );
             })}
           </div>
-          {funnelRaw?.conversion_rate != null && (
-            <div style={{ marginTop: 12, fontSize: 13, color: '#A3A3A3' }}>
-              전체 전환율: <span style={{ color: '#22C55E', fontWeight: 600 }}>{funnelRaw.conversion_rate.toFixed(2)}%</span>
-            </div>
-          )}
         </div>
       )}
     </div>
