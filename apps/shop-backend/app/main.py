@@ -76,54 +76,58 @@ def read_root():
 
 @router.get("/summary")
 async def get_summary():
-    """파이프라인 개요: 총 처리 이벤트, 오늘 처리량, 오늘 매출, 데이터 신선도"""
+    """파이프라인 개요 + DoD 비교 (mart_daily_summary 활용)"""
     try:
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # 단일 쿼리로 24h 데이터만 집계 (인덱스 활용)
+        # 24h 집계 (speed layer)
         cur.execute("""
-            SELECT
-                COALESCE(SUM(event_count), 0) as today_events,
-                COALESCE(SUM(total_revenue), 0) as today_revenue
-            FROM dq_category_hourly
-            WHERE hour >= NOW() - INTERVAL '24 hours'
+            SELECT COALESCE(SUM(event_count),0), COALESCE(SUM(total_revenue),0)
+            FROM dq_category_hourly WHERE hour >= NOW() - INTERVAL '24 hours'
         """)
         row = cur.fetchone()
-        today_events = row[0] or 0
+        today_events = int(row[0] or 0)
         today_revenue = float(row[1] or 0)
 
-        # Total events는 approximate (pg_stat 활용)
-        cur.execute("""
-            SELECT reltuples::bigint FROM pg_class WHERE relname = 'dq_category_hourly'
-        """)
-        total_events = cur.fetchone()[0] or 0
+        # Total events approximate
+        cur.execute("SELECT reltuples::bigint FROM pg_class WHERE relname = 'dq_category_hourly'")
+        total_events = int(cur.fetchone()[0] or 0)
 
-        # Data freshness (최근 created_at만 — 인덱스 활용)
-        cur.execute("""
-            SELECT EXTRACT(EPOCH FROM (NOW() - created_at))
-            FROM shop_hourly_sales_log ORDER BY created_at DESC LIMIT 1
-        """)
-        freshness_row = cur.fetchone()
-        data_freshness_sec = int(freshness_row[0]) if freshness_row and freshness_row[0] else None
+        # Data freshness
+        cur.execute("SELECT EXTRACT(EPOCH FROM (NOW()-created_at)) FROM shop_hourly_sales_log ORDER BY created_at DESC LIMIT 1")
+        fr = cur.fetchone()
+        data_freshness_sec = int(fr[0]) if fr and fr[0] else None
+
+        # DoD 비교: mart_daily_summary 최근 2일
+        cur.execute("SELECT date,total_revenue,total_orders,avg_order_value,top_category FROM mart_daily_summary ORDER BY date DESC LIMIT 2")
+        mart = cur.fetchall()
+        avg_order_value = float(mart[0][3]) if mart and mart[0][3] else None
+        top_category = mart[0][4] if mart else None
+        dod_revenue_pct = None
+        dod_orders_pct = None
+        if len(mart) >= 2:
+            cr, pr = float(mart[0][1]), float(mart[1][1])
+            co, po = int(mart[0][2]), int(mart[1][2])
+            if pr > 0:
+                dod_revenue_pct = round((cr - pr) / pr * 100, 1)
+            if po > 0:
+                dod_orders_pct = round((co - po) / po * 100, 1)
 
         cur.close()
         conn.close()
-
         return {
-            "total_events": int(total_events),
-            "today_events": int(today_events),
-            "today_revenue": round(today_revenue, 0),
-            "data_freshness_sec": data_freshness_sec
+            "total_events": total_events, "today_events": today_events,
+            "today_revenue": round(today_revenue, 0), "data_freshness_sec": data_freshness_sec,
+            "avg_order_value": avg_order_value, "top_category": top_category,
+            "dod_revenue_pct": dod_revenue_pct, "dod_orders_pct": dod_orders_pct,
         }
     except Exception as e:
         logger.error(f"summary failed: {e}")
         return {
-            "total_events": 0,
-            "today_events": 0,
-            "today_revenue": 0,
-            "data_freshness_sec": None,
-            "error": str(e)
+            "total_events": 0, "today_events": 0, "today_revenue": 0,
+            "data_freshness_sec": None, "avg_order_value": None, "top_category": None,
+            "dod_revenue_pct": None, "dod_orders_pct": None, "error": str(e),
         }
 
 @router.get("/hourly-traffic")
@@ -583,6 +587,208 @@ async def get_weekly_trend(weeks: int = 8):
     except Exception as e:
         logger.error(f"mart/weekly-trend failed: {e}")
         return []
+
+
+@router.get("/mart/daily-trend")
+async def get_daily_trend():
+    """7일 일별 요약 + DoD% — KPI 스파크라인 용도"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT date, total_revenue, total_orders, avg_order_value,
+                ROUND(((total_revenue - LAG(total_revenue) OVER (ORDER BY date))
+                    / NULLIF(LAG(total_revenue) OVER (ORDER BY date), 0) * 100)::numeric, 1) as dod_pct
+            FROM mart_daily_summary
+            ORDER BY date DESC LIMIT 8
+        """)
+        rows = cur.fetchall()
+        for r in rows:
+            r['date'] = r['date'].isoformat()
+            r['total_revenue'] = float(r['total_revenue'] or 0)
+            r['total_orders'] = int(r['total_orders'] or 0)
+            r['avg_order_value'] = round(float(r['avg_order_value'] or 0), 1)
+            r['dod_pct'] = float(r['dod_pct']) if r['dod_pct'] is not None else None
+        cur.close()
+        conn.close()
+        return list(reversed(rows))
+    except Exception as e:
+        logger.error(f"mart/daily-trend failed: {e}")
+        return []
+
+
+@router.get("/mart/weekly-summary")
+async def get_weekly_summary():
+    """이번주 vs 지난주 요약 + WoW%"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("""
+            WITH weekly AS (
+                SELECT week_start, SUM(total_revenue) as revenue, SUM(order_count) as orders
+                FROM mart_weekly_sales GROUP BY week_start ORDER BY week_start DESC LIMIT 2
+            )
+            SELECT week_start, revenue, orders,
+                LAG(revenue) OVER (ORDER BY week_start) as prev_revenue,
+                LAG(orders) OVER (ORDER BY week_start) as prev_orders
+            FROM weekly ORDER BY week_start DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            cur.close()
+            conn.close()
+            return {}
+        rev, orders = float(row[1]), int(row[2])
+        prev_rev = float(row[3]) if row[3] else None
+        prev_ord = int(row[4]) if row[4] else None
+
+        # 이번주 베스트 카테고리
+        cur.execute("""
+            SELECT category, total_revenue FROM mart_weekly_sales
+            WHERE week_start = (SELECT MAX(week_start) FROM mart_weekly_sales)
+            ORDER BY total_revenue DESC LIMIT 1
+        """)
+        best = cur.fetchone()
+        cur.close()
+        conn.close()
+
+        return {
+            "week_start": row[0].isoformat(),
+            "revenue": rev, "orders": orders,
+            "wow_revenue_pct": round((rev - prev_rev) / prev_rev * 100, 1) if prev_rev and prev_rev > 0 else None,
+            "wow_orders_pct": round((orders - prev_ord) / prev_ord * 100, 1) if prev_ord and prev_ord > 0 else None,
+            "best_category": best[0] if best else None,
+            "best_category_revenue": float(best[1]) if best else None,
+            "total_week_revenue": rev,
+        }
+    except Exception as e:
+        logger.error(f"mart/weekly-summary failed: {e}")
+        return {}
+
+
+@router.get("/mart/funnel-trend")
+async def get_funnel_trend():
+    """일별 퍼널 전환율 (shop_funnel_stats_log 집계)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT
+                DATE(window_start + INTERVAL '9 hours') as date,
+                SUM(total_sessions) as sessions,
+                SUM(view_count) as views,
+                SUM(cart_count) as carts,
+                SUM(purchase_count) as purchases,
+                ROUND((SUM(cart_count)::numeric / NULLIF(SUM(view_count),0) * 100)::numeric, 1) as cart_rate,
+                ROUND((SUM(purchase_count)::numeric / NULLIF(SUM(cart_count),0) * 100)::numeric, 1) as purchase_rate,
+                ROUND((SUM(purchase_count)::numeric / NULLIF(SUM(total_sessions),0) * 100)::numeric, 1) as overall_cvr
+            FROM shop_funnel_stats_log
+            WHERE window_start >= NOW() - INTERVAL '7 days'
+            GROUP BY DATE(window_start + INTERVAL '9 hours')
+            ORDER BY date
+        """)
+        rows = cur.fetchall()
+        for r in rows:
+            r['date'] = r['date'].isoformat()
+            for k in ['sessions','views','carts','purchases']:
+                r[k] = int(r[k] or 0)
+            for k in ['cart_rate','purchase_rate','overall_cvr']:
+                r[k] = float(r[k]) if r[k] is not None else 0
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"mart/funnel-trend failed: {e}")
+        return []
+
+
+@router.get("/mart/category-ranking")
+async def get_category_ranking():
+    """카테고리 매출 랭킹 + WoW% 비교"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            WITH latest_week AS (SELECT MAX(week_start) as ws FROM mart_weekly_sales),
+            this_week AS (
+                SELECT category, total_revenue, order_count
+                FROM mart_weekly_sales WHERE week_start = (SELECT ws FROM latest_week)
+            ),
+            last_week AS (
+                SELECT category, total_revenue, order_count
+                FROM mart_weekly_sales WHERE week_start = (SELECT ws FROM latest_week) - INTERVAL '7 days'
+            )
+            SELECT t.category, t.total_revenue as revenue, t.order_count as orders,
+                ROUND(((t.total_revenue - COALESCE(l.total_revenue,0))
+                    / NULLIF(l.total_revenue,0) * 100)::numeric, 1) as wow_pct
+            FROM this_week t LEFT JOIN last_week l ON t.category = l.category
+            ORDER BY t.total_revenue DESC
+        """)
+        rows = cur.fetchall()
+        total = sum(float(r['revenue'] or 0) for r in rows)
+        for r in rows:
+            r['revenue'] = float(r['revenue'] or 0)
+            r['orders'] = int(r['orders'] or 0)
+            r['wow_pct'] = float(r['wow_pct']) if r['wow_pct'] is not None else None
+            r['share_pct'] = round(r['revenue'] / total * 100, 1) if total > 0 else 0
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"mart/category-ranking failed: {e}")
+        return []
+
+
+@router.get("/dq/overview")
+async def get_dq_overview():
+    """DQ 통합 요약 — 스코어 + 어제 비교 + anomaly 카운트"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # 최근 2일 DQ 스코어
+        cur.execute("SELECT date,total_score,completeness_score,validity_score,timeliness_score FROM dq_daily_score ORDER BY date DESC LIMIT 2")
+        scores = cur.fetchall()
+        today_score = None
+        yesterday_score = None
+        score_detail = {}
+        if scores:
+            today_score = int(scores[0][1])
+            score_detail = {"completeness": int(scores[0][2]), "validity": int(scores[0][3]), "timeliness": int(scores[0][4])}
+        if len(scores) >= 2:
+            yesterday_score = int(scores[1][1])
+
+        # severity별 24h anomaly 카운트
+        cur.execute("SELECT severity, COUNT(*) FROM dq_anomaly_log WHERE detected_at >= NOW() - INTERVAL '24 hours' GROUP BY severity")
+        sev = {r[0]: int(r[1]) for r in cur.fetchall()}
+
+        # 미해결 anomaly 수
+        cur.execute("SELECT COUNT(*) FROM dq_anomaly_log WHERE resolved = FALSE")
+        unresolved = int(cur.fetchone()[0])
+
+        # 최대 reconciliation diff
+        cur.execute("""
+            WITH diffs AS (
+                SELECT hour, ABS(c.total - p.total)::float / GREATEST(c.total, p.total, 1) * 100 as diff_pct
+                FROM (SELECT hour, SUM(purchase_count) as total FROM dq_category_hourly WHERE hour >= NOW()-INTERVAL '24 hours' GROUP BY hour) c
+                JOIN (SELECT hour, SUM(purchase_count) as total FROM dq_payment_hourly WHERE hour >= NOW()-INTERVAL '24 hours' GROUP BY hour) p USING(hour)
+            ) SELECT ROUND(MAX(diff_pct)::numeric, 1) FROM diffs
+        """)
+        max_diff_row = cur.fetchone()
+        max_diff = float(max_diff_row[0]) if max_diff_row and max_diff_row[0] else 0
+
+        cur.close()
+        conn.close()
+        return {
+            "score": today_score, "prev_score": yesterday_score,
+            "score_change": today_score - yesterday_score if today_score and yesterday_score else None,
+            "detail": score_detail,
+            "anomalies_24h": sev, "unresolved": unresolved,
+            "max_diff_pct": max_diff,
+        }
+    except Exception as e:
+        logger.error(f"dq/overview failed: {e}")
+        return {"score": None, "prev_score": None, "score_change": None, "detail": {}, "anomalies_24h": {}, "unresolved": 0, "max_diff_pct": 0}
 
 
 @admin_router.post("/login")

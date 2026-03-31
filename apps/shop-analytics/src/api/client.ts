@@ -1,9 +1,6 @@
 import axios from 'axios';
 
-const api = axios.create({
-  baseURL: '/api/analytics',
-  timeout: 10_000,
-});
+const api = axios.create({ baseURL: '/api/analytics', timeout: 10_000 });
 
 /* ===== Overview ===== */
 
@@ -27,7 +24,22 @@ export const fetchFunnel = async () => {
   return data;
 };
 
+export const fetchDailyTrend = async () => {
+  const { data } = await api.get('/mart/daily-trend');
+  return data;
+};
+
+export const fetchFunnelTrend = async () => {
+  const { data } = await api.get('/mart/funnel-trend');
+  return data;
+};
+
 /* ===== DQ ===== */
+
+export const fetchDQOverview = async () => {
+  const { data } = await api.get('/dq/overview');
+  return data;
+};
 
 export const fetchDQScoreTrend = async () => {
   const { data } = await api.get('/dq/score-trend');
@@ -39,30 +51,25 @@ export const fetchDQReconciliation = async () => {
   return data;
 };
 
-export const fetchDQAnomalyRawCount = async () => {
-  const { data } = await api.get('/dq/anomaly-raw-count');
-  return data;
-};
-
-export const fetchDQCategoryHealth = async () => {
-  const { data } = await api.get('/dq/category-health');
-  return data;
-};
-
-export const fetchDQRulesSummary = async () => {
-  const { data } = await api.get('/dq/rules-summary');
-  return data;
-};
-
 export const fetchDQAnomalies = async () => {
   const { data } = await api.get('/dq/anomalies');
   return data;
 };
 
+export const fetchDQAnomalyRawCount = async () => {
+  const { data } = await api.get('/dq/anomaly-raw-count');
+  return data;
+};
+
 /* ===== Mart ===== */
 
-export const fetchMartDailySales = async (days = 7) => {
-  const { data } = await api.get('/mart/daily-sales', { params: { days } });
+export const fetchWeeklySummary = async () => {
+  const { data } = await api.get('/mart/weekly-summary');
+  return data;
+};
+
+export const fetchCategoryRanking = async () => {
+  const { data } = await api.get('/mart/category-ranking');
   return data;
 };
 
@@ -71,7 +78,7 @@ export const fetchMartRFM = async () => {
   return data;
 };
 
-export const fetchMartAssociation = async (limit = 10) => {
+export const fetchMartAssociation = async (limit = 5) => {
   const { data } = await api.get('/mart/product-association', { params: { limit } });
   return data;
 };
