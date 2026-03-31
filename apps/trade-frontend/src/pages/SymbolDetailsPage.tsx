@@ -1,8 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { fetchAnalysisInfo, fetchTicker, fetchExchangeRate } from '../api/client';
+import { fetchAnalysisInfo, fetchTicker, fetchExchangeRate, fetchNetworkInfo } from '../api/client';
 import ChartWrapper from '../components/ChartWrapper';
-import { ArrowLeft, Clock, Coins, Activity, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Clock, Coins, Activity, BarChart3, Zap } from 'lucide-react';
 
 export default function SymbolDetailsPage() {
     const { symbol } = useParams<{ symbol: string }>();
@@ -25,6 +25,12 @@ export default function SymbolDetailsPage() {
         queryKey: ['exchangeRate'],
         queryFn: fetchExchangeRate,
         staleTime: 3600000
+    });
+
+    const { data: networkInfo } = useQuery({
+        queryKey: ['networkInfo', safeSymbol],
+        queryFn: () => fetchNetworkInfo(safeSymbol),
+        staleTime: 86400000
     });
 
     const price = ticker ? parseFloat(ticker.lastPrice) : 0;
@@ -177,6 +183,29 @@ export default function SymbolDetailsPage() {
                                 </div>
                                 <div className="progress">
                                     <div className="progress-fill" style={{ width: `${Math.min(info.unlock_percent, 100)}%` }} />
+                                </div>
+                            </>
+                        ) : (
+                            <div className="stat-sub">데이터 없음</div>
+                        )}
+                    </div>
+
+                    {/* 6. Transfer Speed */}
+                    <div className="stat-card">
+                        <div className="stat-label">
+                            <Zap size={14} />
+                            <span>전송속도</span>
+                        </div>
+                        {networkInfo?.fastest_network ? (
+                            <>
+                                <div className="stat-value" style={{
+                                    color: networkInfo.speed === 'fast' ? '#26a69a'
+                                        : networkInfo.speed === 'medium' ? '#ffb74d' : '#ef5350'
+                                }}>
+                                    ~{networkInfo.est_minutes < 1 ? '<1' : networkInfo.est_minutes}분
+                                </div>
+                                <div className="stat-sub">
+                                    {networkInfo.fastest_network} 기준
                                 </div>
                             </>
                         ) : (

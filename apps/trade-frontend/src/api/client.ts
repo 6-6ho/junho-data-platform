@@ -63,6 +63,12 @@ export const fetchExchangeRate = async () => {
   return data;
 };
 
+// Network transfer speed
+export const fetchNetworkInfo = async (symbol: string) => {
+  const { data } = await api.get(`/analysis/networks/${symbol}`);
+  return data;
+};
+
 // Ticker (for Watchlist)
 export const fetchTicker = async (symbol: string) => {
   const { data } = await api.get('/klines/ticker', { params: { symbol } });

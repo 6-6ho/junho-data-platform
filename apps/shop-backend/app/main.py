@@ -81,29 +81,28 @@ async def get_summary():
         conn = get_db_connection()
         cur = conn.cursor()
 
-        # Total processed events (all categories across all time)
-        cur.execute("SELECT COALESCE(SUM(event_count), 0) FROM dq_category_hourly")
-        total_events = cur.fetchone()[0] or 0
-
-        # Today's throughput
+        # 단일 쿼리로 24h 데이터만 집계 (인덱스 활용)
         cur.execute("""
-            SELECT COALESCE(SUM(event_count), 0) FROM dq_category_hourly
+            SELECT
+                COALESCE(SUM(event_count), 0) as today_events,
+                COALESCE(SUM(total_revenue), 0) as today_revenue
+            FROM dq_category_hourly
             WHERE hour >= NOW() - INTERVAL '24 hours'
         """)
-        today_events = cur.fetchone()[0] or 0
+        row = cur.fetchone()
+        today_events = row[0] or 0
+        today_revenue = float(row[1] or 0)
 
-        # Today's revenue (24h)
+        # Total events는 approximate (pg_stat 활용)
         cur.execute("""
-            SELECT COALESCE(SUM(total_revenue), 0)
-            FROM shop_hourly_sales_log
-            WHERE window_start >= NOW() - INTERVAL '24 hours'
+            SELECT reltuples::bigint FROM pg_class WHERE relname = 'dq_category_hourly'
         """)
-        today_revenue = float(cur.fetchone()[0] or 0)
+        total_events = cur.fetchone()[0] or 0
 
-        # Data freshness (seconds since last data arrival)
+        # Data freshness (최근 created_at만 — 인덱스 활용)
         cur.execute("""
-            SELECT EXTRACT(EPOCH FROM (NOW() - MAX(created_at)))
-            FROM shop_hourly_sales_log
+            SELECT EXTRACT(EPOCH FROM (NOW() - created_at))
+            FROM shop_hourly_sales_log ORDER BY created_at DESC LIMIT 1
         """)
         freshness_row = cur.fetchone()
         data_freshness_sec = int(freshness_row[0]) if freshness_row and freshness_row[0] else None
@@ -483,6 +482,108 @@ def get_latest_report(date: str = None):
         return {"error": str(e)}
     finally:
         conn.close()
+
+@router.get("/mart/rfm-distribution")
+async def get_rfm_distribution():
+    """RFM 세그먼트별 사용자 분포"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT rfm_segment as segment, COUNT(*) as user_count
+            FROM mart_user_rfm
+            GROUP BY segment
+            ORDER BY user_count DESC
+        """)
+        rows = cur.fetchall()
+        for r in rows:
+            r['user_count'] = int(r['user_count'])
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"mart/rfm-distribution failed: {e}")
+        return []
+
+
+@router.get("/mart/product-association")
+async def get_product_association(limit: int = 10):
+    """상품 연관 규칙 (lift 기준 상위 N개)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT antecedents, consequents, confidence, lift, support
+            FROM mart_product_association
+            ORDER BY lift DESC
+            LIMIT %s
+        """, (limit,))
+        rows = cur.fetchall()
+        for r in rows:
+            r['confidence'] = float(r['confidence'])
+            r['lift'] = float(r['lift'])
+            r['support'] = float(r['support'])
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"mart/product-association failed: {e}")
+        return []
+
+
+@router.get("/mart/daily-sales")
+async def get_daily_sales(days: int = 7):
+    """일별 매출 집계 (mart 테이블)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT date, category, total_revenue as revenue,
+                   order_count as orders, avg_order_value as avg_value
+            FROM mart_daily_sales
+            WHERE date >= CURRENT_DATE - make_interval(days => %s)
+            ORDER BY date DESC, revenue DESC
+        """, (days,))
+        rows = cur.fetchall()
+        for r in rows:
+            r['date'] = r['date'].isoformat() if hasattr(r['date'], 'isoformat') else str(r['date'])
+            r['revenue'] = round(float(r['revenue']), 2)
+            r['orders'] = int(r['orders'])
+            r['avg_value'] = round(float(r['avg_value']), 2)
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"mart/daily-sales failed: {e}")
+        return []
+
+
+@router.get("/mart/weekly-trend")
+async def get_weekly_trend(weeks: int = 8):
+    """주별 매출 트렌드 (mart 테이블)"""
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute("""
+            SELECT week_start as week,
+                   SUM(total_revenue) as revenue, SUM(order_count) as orders
+            FROM mart_weekly_sales
+            WHERE week_start >= CURRENT_DATE - make_interval(weeks => %s)
+            GROUP BY week_start
+            ORDER BY week DESC
+        """, (weeks,))
+        rows = cur.fetchall()
+        for r in rows:
+            r['week'] = r['week'].isoformat() if hasattr(r['week'], 'isoformat') else str(r['week'])
+            r['revenue'] = round(float(r['revenue']), 2)
+            r['orders'] = int(r['orders'])
+        cur.close()
+        conn.close()
+        return rows
+    except Exception as e:
+        logger.error(f"mart/weekly-trend failed: {e}")
+        return []
+
 
 @admin_router.post("/login")
 def admin_login(req: LoginRequest):

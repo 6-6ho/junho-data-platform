@@ -28,6 +28,57 @@ MAJOR_COIN_IDS = {
     "etc": "ethereum-classic"
 }
 
+# Extended CoinGecko ID mapping for network lookups
+COINGECKO_IDS = {
+    **MAJOR_COIN_IDS,
+    "avax": "avalanche-2", "atom": "cosmos", "near": "near",
+    "apt": "aptos", "sui": "sui", "arb": "arbitrum",
+    "op": "optimism", "ftm": "fantom", "fil": "filecoin",
+    "shib": "shiba-inu", "pepe": "pepe", "sei": "sei-network",
+    "inj": "injective-protocol", "stx": "blockstack",
+}
+
+# Network transfer speed reference (est times in minutes)
+NETWORK_SPEED = {
+    "bitcoin": {"name": "Bitcoin", "est_min": 10, "est_max": 60, "speed": "slow"},
+    "ethereum": {"name": "Ethereum (ERC20)", "est_min": 3, "est_max": 7, "speed": "medium"},
+    "binance-smart-chain": {"name": "BSC (BEP20)", "est_min": 1, "est_max": 3, "speed": "fast"},
+    "tron": {"name": "Tron (TRC20)", "est_min": 1, "est_max": 3, "speed": "fast"},
+    "solana": {"name": "Solana", "est_min": 0.5, "est_max": 2, "speed": "fast"},
+    "polygon-pos": {"name": "Polygon", "est_min": 1, "est_max": 3, "speed": "fast"},
+    "arbitrum-one": {"name": "Arbitrum", "est_min": 1, "est_max": 5, "speed": "fast"},
+    "optimistic-ethereum": {"name": "Optimism", "est_min": 1, "est_max": 7, "speed": "medium"},
+    "avalanche": {"name": "Avalanche (C-Chain)", "est_min": 1, "est_max": 3, "speed": "fast"},
+    "base": {"name": "Base", "est_min": 1, "est_max": 5, "speed": "fast"},
+    "near-protocol": {"name": "NEAR", "est_min": 1, "est_max": 2, "speed": "fast"},
+    "cardano": {"name": "Cardano", "est_min": 2, "est_max": 10, "speed": "medium"},
+    "polkadot": {"name": "Polkadot", "est_min": 1, "est_max": 5, "speed": "medium"},
+    "cosmos": {"name": "Cosmos (IBC)", "est_min": 1, "est_max": 5, "speed": "fast"},
+    "ripple": {"name": "XRP Ledger", "est_min": 0.1, "est_max": 1, "speed": "fast"},
+    "stellar": {"name": "Stellar", "est_min": 0.1, "est_max": 1, "speed": "fast"},
+    "litecoin": {"name": "Litecoin", "est_min": 5, "est_max": 30, "speed": "medium"},
+    "dogecoin": {"name": "Dogecoin", "est_min": 5, "est_max": 20, "speed": "medium"},
+    "aptos": {"name": "Aptos", "est_min": 0.5, "est_max": 2, "speed": "fast"},
+    "sui": {"name": "Sui", "est_min": 0.5, "est_max": 2, "speed": "fast"},
+    "fantom": {"name": "Fantom", "est_min": 1, "est_max": 3, "speed": "fast"},
+    "ethereum-classic": {"name": "Ethereum Classic", "est_min": 10, "est_max": 30, "speed": "slow"},
+    "bitcoin-cash": {"name": "Bitcoin Cash", "est_min": 5, "est_max": 30, "speed": "medium"},
+}
+
+# Map coin symbol to its native chain platform ID
+NATIVE_CHAIN_MAP = {
+    "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
+    "xrp": "ripple", "doge": "dogecoin", "ada": "cardano",
+    "bnb": "binance-smart-chain", "dot": "polkadot", "trx": "tron",
+    "ltc": "litecoin", "xlm": "stellar", "avax": "avalanche",
+    "atom": "cosmos", "near": "near-protocol", "apt": "aptos",
+    "sui": "sui", "ftm": "fantom", "matic": "polygon-pos",
+    "etc": "ethereum-classic", "bch": "bitcoin-cash",
+}
+
+# Cache for network info (24h TTL)
+network_info_cache = TTLCache(maxsize=200, ttl=86400)
+
 
 async def get_usd_krw_rate():
     """Get USD to KRW exchange rate."""
@@ -274,6 +325,63 @@ async def get_market_overview():
             }
         except httpx.HTTPError as e:
             raise HTTPException(status_code=502, detail="Failed to fetch market overview")
+
+
+@router.get("/networks/{symbol}")
+async def get_network_info(symbol: str):
+    """Get available transfer networks and fastest estimated time for a coin."""
+    base = symbol.replace("USDT", "").lower()
+
+    if base in network_info_cache:
+        return network_info_cache[base]
+
+    cg_id = COINGECKO_IDS.get(base, base)
+    networks = []
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        try:
+            resp = await client.get(
+                f"https://api.coingecko.com/api/v3/coins/{cg_id}",
+                params={"localization": "false", "tickers": "false",
+                        "market_data": "false", "community_data": "false",
+                        "developer_data": "false"},
+            )
+            if resp.status_code == 200:
+                detail_platforms = resp.json().get("detail_platforms", {})
+                seen = set()
+                for platform_id in detail_platforms:
+                    if platform_id == "":
+                        native = NATIVE_CHAIN_MAP.get(base)
+                        if native and native in NETWORK_SPEED and native not in seen:
+                            networks.append({**NETWORK_SPEED[native], "network": native, "native": True})
+                            seen.add(native)
+                    elif platform_id in NETWORK_SPEED and platform_id not in seen:
+                        networks.append({**NETWORK_SPEED[platform_id], "network": platform_id, "native": False})
+                        seen.add(platform_id)
+        except Exception as e:
+            logger.warning(f"Failed to fetch network info for {symbol}: {e}")
+
+    # Fallback: native chain only
+    if not networks:
+        native = NATIVE_CHAIN_MAP.get(base)
+        if native and native in NETWORK_SPEED:
+            networks.append({**NETWORK_SPEED[native], "network": native, "native": True})
+
+    # Sort by speed (fastest first)
+    speed_order = {"fast": 0, "medium": 1, "slow": 2}
+    networks.sort(key=lambda n: (speed_order.get(n["speed"], 3), n["est_min"]))
+
+    fastest = networks[0] if networks else None
+    result = {
+        "symbol": symbol,
+        "coin": base.upper(),
+        "fastest_network": fastest["name"] if fastest else None,
+        "est_minutes": fastest["est_min"] if fastest else None,
+        "speed": fastest["speed"] if fastest else None,
+        "networks": networks,
+    }
+    network_info_cache[base] = result
+    return result
 
 
 @router.get("/symbols")
