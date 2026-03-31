@@ -21,8 +21,8 @@ const SERVICES = [
   { id: 'spark-cluster', name: 'Spark Cluster', node: 'desktop', domain: 'infra', type: 'compute', desc: 'Master + Worker×2 (7cores/7GB). Standalone.', cpu: '6.5', mem: '8.5G' },
   { id: 'airflow', name: 'Airflow', node: 'desktop', domain: 'infra', type: 'orchestrator', desc: 'LocalExecutor. 12 DAG. parallelism=4.', cpu: '1.0', mem: '1.5G' },
   { id: 'minio', name: 'MinIO', node: 'desktop', domain: 'infra', type: 'storage', desc: 'S3 호환. raw/checkpoints/iceberg-warehouse.', cpu: '0.5', mem: '512M' },
-  { id: 'shop-backend', name: 'Shop Backend', node: 'laptop', domain: 'shop', type: 'serving', desc: 'FastAPI. Analytics + DQ + Admin API.', cpu: '0.3', mem: '256M' },
-  { id: 'shop-frontend', name: 'Shop Analytics', node: 'laptop', domain: 'shop', type: 'serving', desc: 'React 19. Overview + DQ 대시보드.', cpu: '0.2', mem: '128M' },
+  { id: 'shop-backend', name: 'Shop Backend', node: 'laptop', domain: 'shop', type: 'serving', desc: 'FastAPI. Analytics + DQ + Mart API. 20+ 엔드포인트.', cpu: '0.3', mem: '256M' },
+  { id: 'shop-frontend', name: 'Shop Analytics', node: 'laptop', domain: 'shop', type: 'serving', desc: 'React 19. Overview + DQ + Mart 대시보드. DoD/WoW 비교, 퍼널 전환율.', cpu: '0.2', mem: '128M' },
 ];
 
 // === Kafka 토픽 ===
@@ -72,6 +72,12 @@ const DAGS = [
     schedule: '*/10 * * * *', scheduleKr: '10분마다', catchup: false, tags: ['trade'],
     desc: 'market_snapshot 기반 테마별 RS Score 계산.',
     reads: ['coin_theme_mapping', 'market_snapshot'], writes: ['theme_rs_snapshot'],
+  },
+  {
+    id: 'shop_mart', name: 'Shop Mart Build',
+    schedule: '0 6 * * *', scheduleKr: '매일 15:00 KST', catchup: false, tags: ['shop', 'mart'],
+    desc: 'shop_hourly_sales_log → 일별/주별 마트 빌드. DoD/WoW 비교 데이터 생성.',
+    reads: ['shop_hourly_sales_log'], writes: ['mart_daily_sales', 'mart_daily_summary', 'mart_weekly_sales'],
   },
   {
     id: 'basket_analysis', name: 'Basket Analysis (FP-Growth)',
@@ -150,7 +156,10 @@ const TABLES = [
   // Shop Mart
   { id: 'mart_rfm', name: 'mart_user_rfm', domain: 'shop', layer: 'mart', pk: 'user_id', writer: 'user_rfm', readers: ['shop-backend', 'rfm_alert'], freq: '매일', desc: 'RFM 세그먼테이션 (시뮬레이션)' },
   { id: 'mart_assoc', name: 'mart_product_association', domain: 'shop', layer: 'mart', pk: '(antecedents, consequents)', writer: 'basket_analysis', readers: ['shop-backend'], freq: '매일', desc: 'FP-Growth 연관규칙' },
-  { id: 'mart_daily', name: 'mart_daily_sales', domain: 'shop', layer: 'mart', pk: '(date, category)', writer: 'airflow-batch', readers: ['shop-backend'], freq: '매일', desc: '일별 카테고리 매출' },
+  { id: 'mart_daily', name: 'mart_daily_sales', domain: 'shop', layer: 'mart', pk: '(date, category)', writer: 'shop_mart', readers: ['shop-backend'], freq: '매일', desc: '일별 카테고리 매출' },
+  { id: 'mart_summary', name: 'mart_daily_summary', domain: 'shop', layer: 'mart', pk: 'date', writer: 'shop_mart', readers: ['shop-backend'], freq: '매일', desc: '일별 요약 (매출/주문/AOV/top카테고리)' },
+  { id: 'mart_weekly', name: 'mart_weekly_sales', domain: 'shop', layer: 'mart', pk: '(week_start, category)', writer: 'shop_mart', readers: ['shop-backend'], freq: '매일', desc: '주별 카테고리 매출' },
+  { id: 'dq_anomaly_log', name: 'dq_anomaly_log', domain: 'shop', layer: 'dq', pk: 'id (SERIAL)', writer: 'dq_scoring', readers: ['shop-backend'], freq: '매일', desc: '이상 탐지 로그 (severity/resolved)' },
 ];
 
 // === 리니지 엣지 ===
@@ -168,7 +177,6 @@ const EDGES = [
   { source: 'postgres', target: 'trade-backend', label: 'SQL' },
   { source: 'postgres', target: 'shop-backend', label: 'SQL' },
   { source: 'trade-backend', target: 'trade-frontend', label: 'REST API' },
-  { source: 'shop-backend', target: 'shop-frontend', label: 'REST API' },
   { source: 'airflow', target: 'postgres', label: 'DAG 실행' },
   { source: 'journal-bot', target: 'postgres', label: 'memo insert' },
   { source: 'investment-agent', target: 'postgres', label: 'MCP query' },
@@ -238,6 +246,19 @@ const EDGES = [
   { source: 'dq_cat', target: 'dq_scoring', label: 'completeness' },
   { source: 'dq_pay', target: 'dq_scoring', label: 'reconciliation' },
   { source: 'dq_scoring', target: 'dq_score', label: '3-dim score' },
+  { source: 'dq_scoring', target: 'dq_anomaly_log', label: 'anomaly detect' },
+  // Shop Mart DAG
+  { source: 'shop_sales', target: 'shop_mart', label: 'hourly input' },
+  { source: 'shop_mart', target: 'mart_daily', label: 'daily aggregate' },
+  { source: 'shop_mart', target: 'mart_summary', label: 'daily summary' },
+  { source: 'shop_mart', target: 'mart_weekly', label: 'weekly aggregate' },
+  // Shop Serving (mart → API)
+  { source: 'mart_summary', target: 'shop-backend', label: 'summary + daily-trend API' },
+  { source: 'mart_weekly', target: 'shop-backend', label: 'weekly-summary + category-ranking API' },
+  { source: 'mart_daily', target: 'shop-backend', label: 'daily-sales API' },
+  { source: 'shop_funnel', target: 'shop-backend', label: 'funnel-trend API' },
+  { source: 'dq_anomaly_log', target: 'shop-backend', label: 'dq/overview API' },
+  { source: 'shop-backend', target: 'shop-frontend', label: 'REST API' },
 ];
 
 // 도메인 색상
