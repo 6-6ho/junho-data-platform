@@ -93,7 +93,7 @@ function AppContent() {
       <main style={{ flex: 1, maxWidth: '1400px', margin: '0 auto', width: '100%', padding: '16px' }}>
         <Routes>
           {/* Default */}
-          <Route path="/" element={<Navigate to="/crypto/movers" replace />} />
+          <Route path="/" element={<Navigate to="/market" replace />} />
 
           {/* Market */}
           <Route path="/market" element={<MarketOverviewPage />} />
