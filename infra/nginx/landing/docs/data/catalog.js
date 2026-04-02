@@ -4,11 +4,13 @@ const SERVICES = [
   { id: 'binance-ws', name: 'Binance WebSocket', node: 'external', domain: 'trade', type: 'source', desc: 'USDT-M Futures 전종목 실시간 ticker' },
   { id: 'trade-ingest', name: 'Trade Ingest', node: 'laptop', domain: 'trade', type: 'ingestion', desc: 'WebSocket → Kafka 브릿지. 정규화 6필드 추출.', cpu: '0.3', mem: '256M' },
   { id: 'kafka-laptop', name: 'Kafka (Laptop)', node: 'laptop', domain: 'infra', type: 'messaging', desc: 'KRaft 모드. Trade 토픽 (raw.ticker.usdtm)', cpu: '0.5', mem: '768M' },
-  { id: 'trade-movers', name: 'Trade Movers', node: 'laptop', domain: 'trade', type: 'streaming', desc: 'Spark local[*]. 5m/10m 슬라이딩 윈도우 급등/급락 감지.', cpu: '1.0', mem: '1G' },
+  { id: 'trade-movers', name: 'Trade Movers', node: 'laptop', domain: 'trade', type: 'streaming', desc: 'Spark local[*]. 5m/10m 급등 감지 + DQ 3쿼리(symbol hourly, Kafka offset 교차검증, anomaly 격리).', cpu: '1.0', mem: '1G' },
   { id: 'whale-monitor', name: 'Whale Monitor', node: 'laptop', domain: 'trade', type: 'streaming', desc: 'BTC 에피소드 축적형 분석. aggTrade($1M+), forceOrder, 호가/OI/펀딩비.', cpu: '0.3', mem: '256M' },
   { id: 'listing-monitor', name: 'Listing Monitor', node: 'laptop', domain: 'trade', type: 'polling', desc: '업비트/빗썸 신규 상장 1분 폴링 → 텔레그램 알림.', cpu: '0.1', mem: '64M' },
-  { id: 'trade-backend', name: 'Trade Backend', node: 'laptop', domain: 'trade', type: 'serving', desc: 'FastAPI. 11 Router, 30+ 엔드포인트.', cpu: '1.0', mem: '512M' },
-  { id: 'trade-frontend', name: 'Trade Frontend', node: 'laptop', domain: 'trade', type: 'serving', desc: 'React 19 + Vite + nginx. 6개 페이지 + Agent.', cpu: '0.5', mem: '256M' },
+  { id: 'exchange-ingest', name: 'Exchange Ingest', node: 'laptop', domain: 'trade', type: 'ingestion', desc: 'Upbit WS + Bithumb REST → 멀티소스 가격 수집. 교차검증 + stale 감지.', cpu: '0.2', mem: '128M' },
+  { id: 'onchain-ingest', name: 'On-Chain Ingest', node: 'laptop', domain: 'trade', type: 'ingestion', desc: 'mempool.space API. BTC 멤풀/수수료/블록/난이도 5분 수집.', cpu: '0.1', mem: '64M' },
+  { id: 'trade-backend', name: 'Trade Backend', node: 'laptop', domain: 'trade', type: 'serving', desc: 'FastAPI. 14 Router. DQ + 교차검증 + 온체인 + 드리프트 API 포함.', cpu: '1.0', mem: '512M' },
+  { id: 'trade-frontend', name: 'Trade Frontend', node: 'laptop', domain: 'trade', type: 'serving', desc: 'React 19 + Vite + nginx. 7개 페이지 (DQ 탭 포함) + Agent.', cpu: '0.5', mem: '256M' },
   { id: 'postgres', name: 'PostgreSQL + pgvector', node: 'laptop', domain: 'infra', type: 'storage', desc: '단일 DB. Trade + Shop + Agent 테이블. 벡터 검색.', cpu: '1.0', mem: '1G' },
   { id: 'journal-bot', name: 'Journal Bot', node: 'laptop', domain: 'agent', type: 'bot', desc: '텔레그램 저널 봇. Voyage AI 임베딩 → pgvector.', cpu: '0.1', mem: '64M' },
   { id: 'investment-agent', name: 'Investment Agent', node: 'local', domain: 'agent', type: 'agent', desc: 'MCP 서버. 투자 기준 CRUD, 메모 벡터 검색, 종목 스크리닝.' },
@@ -19,7 +21,7 @@ const SERVICES = [
   { id: 'shop-generator', name: 'Shop Generator', node: 'laptop', domain: 'shop', type: 'source', desc: '3 persona × 5 category 이벤트 생성. TPS 10~2000. Chaos Mode.', cpu: '0.2', mem: '256M' },
   { id: 'analytics-streaming', name: 'Shop Streaming', node: 'laptop', domain: 'shop', type: 'streaming', desc: 'Spark local. 6개 병렬 쿼리. 매출/퍼널/DQ 1h 윈도우 집계.', cpu: '0.5', mem: '1G' },
   { id: 'spark-cluster', name: 'Spark Cluster', node: 'desktop', domain: 'infra', type: 'compute', desc: 'Master + Worker×2 (7cores/7GB). Standalone.', cpu: '6.5', mem: '8.5G' },
-  { id: 'airflow', name: 'Airflow', node: 'desktop', domain: 'infra', type: 'orchestrator', desc: 'LocalExecutor. 12 DAG. parallelism=4.', cpu: '1.0', mem: '1.5G' },
+  { id: 'airflow', name: 'Airflow', node: 'desktop', domain: 'infra', type: 'orchestrator', desc: 'LocalExecutor. 17 DAG. parallelism=4.', cpu: '1.0', mem: '1.5G' },
   { id: 'minio', name: 'MinIO', node: 'desktop', domain: 'infra', type: 'storage', desc: 'S3 호환. raw/checkpoints/iceberg-warehouse.', cpu: '0.5', mem: '512M' },
   { id: 'shop-backend', name: 'Shop Backend', node: 'laptop', domain: 'shop', type: 'serving', desc: 'FastAPI. Analytics + DQ + Mart API. 20+ 엔드포인트.', cpu: '0.3', mem: '256M' },
   { id: 'shop-frontend', name: 'Shop Analytics', node: 'laptop', domain: 'shop', type: 'serving', desc: 'React 19. Overview + DQ + Mart 대시보드. DoD/WoW 비교, 퍼널 전환율.', cpu: '0.2', mem: '128M' },
@@ -80,9 +82,21 @@ const DAGS = [
     reads: ['market_snapshot', 'movers_latest', 'dq_trade_symbol_hourly'], writes: ['MinIO Iceberg'],
   },
   {
+    id: 'trade_backfill', name: 'Trade Backfill',
+    schedule: '0 8 * * *', scheduleKr: '매일 17:00 KST', catchup: false, tags: ['trade', 'backfill'],
+    desc: '14일 내 파이프라인 갭 자동 탐지 → performance 재수집 + DQ 재계산. Telegram 알림.',
+    reads: ['movers_latest', 'trade_performance_timeseries', 'mart_trade_optimize_daily', 'dq_trade_daily_score', 'Binance API'], writes: ['trade_performance_timeseries', 'signal_raw_snapshot', 'dq_trade_daily_score'],
+  },
+  {
+    id: 'pg_backup', name: 'Postgres Backup',
+    schedule: '0 4 * * *', scheduleKr: '매일 13:00 KST', catchup: false, tags: ['infra', 'backup'],
+    desc: 'pg_dump → gzip → MinIO 업로드. 7일 초과 백업 자동 삭제.',
+    reads: ['PostgreSQL'], writes: ['MinIO backups/'],
+  },
+  {
     id: 'trade_dq_scoring', name: 'Trade DQ Scoring',
     schedule: '0 6 * * *', scheduleKr: '매일 15:00 KST', catchup: false, tags: ['trade', 'dq'],
-    desc: 'Trade 3차원 DQ 스코어링(C/V/T) + 심볼 드롭 탐지 + 소스 교차검증.',
+    desc: 'Trade 3차원 DQ 스코어링(C/V/T) + 심볼 드롭 탐지 + Kafka offset 교차검증 + tick 드리프트.',
     reads: ['dq_trade_symbol_hourly', 'dq_trade_source_hourly', 'dq_trade_anomaly_raw', 'market_snapshot'], writes: ['dq_trade_daily_score', 'dq_trade_anomaly_log'],
   },
   {
@@ -178,6 +192,11 @@ const TABLES = [
   { id: 'dq_trade_anomaly_raw', name: 'dq_trade_anomaly_raw', domain: 'trade', layer: 'dq', pk: 'id (SERIAL)', writer: 'trade-movers', readers: ['trade_dq_scoring'], freq: '실시간', desc: '이상 틱 격리 (price≤0, 극단 변동)' },
   { id: 'dq_trade_anomaly_log', name: 'dq_trade_anomaly_log', domain: 'trade', layer: 'dq', pk: 'id (SERIAL)', writer: 'trade_dq_scoring', readers: ['trade-backend'], freq: '매일', desc: 'Trade 이상 탐지 로그' },
   { id: 'dq_trade_score', name: 'dq_trade_daily_score', domain: 'trade', layer: 'dq', pk: 'date', writer: 'trade_dq_scoring', readers: ['trade-backend'], freq: '매일', desc: 'Trade DQ 3차원 스코어 (C/V/T)' },
+  // Exchange Price (멀티소스)
+  { id: 'exchange_price', name: 'exchange_price_snapshot', domain: 'trade', layer: 'serving', pk: '(exchange, symbol)', writer: 'exchange-ingest', readers: ['trade-backend'], freq: '실시간', desc: 'Upbit/Bithumb 가격 스냅샷 (교차검증)' },
+  // On-Chain
+  { id: 'onchain_metrics', name: 'onchain_btc_metrics', domain: 'trade', layer: 'serving', pk: 'id (SERIAL)', writer: 'onchain-ingest', readers: ['trade-backend'], freq: '5분', desc: 'BTC 멤풀/수수료/블록/난이도' },
+  { id: 'onchain_hourly', name: 'onchain_btc_hourly', domain: 'trade', layer: 'serving', pk: 'hour', writer: 'onchain-ingest', readers: ['trade-backend'], freq: '1h', desc: 'BTC 온체인 시간 집계' },
 ];
 
 // === 리니지 엣지 ===
@@ -289,6 +308,14 @@ const EDGES = [
   { source: 'trade_dq_scoring', target: 'dq_trade_anomaly_log', label: 'anomaly detect' },
   { source: 'dq_trade_score', target: 'trade-backend', label: 'DQ API' },
   { source: 'dq_trade_anomaly_log', target: 'trade-backend', label: 'DQ API' },
+  // Exchange Ingest (멀티소스)
+  { source: 'exchange-ingest', target: 'exchange_price', label: 'Upbit WS + Bithumb REST' },
+  { source: 'exchange_price', target: 'trade-backend', label: 'cross-exchange API' },
+  { source: 'market_snapshot', target: 'exchange-ingest', label: 'cross-validation base' },
+  // On-Chain Ingest
+  { source: 'onchain-ingest', target: 'onchain_metrics', label: 'mempool.space 5min' },
+  { source: 'onchain-ingest', target: 'onchain_hourly', label: 'hourly aggregate' },
+  { source: 'onchain_metrics', target: 'trade-backend', label: 'onchain API' },
 ];
 
 // 도메인 색상
