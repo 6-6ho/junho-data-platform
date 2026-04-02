@@ -473,6 +473,26 @@ services:
     networks: [appnet]
 
   # === Listing Monitor ===
+  onchain-ingest:
+    build: ./apps/onchain-ingest
+    container_name: jdp-onchain-ingest
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 64M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [appnet]
+
   exchange-ingest:
     build: ./apps/exchange-ingest
     container_name: jdp-exchange-ingest

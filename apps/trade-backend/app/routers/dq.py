@@ -233,3 +233,52 @@ def get_drift(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"dq/drift failed: {e}")
         return []
+
+
+@router.get("/onchain")
+def get_onchain(db: Session = Depends(get_db)):
+    """BTC 온체인 최신 메트릭 + 24h 트렌드"""
+    try:
+        # 최신 1건
+        latest = db.execute(text("""
+            SELECT block_height, mempool_tx_count, mempool_vsize, mempool_total_fee,
+                   fee_fastest, fee_half_hour, fee_hour, fee_economy,
+                   difficulty_progress, difficulty_remaining_blocks, difficulty_estimated_retarget,
+                   collected_at AT TIME ZONE 'Asia/Seoul' as collected_at
+            FROM onchain_btc_metrics ORDER BY collected_at DESC LIMIT 1
+        """)).fetchone()
+
+        # 24h 시간별 트렌드
+        hourly = db.execute(text("""
+            SELECT hour AT TIME ZONE 'Asia/Seoul' as hour,
+                   avg_mempool_tx, avg_fee_fastest, avg_fee_economy, block_count
+            FROM onchain_btc_hourly
+            WHERE hour >= NOW() - INTERVAL '24 hours'
+            ORDER BY hour
+        """)).fetchall()
+
+        return {
+            "latest": {
+                "block_height": latest.block_height,
+                "mempool_tx_count": latest.mempool_tx_count,
+                "mempool_vsize_mb": round(latest.mempool_vsize / 1e6, 1) if latest.mempool_vsize else 0,
+                "mempool_total_fee_btc": float(latest.mempool_total_fee) if latest.mempool_total_fee else 0,
+                "fee_fastest": latest.fee_fastest,
+                "fee_economy": latest.fee_economy,
+                "difficulty_progress": float(latest.difficulty_progress) if latest.difficulty_progress else 0,
+                "collected_at": str(latest.collected_at),
+            } if latest else None,
+            "hourly": [
+                {
+                    "hour": str(r.hour),
+                    "mempool_tx": r.avg_mempool_tx,
+                    "fee_fastest": r.avg_fee_fastest,
+                    "fee_economy": r.avg_fee_economy,
+                    "blocks": r.block_count,
+                }
+                for r in hourly
+            ],
+        }
+    except Exception as e:
+        logger.error(f"dq/onchain failed: {e}")
+        return {"latest": None, "hourly": []}
