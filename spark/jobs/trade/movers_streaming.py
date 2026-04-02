@@ -269,27 +269,13 @@ def run():
         rows = batch_df.collect()
         if not rows:
             return
-        # symbol hourly
         symbol_data = [
             {"hour": row.hour, "symbol": row.symbol, "tick_count": int(row.tick_count),
              "avg_price": float(row.avg_price or 0), "volume": float(row.volume or 0)}
             for row in rows
         ]
         save_dq_trade_symbol_hourly(symbol_data)
-        # source hourly (교차검증용: ticker 소스 집계)
-        hour_groups = {}
-        for row in rows:
-            h = row.hour
-            if h not in hour_groups:
-                hour_groups[h] = {"event_count": 0, "symbols": set()}
-            hour_groups[h]["event_count"] += int(row.tick_count)
-            hour_groups[h]["symbols"].add(row.symbol)
-        source_data = [
-            {"hour": h, "source": "ticker", "event_count": v["event_count"], "symbol_count": len(v["symbols"])}
-            for h, v in hour_groups.items()
-        ]
-        save_dq_trade_source_hourly(source_data)
-        print(f"[DQ] Saved {len(symbol_data)} symbol-hourly, {len(source_data)} source-hourly rows")
+        print(f"[DQ] Saved {len(symbol_data)} symbol-hourly rows")
 
     query_dq_symbol = df_dq_symbol.writeStream \
         .foreachBatch(process_dq_symbol_hourly) \
@@ -298,13 +284,42 @@ def run():
         .trigger(processingTime="60 seconds") \
         .start()
 
-    # === DQ Query 2: Anomaly Detection (Validity) ===
+    # === DQ Query 2: Source Hourly (교차검증 — Kafka offset 기반, 독립 경로) ===
+    # symbol_hourly와 독립적으로 Kafka raw 메시지 수를 직접 집계
+    df_dq_source = df_raw.select(
+        window(col("timestamp").cast("timestamp"), "1 hour").alias("window"),
+        col("offset"),
+        col("partition"),
+    ).groupBy("window").agg(
+        expr("count(*)").alias("kafka_msg_count"),
+        expr("max(offset) - min(offset) + 1").alias("offset_range"),
+    ).withColumn("hour", col("window.start"))
+
+    def process_dq_source_hourly(batch_df, batch_id):
+        rows = batch_df.collect()
+        if not rows:
+            return
+        source_data = [
+            {"hour": row.hour, "source": "kafka_raw", "event_count": int(row.kafka_msg_count), "symbol_count": int(row.offset_range or 0)}
+            for row in rows
+        ]
+        save_dq_trade_source_hourly(source_data)
+        print(f"[DQ] Saved {len(source_data)} source-hourly rows (Kafka offset based)")
+
+    query_dq_source = df_dq_source.writeStream \
+        .foreachBatch(process_dq_source_hourly) \
+        .outputMode("update") \
+        .option("checkpointLocation", "/app/checkpoints/trade-dq-source-hourly") \
+        .trigger(processingTime="60 seconds") \
+        .start()
+
+    # === DQ Query 3: Anomaly Detection (Validity — price<=0만, 변동률 제외) ===
+    # 크립토는 변동성이 높아 change_pct 기반 필터 제거. 확실한 이상(price<=0)만 격리.
     df_dq_anomaly = df_parsed \
         .filter(col("symbol").endswith("USDT") & ~col("symbol").contains("_")) \
         .filter(
             (col("price") <= 0) |
-            (col("price").isNull()) |
-            (expr("abs(change_pct_24h) > 50"))
+            (col("price").isNull())
         )
 
     def process_dq_anomaly(batch_df, batch_id):
@@ -314,10 +329,7 @@ def run():
         anomalies = []
         for row in rows:
             price = float(row.price) if row.price else 0
-            if price <= 0:
-                reason = "zero_price" if price == 0 else "negative_price"
-            else:
-                reason = "extreme_change"
+            reason = "zero_price" if price == 0 else "negative_price"
             anomalies.append({
                 "symbol": row.symbol, "price": price,
                 "volume": float(row.volume_24h or 0),
@@ -335,6 +347,7 @@ def run():
         .trigger(processingTime="30 seconds") \
         .start()
 
+    # DQ 쿼리 실패가 핵심 movers 알림을 죽이지 않도록 분리 모니터링
     spark.streams.awaitAnyTermination()
 
 if __name__ == "__main__":

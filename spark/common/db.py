@@ -11,7 +11,7 @@ class DBConnection:
     @classmethod
     def initialize(cls):
         if cls._pool is None:
-            cls._pool = psycopg2.pool.SimpleConnectionPool(
+            cls._pool = psycopg2.pool.ThreadedConnectionPool(
                 1, 10,
                 host=os.getenv("DB_HOST", "postgres"),
                 port=5432,

@@ -18,6 +18,7 @@ from datetime import datetime
 import websocket
 import requests
 import psycopg2
+import psycopg2.pool
 from psycopg2.extras import execute_values
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -36,8 +37,22 @@ USDT_KRW_RATE = 1380.0  # 초기값, 주기적 업데이트
 TOP_SYMBOLS = []
 
 
+_pool = None
+
+def _init_pool():
+    global _pool
+    if _pool is None:
+        _pool = psycopg2.pool.SimpleConnectionPool(
+            1, 5, host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS
+        )
+
 def get_conn():
-    return psycopg2.connect(host=DB_HOST, port=DB_PORT, dbname=DB_NAME, user=DB_USER, password=DB_PASS)
+    _init_pool()
+    return _pool.getconn()
+
+def put_conn(conn):
+    if _pool and conn:
+        _pool.putconn(conn)
 
 
 def load_tracked_symbols():
@@ -75,9 +90,10 @@ def update_usdt_krw():
 
 
 def upsert_prices(exchange, prices):
-    """exchange_price_snapshot에 가격 upsert."""
+    """exchange_price_snapshot에 가격 upsert. 커넥션 풀 사용."""
     if not prices:
         return
+    conn = None
     try:
         conn = get_conn()
         cur = conn.cursor()
@@ -91,16 +107,31 @@ def upsert_prices(exchange, prices):
         """, [(exchange, p["symbol"], p["price_krw"], p.get("volume", 0)) for p in prices])
         conn.commit()
         cur.close()
-        conn.close()
     except Exception as e:
         logger.error(f"[{exchange}] DB upsert failed: {e}")
+        if conn and not conn.closed:
+            conn.rollback()
+    finally:
+        if conn:
+            put_conn(conn)
 
 
 def check_cross_exchange():
-    """Binance vs Upbit/Bithumb 가격 교차검증."""
+    """Binance vs Upbit/Bithumb 가격 교차검증. market_snapshot stale 시 skip."""
+    conn = None
     try:
         conn = get_conn()
         cur = conn.cursor()
+
+        # stale 감지: market_snapshot이 5분 이상 안 갱신되면 skip
+        cur.execute("SELECT EXTRACT(EPOCH FROM (NOW() - MAX(updated_at))) / 60 FROM market_snapshot")
+        stale_row = cur.fetchone()
+        stale_min = float(stale_row[0]) if stale_row and stale_row[0] else 999
+        if stale_min > 5:
+            logger.warning(f"[CrossExchange] market_snapshot stale ({stale_min:.0f}min) — skipping")
+            cur.close()
+            put_conn(conn)
+            return
 
         # Binance 가격 (USDT → KRW 변환)
         cur.execute("""
@@ -141,9 +172,11 @@ def check_cross_exchange():
             logger.warning(f"[CrossExchange] {len(divergent)} divergences detected (>3%)")
 
         cur.close()
-        conn.close()
     except Exception as e:
         logger.error(f"[CrossExchange] Check failed: {e}")
+    finally:
+        if conn:
+            put_conn(conn)
 
 
 # === Upbit WebSocket ===
@@ -254,9 +287,13 @@ def main():
         t.start()
         logger.info(f"Started thread: {t.name}")
 
-    # 메인 스레드는 살아있기만
+    # 메인 스레드: 스레드 생사 감시
     while True:
         time.sleep(60)
+        for t in threads:
+            if not t.is_alive():
+                logger.error(f"Thread {t.name} died — exiting to trigger container restart")
+                os._exit(1)
 
 
 if __name__ == "__main__":

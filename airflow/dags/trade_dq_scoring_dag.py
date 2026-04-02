@@ -70,17 +70,22 @@ def compute_trade_dq_score(**ctx):
     anomaly_count = cur.fetchone()[0] or 0
     validity = max(0, 100 - anomaly_count * 2)
 
-    # Timeliness: freshness of latest data
+    # Timeliness: target_date 당일 기준으로 마지막 데이터와 해당일 자정의 차이
+    # NOW() 기준이면 배치 실행 시각에 오염됨
     cur.execute("""
-        SELECT EXTRACT(EPOCH FROM (NOW() - MAX(event_time))) / 60
-        FROM market_snapshot
-    """)
+        SELECT EXTRACT(EPOCH FROM (
+            %s::timestamptz - COALESCE(MAX(hour), %s::timestamptz - INTERVAL '24 hours')
+        )) / 3600
+        FROM dq_trade_symbol_hourly
+        WHERE hour >= %s::timestamptz - INTERVAL '24 hours'
+          AND hour < %s::timestamptz
+    """, (target_ts, target_ts, target_ts, target_ts))
     row = cur.fetchone()
-    minutes_late = float(row[0]) if row and row[0] else 999
-    if minutes_late <= 2:
+    hours_gap = float(row[0]) if row and row[0] else 24
+    if hours_gap <= 2:
         timeliness = 100
     else:
-        timeliness = max(0, int(100 - (minutes_late - 2) * 10))
+        timeliness = max(0, int(100 - (hours_gap - 2) * 10))
 
     total = int(completeness * 0.4 + validity * 0.3 + timeliness * 0.3)
 
@@ -113,7 +118,7 @@ def compute_trade_dq_score(**ctx):
     cur.close()
     conn.close()
     print(f"[Trade DQ] Score: C={completeness} V={validity} T={timeliness} Total={total} "
-          f"(symbols={actual_symbols}/{expected_symbols}, anomalies={anomaly_count}, lag={minutes_late:.1f}min)")
+          f"(symbols={actual_symbols}/{expected_symbols}, anomalies={anomaly_count}, gap={hours_gap:.1f}h)")
 
 
 def detect_trade_anomalies(**ctx):
@@ -245,60 +250,43 @@ def detect_drift(**ctx):
     conn = _get_conn()
     cur = conn.cursor()
 
+    # tick_count 드리프트만 감지 (수집 이상 탐지 목적)
+    # 크립토 price/volume은 heavy-tail 분포라 z-score 부적합 → 제외
     cur.execute("""
         WITH baseline AS (
             SELECT symbol,
-                AVG(tick_count) as mean_ticks, STDDEV_POP(tick_count) as std_ticks,
-                AVG(avg_price) as mean_price, STDDEV_POP(avg_price) as std_price,
-                AVG(volume) as mean_vol, STDDEV_POP(volume) as std_vol
+                AVG(tick_count) as mean_ticks, STDDEV_POP(tick_count) as std_ticks
             FROM dq_trade_symbol_hourly
             WHERE hour >= NOW() - INTERVAL '8 days'
               AND hour < NOW() - INTERVAL '1 day'
             GROUP BY symbol
-            HAVING COUNT(*) >= 24
+            HAVING COUNT(*) >= 24 AND STDDEV_POP(tick_count) > 0
         ),
         recent AS (
-            SELECT symbol,
-                AVG(tick_count) as r_ticks,
-                AVG(avg_price) as r_price,
-                AVG(volume) as r_vol
+            SELECT symbol, AVG(tick_count) as r_ticks
             FROM dq_trade_symbol_hourly
             WHERE hour >= NOW() - INTERVAL '24 hours'
             GROUP BY symbol
         )
-        SELECT
-            r.symbol,
-            r.r_ticks, b.mean_ticks, b.std_ticks,
-            r.r_price, b.mean_price, b.std_price,
-            r.r_vol, b.mean_vol, b.std_vol,
-            CASE WHEN b.std_ticks > 0 THEN (r.r_ticks - b.mean_ticks) / b.std_ticks ELSE 0 END as tick_z,
-            CASE WHEN b.std_price > 0 THEN (r.r_price - b.mean_price) / b.std_price ELSE 0 END as price_z,
-            CASE WHEN b.std_vol > 0 THEN (r.r_vol - b.mean_vol) / b.std_vol ELSE 0 END as vol_z
+        SELECT r.symbol, r.r_ticks, b.mean_ticks, b.std_ticks,
+            (r.r_ticks - b.mean_ticks) / b.std_ticks as tick_z
         FROM recent r
         JOIN baseline b ON r.symbol = b.symbol
+        WHERE ABS((r.r_ticks - b.mean_ticks) / b.std_ticks) > 3
     """)
 
     drift_count = 0
     for row in cur.fetchall():
-        symbol = row[0]
-        tick_z, price_z, vol_z = float(row[10] or 0), float(row[11] or 0), float(row[12] or 0)
-
-        for metric, z, expected, actual in [
-            ("tick_rate", tick_z, float(row[2] or 0), float(row[1] or 0)),
-            ("price", price_z, float(row[5] or 0), float(row[4] or 0)),
-            ("volume", vol_z, float(row[8] or 0), float(row[7] or 0)),
-        ]:
-            if abs(z) > 3:
-                severity = "critical" if abs(z) > 5 else "warning"
-                cur.execute("""
-                    INSERT INTO dq_trade_anomaly_log
-                    (anomaly_type, dimension, expected_value, actual_value, severity, notes)
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (
-                    f"drift_{metric}", symbol, expected, actual, severity,
-                    f"z-score={z:.2f}, 7d baseline mean={expected:.2f}"
-                ))
-                drift_count += 1
+        symbol, r_ticks, mean_ticks, std_ticks, tick_z = row
+        tick_z = float(tick_z or 0)
+        severity = "critical" if abs(tick_z) > 5 else "warning"
+        cur.execute("""
+            INSERT INTO dq_trade_anomaly_log
+            (anomaly_type, dimension, expected_value, actual_value, severity, notes)
+            VALUES ('drift_tick_rate', %s, %s, %s, %s, %s)
+        """, (symbol, float(mean_ticks), float(r_ticks), severity,
+              f"z-score={tick_z:.2f}, 7d mean={float(mean_ticks):.1f}"))
+        drift_count += 1
 
     conn.commit()
     cur.close()

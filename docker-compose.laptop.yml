@@ -61,6 +61,8 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+      - KAFKA_LOG_RETENTION_HOURS=48
+      - KAFKA_LOG_RETENTION_BYTES=5368709120
     networks: [appnet]
 
   # === Trade: Data Ingestion ===
@@ -423,7 +425,8 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/rootfs'
-      - '--no-collector.filesystem'
+      - '--collector.filesystem'
+      - '--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run)($|/)'
       - '--collector.disable-defaults'
       - '--collector.cpu'
       - '--collector.meminfo'
