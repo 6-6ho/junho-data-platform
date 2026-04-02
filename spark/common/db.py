@@ -185,5 +185,94 @@ def save_market_snapshot(data):
             DBConnection.return_connection(conn)
 
 
-# Initialize pool on module load if appropriate, or let explicit call handle it
-# DBConnection.initialize()
+def save_dq_trade_symbol_hourly(data):
+    """data: list of dicts {hour, symbol, tick_count, avg_price, volume}"""
+    if not data:
+        return
+    conn = DBConnection.get_connection()
+    try:
+        query = """
+            INSERT INTO dq_trade_symbol_hourly (hour, symbol, tick_count, avg_price, volume)
+            VALUES %s
+            ON CONFLICT (hour, symbol) DO UPDATE SET
+                tick_count = EXCLUDED.tick_count,
+                avg_price = EXCLUDED.avg_price,
+                volume = EXCLUDED.volume,
+                created_at = NOW();
+        """
+        rows = [(d['hour'], d['symbol'], d['tick_count'], d['avg_price'], d['volume']) for d in data]
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, query, rows)
+        conn.commit()
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        print(f"[DB] Connection error saving dq_trade_symbol_hourly: {e}")
+        DBConnection._reset_pool()
+        conn = None
+    except Exception as e:
+        print(f"[DB] Error saving dq_trade_symbol_hourly: {e}")
+        if not conn.closed:
+            conn.rollback()
+    finally:
+        if conn:
+            DBConnection.return_connection(conn)
+
+
+def save_dq_trade_source_hourly(data):
+    """data: list of dicts {hour, source, event_count, symbol_count}"""
+    if not data:
+        return
+    conn = DBConnection.get_connection()
+    try:
+        query = """
+            INSERT INTO dq_trade_source_hourly (hour, source, event_count, symbol_count)
+            VALUES %s
+            ON CONFLICT (hour, source) DO UPDATE SET
+                event_count = EXCLUDED.event_count,
+                symbol_count = EXCLUDED.symbol_count,
+                created_at = NOW();
+        """
+        rows = [(d['hour'], d['source'], d['event_count'], d['symbol_count']) for d in data]
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, query, rows)
+        conn.commit()
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        print(f"[DB] Connection error saving dq_trade_source_hourly: {e}")
+        DBConnection._reset_pool()
+        conn = None
+    except Exception as e:
+        print(f"[DB] Error saving dq_trade_source_hourly: {e}")
+        if not conn.closed:
+            conn.rollback()
+    finally:
+        if conn:
+            DBConnection.return_connection(conn)
+
+
+def save_dq_trade_anomaly_raw(data):
+    """data: list of dicts {symbol, price, volume, change_pct, anomaly_reason, raw_data}"""
+    if not data:
+        return
+    conn = DBConnection.get_connection()
+    try:
+        query = """
+            INSERT INTO dq_trade_anomaly_raw (symbol, price, volume, change_pct, anomaly_reason, raw_data)
+            VALUES %s
+        """
+        rows = [
+            (d['symbol'], d['price'], d['volume'], d['change_pct'], d['anomaly_reason'], json.dumps(d.get('raw_data', {})))
+            for d in data
+        ]
+        with conn.cursor() as cur:
+            psycopg2.extras.execute_values(cur, query, rows)
+        conn.commit()
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        print(f"[DB] Connection error saving dq_trade_anomaly_raw: {e}")
+        DBConnection._reset_pool()
+        conn = None
+    except Exception as e:
+        print(f"[DB] Error saving dq_trade_anomaly_raw: {e}")
+        if not conn.closed:
+            conn.rollback()
+    finally:
+        if conn:
+            DBConnection.return_connection(conn)

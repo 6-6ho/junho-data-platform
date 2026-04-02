@@ -17,12 +17,11 @@ from pyspark.sql.types import (
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 try:
-    from common.db import save_movers_batch, save_market_snapshot, get_watchlist
+    from common.db import save_movers_batch, save_market_snapshot, get_watchlist, save_dq_trade_symbol_hourly, save_dq_trade_source_hourly, save_dq_trade_anomaly_raw
     from common.trade_utils import send_telegram_alert, AlertManager, classify_status
 except ImportError:
-    # Fallback for when running from different context
     sys.path.append(os.path.join(os.getcwd(), 'spark'))
-    from common.db import save_movers_batch, save_market_snapshot, get_watchlist
+    from common.db import save_movers_batch, save_market_snapshot, get_watchlist, save_dq_trade_symbol_hourly, save_dq_trade_source_hourly, save_dq_trade_anomaly_raw
     from common.trade_utils import send_telegram_alert, AlertManager, classify_status
 
 # CONFIG
@@ -254,6 +253,86 @@ def run():
         .outputMode("update") \
         .option("checkpointLocation", "/app/checkpoints/trade-movers-10m") \
         .trigger(processingTime="10 seconds") \
+        .start()
+
+    # === DQ Query 1: Symbol Hourly (Completeness) ===
+    df_dq_symbol = df_clean.groupBy(
+        window("timestamp", "1 hour"),
+        "symbol"
+    ).agg(
+        expr("count(*)").alias("tick_count"),
+        expr("avg(price)").alias("avg_price"),
+        expr("last(volume_24h)").alias("volume")
+    ).withColumn("hour", col("window.start"))
+
+    def process_dq_symbol_hourly(batch_df, batch_id):
+        rows = batch_df.collect()
+        if not rows:
+            return
+        # symbol hourly
+        symbol_data = [
+            {"hour": row.hour, "symbol": row.symbol, "tick_count": int(row.tick_count),
+             "avg_price": float(row.avg_price or 0), "volume": float(row.volume or 0)}
+            for row in rows
+        ]
+        save_dq_trade_symbol_hourly(symbol_data)
+        # source hourly (교차검증용: ticker 소스 집계)
+        hour_groups = {}
+        for row in rows:
+            h = row.hour
+            if h not in hour_groups:
+                hour_groups[h] = {"event_count": 0, "symbols": set()}
+            hour_groups[h]["event_count"] += int(row.tick_count)
+            hour_groups[h]["symbols"].add(row.symbol)
+        source_data = [
+            {"hour": h, "source": "ticker", "event_count": v["event_count"], "symbol_count": len(v["symbols"])}
+            for h, v in hour_groups.items()
+        ]
+        save_dq_trade_source_hourly(source_data)
+        print(f"[DQ] Saved {len(symbol_data)} symbol-hourly, {len(source_data)} source-hourly rows")
+
+    query_dq_symbol = df_dq_symbol.writeStream \
+        .foreachBatch(process_dq_symbol_hourly) \
+        .outputMode("update") \
+        .option("checkpointLocation", "/app/checkpoints/trade-dq-symbol-hourly") \
+        .trigger(processingTime="60 seconds") \
+        .start()
+
+    # === DQ Query 2: Anomaly Detection (Validity) ===
+    df_dq_anomaly = df_parsed \
+        .filter(col("symbol").endswith("USDT") & ~col("symbol").contains("_")) \
+        .filter(
+            (col("price") <= 0) |
+            (col("price").isNull()) |
+            (expr("abs(change_pct_24h) > 50"))
+        )
+
+    def process_dq_anomaly(batch_df, batch_id):
+        rows = batch_df.collect()
+        if not rows:
+            return
+        anomalies = []
+        for row in rows:
+            price = float(row.price) if row.price else 0
+            if price <= 0:
+                reason = "zero_price" if price == 0 else "negative_price"
+            else:
+                reason = "extreme_change"
+            anomalies.append({
+                "symbol": row.symbol, "price": price,
+                "volume": float(row.volume_24h or 0),
+                "change_pct": float(row.change_pct_24h or 0),
+                "anomaly_reason": reason,
+                "raw_data": {"event_time_ms": row.event_time_ms, "quote_volume_24h": row.quote_volume_24h}
+            })
+        save_dq_trade_anomaly_raw(anomalies)
+        print(f"[DQ] Quarantined {len(anomalies)} anomalous ticks")
+
+    query_dq_anomaly = df_dq_anomaly.writeStream \
+        .foreachBatch(process_dq_anomaly) \
+        .outputMode("append") \
+        .option("checkpointLocation", "/app/checkpoints/trade-dq-anomaly") \
+        .trigger(processingTime="30 seconds") \
         .start()
 
     spark.streams.awaitAnyTermination()
