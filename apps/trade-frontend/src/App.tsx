@@ -11,6 +11,7 @@ import StocksPage from './pages/StocksPage';
 import ScreenerPage from './pages/ScreenerPage';
 import SettingsPage from './pages/SettingsPage';
 import AgentPage from './pages/AgentPage';
+import DQPage from './pages/DQPage';
 
 function LegacySymbolRedirect() {
   const { symbol } = useParams();
@@ -82,6 +83,9 @@ function AppContent() {
           <NavLink to="/crypto/screener" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
             Screener
           </NavLink>
+          <NavLink to="/crypto/dq" className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            DQ
+          </NavLink>
         </nav>
       )}
 
@@ -100,6 +104,7 @@ function AppContent() {
           <Route path="/crypto/performance" element={<PerformancePage />} />
           <Route path="/crypto/theme" element={<ThemePage />} />
           <Route path="/crypto/screener" element={<ScreenerPage />} />
+          <Route path="/crypto/dq" element={<DQPage />} />
           <Route path="/crypto/symbol/:symbol" element={<SymbolDetailsPage />} />
 
           {/* Stocks */}

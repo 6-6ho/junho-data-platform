@@ -74,6 +74,12 @@ const DAGS = [
     reads: ['coin_theme_mapping', 'market_snapshot'], writes: ['theme_rs_snapshot'],
   },
   {
+    id: 'trade_dq_scoring', name: 'Trade DQ Scoring',
+    schedule: '0 6 * * *', scheduleKr: '매일 15:00 KST', catchup: false, tags: ['trade', 'dq'],
+    desc: 'Trade 3차원 DQ 스코어링(C/V/T) + 심볼 드롭 탐지 + 소스 교차검증.',
+    reads: ['dq_trade_symbol_hourly', 'dq_trade_source_hourly', 'dq_trade_anomaly_raw', 'market_snapshot'], writes: ['dq_trade_daily_score', 'dq_trade_anomaly_log'],
+  },
+  {
     id: 'shop_mart', name: 'Shop Mart Build',
     schedule: '0 6 * * *', scheduleKr: '매일 15:00 KST', catchup: false, tags: ['shop', 'mart'],
     desc: 'shop_hourly_sales_log → 일별/주별 마트 빌드. DoD/WoW 비교 데이터 생성.',
@@ -160,6 +166,12 @@ const TABLES = [
   { id: 'mart_summary', name: 'mart_daily_summary', domain: 'shop', layer: 'mart', pk: 'date', writer: 'shop_mart', readers: ['shop-backend'], freq: '매일', desc: '일별 요약 (매출/주문/AOV/top카테고리)' },
   { id: 'mart_weekly', name: 'mart_weekly_sales', domain: 'shop', layer: 'mart', pk: '(week_start, category)', writer: 'shop_mart', readers: ['shop-backend'], freq: '매일', desc: '주별 카테고리 매출' },
   { id: 'dq_anomaly_log', name: 'dq_anomaly_log', domain: 'shop', layer: 'dq', pk: 'id (SERIAL)', writer: 'dq_scoring', readers: ['shop-backend'], freq: '매일', desc: '이상 탐지 로그 (severity/resolved)' },
+  // Trade DQ (Shop과 완전 독립)
+  { id: 'dq_trade_symbol', name: 'dq_trade_symbol_hourly', domain: 'trade', layer: 'dq', pk: '(hour, symbol)', writer: 'trade-movers', readers: ['trade_dq_scoring'], freq: '1h', desc: '심볼별 틱 카운트/가격/볼륨' },
+  { id: 'dq_trade_source', name: 'dq_trade_source_hourly', domain: 'trade', layer: 'dq', pk: '(hour, source)', writer: 'trade-movers', readers: ['trade_dq_scoring'], freq: '1h', desc: '소스별 이벤트 카운트 (교차검증)' },
+  { id: 'dq_trade_anomaly_raw', name: 'dq_trade_anomaly_raw', domain: 'trade', layer: 'dq', pk: 'id (SERIAL)', writer: 'trade-movers', readers: ['trade_dq_scoring'], freq: '실시간', desc: '이상 틱 격리 (price≤0, 극단 변동)' },
+  { id: 'dq_trade_anomaly_log', name: 'dq_trade_anomaly_log', domain: 'trade', layer: 'dq', pk: 'id (SERIAL)', writer: 'trade_dq_scoring', readers: ['trade-backend'], freq: '매일', desc: 'Trade 이상 탐지 로그' },
+  { id: 'dq_trade_score', name: 'dq_trade_daily_score', domain: 'trade', layer: 'dq', pk: 'date', writer: 'trade_dq_scoring', readers: ['trade-backend'], freq: '매일', desc: 'Trade DQ 3차원 스코어 (C/V/T)' },
 ];
 
 // === 리니지 엣지 ===
@@ -259,6 +271,18 @@ const EDGES = [
   { source: 'shop_funnel', target: 'shop-backend', label: 'funnel-trend API' },
   { source: 'dq_anomaly_log', target: 'shop-backend', label: 'dq/overview API' },
   { source: 'shop-backend', target: 'shop-frontend', label: 'REST API' },
+  // Trade DQ lineage
+  { source: 'trade-movers', target: 'dq_trade_symbol', label: 'DQ symbol hourly' },
+  { source: 'trade-movers', target: 'dq_trade_source', label: 'DQ source hourly' },
+  { source: 'trade-movers', target: 'dq_trade_anomaly_raw', label: 'anomaly quarantine' },
+  { source: 'dq_trade_symbol', target: 'trade_dq_scoring', label: 'completeness input' },
+  { source: 'dq_trade_source', target: 'trade_dq_scoring', label: 'reconciliation input' },
+  { source: 'dq_trade_anomaly_raw', target: 'trade_dq_scoring', label: 'validity input' },
+  { source: 'market_snapshot', target: 'trade_dq_scoring', label: 'expected symbols' },
+  { source: 'trade_dq_scoring', target: 'dq_trade_score', label: '3-dim score' },
+  { source: 'trade_dq_scoring', target: 'dq_trade_anomaly_log', label: 'anomaly detect' },
+  { source: 'dq_trade_score', target: 'trade-backend', label: 'DQ API' },
+  { source: 'dq_trade_anomaly_log', target: 'trade-backend', label: 'DQ API' },
 ];
 
 // 도메인 색상
