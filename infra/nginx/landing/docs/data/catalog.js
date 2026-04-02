@@ -74,6 +74,12 @@ const DAGS = [
     reads: ['coin_theme_mapping', 'market_snapshot'], writes: ['theme_rs_snapshot'],
   },
   {
+    id: 'trade_lake', name: 'Trade Historical Lake',
+    schedule: '0 7 * * *', scheduleKr: '매일 16:00 KST', catchup: false, tags: ['trade', 'lake', 'iceberg'],
+    desc: 'Postgres 서빙 테이블 → Iceberg 히스토리컬 아카이브. market_history/movers_history/dq_history.',
+    reads: ['market_snapshot', 'movers_latest', 'dq_trade_symbol_hourly'], writes: ['MinIO Iceberg'],
+  },
+  {
     id: 'trade_dq_scoring', name: 'Trade DQ Scoring',
     schedule: '0 6 * * *', scheduleKr: '매일 15:00 KST', catchup: false, tags: ['trade', 'dq'],
     desc: 'Trade 3차원 DQ 스코어링(C/V/T) + 심볼 드롭 탐지 + 소스 교차검증.',
