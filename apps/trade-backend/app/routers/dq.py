@@ -202,3 +202,34 @@ def get_cross_exchange(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"dq/cross-exchange failed: {e}")
         return []
+
+
+@router.get("/drift")
+def get_drift(db: Session = Depends(get_db)):
+    """최근 7일 드리프트 이벤트 — 심볼별 분포 변화 감지"""
+    try:
+        rows = db.execute(text("""
+            SELECT detected_at AT TIME ZONE 'Asia/Seoul' as detected_at,
+                   anomaly_type, dimension as symbol,
+                   expected_value, actual_value, severity, notes
+            FROM dq_trade_anomaly_log
+            WHERE anomaly_type LIKE 'drift_%'
+              AND detected_at >= NOW() - INTERVAL '7 days'
+            ORDER BY detected_at DESC
+            LIMIT 50
+        """)).fetchall()
+        return [
+            {
+                "detected_at": str(r.detected_at),
+                "type": r.anomaly_type.replace("drift_", ""),
+                "symbol": r.symbol,
+                "expected": float(r.expected_value) if r.expected_value else None,
+                "actual": float(r.actual_value) if r.actual_value else None,
+                "severity": r.severity,
+                "notes": r.notes,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"dq/drift failed: {e}")
+        return []

@@ -232,10 +232,84 @@ def reconcile_trade(**ctx):
         print("[Trade DQ] Reconciliation: all hours within tolerance")
 
 
+def detect_drift(**ctx):
+    """
+    데이터 드리프트 감지: 심볼별 tick_count/price/volume의 24h 평균을
+    7일 기준선(mean ± 3σ)과 비교. z-score 절대값 > 3이면 드리프트 판정.
+
+    감지 대상:
+      - tick_drift: 틱 빈도 변화 (데이터 수집 이상)
+      - price_drift: 가격 분포 변화 (시장 구조 변화)
+      - volume_drift: 거래량 분포 변화 (유동성 변화)
+    """
+    conn = _get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        WITH baseline AS (
+            SELECT symbol,
+                AVG(tick_count) as mean_ticks, STDDEV_POP(tick_count) as std_ticks,
+                AVG(avg_price) as mean_price, STDDEV_POP(avg_price) as std_price,
+                AVG(volume) as mean_vol, STDDEV_POP(volume) as std_vol
+            FROM dq_trade_symbol_hourly
+            WHERE hour >= NOW() - INTERVAL '8 days'
+              AND hour < NOW() - INTERVAL '1 day'
+            GROUP BY symbol
+            HAVING COUNT(*) >= 24
+        ),
+        recent AS (
+            SELECT symbol,
+                AVG(tick_count) as r_ticks,
+                AVG(avg_price) as r_price,
+                AVG(volume) as r_vol
+            FROM dq_trade_symbol_hourly
+            WHERE hour >= NOW() - INTERVAL '24 hours'
+            GROUP BY symbol
+        )
+        SELECT
+            r.symbol,
+            r.r_ticks, b.mean_ticks, b.std_ticks,
+            r.r_price, b.mean_price, b.std_price,
+            r.r_vol, b.mean_vol, b.std_vol,
+            CASE WHEN b.std_ticks > 0 THEN (r.r_ticks - b.mean_ticks) / b.std_ticks ELSE 0 END as tick_z,
+            CASE WHEN b.std_price > 0 THEN (r.r_price - b.mean_price) / b.std_price ELSE 0 END as price_z,
+            CASE WHEN b.std_vol > 0 THEN (r.r_vol - b.mean_vol) / b.std_vol ELSE 0 END as vol_z
+        FROM recent r
+        JOIN baseline b ON r.symbol = b.symbol
+    """)
+
+    drift_count = 0
+    for row in cur.fetchall():
+        symbol = row[0]
+        tick_z, price_z, vol_z = float(row[10] or 0), float(row[11] or 0), float(row[12] or 0)
+
+        for metric, z, expected, actual in [
+            ("tick_rate", tick_z, float(row[2] or 0), float(row[1] or 0)),
+            ("price", price_z, float(row[5] or 0), float(row[4] or 0)),
+            ("volume", vol_z, float(row[8] or 0), float(row[7] or 0)),
+        ]:
+            if abs(z) > 3:
+                severity = "critical" if abs(z) > 5 else "warning"
+                cur.execute("""
+                    INSERT INTO dq_trade_anomaly_log
+                    (anomaly_type, dimension, expected_value, actual_value, severity, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (
+                    f"drift_{metric}", symbol, expected, actual, severity,
+                    f"z-score={z:.2f}, 7d baseline mean={expected:.2f}"
+                ))
+                drift_count += 1
+
+    conn.commit()
+    cur.close()
+    conn.close()
+    print(f"[Trade DQ] Drift detection: {drift_count} drift events found")
+
+
 with DAG(
     'trade_dq_scoring',
     default_args=default_args,
-    description='Trade DQ 스코어링 + 이상탐지 + 교차검증',
+    description='Trade DQ 스코어링 + 이상탐지 + 교차검증 + 드리프트 감지',
     schedule='0 6 * * *',
     catchup=False,
     tags=['trade', 'dq'],
@@ -244,5 +318,6 @@ with DAG(
     t1 = PythonOperator(task_id='compute_trade_dq_score', python_callable=compute_trade_dq_score)
     t2 = PythonOperator(task_id='detect_trade_anomalies', python_callable=detect_trade_anomalies)
     t3 = PythonOperator(task_id='reconcile_trade', python_callable=reconcile_trade)
+    t4 = PythonOperator(task_id='detect_drift', python_callable=detect_drift)
 
-    t1 >> t2 >> t3
+    t1 >> t2 >> t3 >> t4
