@@ -166,3 +166,39 @@ def get_reconciliation(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"dq/reconciliation failed: {e}")
         return []
+
+
+@router.get("/cross-exchange")
+def get_cross_exchange(db: Session = Depends(get_db)):
+    """거래소 간 가격 교차검증 — Binance vs Upbit/Bithumb"""
+    try:
+        rows = db.execute(text("""
+            SELECT
+                REPLACE(ms.symbol, 'USDT', '') as symbol,
+                ms.price as binance_usd,
+                up.price_krw as upbit_krw,
+                bt.price_krw as bithumb_krw,
+                up.updated_at as upbit_updated,
+                bt.updated_at as bithumb_updated
+            FROM market_snapshot ms
+            LEFT JOIN exchange_price_snapshot up
+                ON REPLACE(ms.symbol, 'USDT', '') = up.symbol AND up.exchange = 'upbit'
+            LEFT JOIN exchange_price_snapshot bt
+                ON REPLACE(ms.symbol, 'USDT', '') = bt.symbol AND bt.exchange = 'bithumb'
+            WHERE (up.price_krw IS NOT NULL OR bt.price_krw IS NOT NULL)
+              AND ms.price > 0
+            ORDER BY ms.price * ms.volume_24h DESC
+            LIMIT 30
+        """)).fetchall()
+        return [
+            {
+                "symbol": r.symbol,
+                "binance_usd": float(r.binance_usd) if r.binance_usd else None,
+                "upbit_krw": float(r.upbit_krw) if r.upbit_krw else None,
+                "bithumb_krw": float(r.bithumb_krw) if r.bithumb_krw else None,
+            }
+            for r in rows
+        ]
+    except Exception as e:
+        logger.error(f"dq/cross-exchange failed: {e}")
+        return []

@@ -473,6 +473,26 @@ services:
     networks: [appnet]
 
   # === Listing Monitor ===
+  exchange-ingest:
+    build: ./apps/exchange-ingest
+    container_name: jdp-exchange-ingest
+    restart: unless-stopped
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - POSTGRES_DB=app
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 128M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [appnet]
+
   listing-monitor:
     build: ./apps/listing-monitor
     restart: unless-stopped
