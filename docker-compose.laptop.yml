@@ -35,12 +35,19 @@
 
 name: jdp
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   # === Messaging (Trade + Shop 토픽 통합) ===
   kafka:
     image: confluentinc/cp-kafka:latest
     hostname: kafka
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -69,6 +76,7 @@ services:
   ingest:
     build: ./apps/trade-ingest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     deploy:
@@ -84,6 +92,7 @@ services:
     build: ./spark
     user: root
     restart: unless-stopped
+    logging: *default-logging
     depends_on: [kafka, postgres]
     env_file: [.env]
     deploy:
@@ -110,6 +119,7 @@ services:
     container_name: jdp-trade-spark
     user: root
     restart: unless-stopped
+    logging: *default-logging
     env_file: [.env]
     deploy:
       resources:
@@ -132,6 +142,7 @@ services:
   frontend:
     build: ./apps/trade-frontend
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3000:80"
     deploy:
@@ -150,6 +161,7 @@ services:
   api:
     build: ./apps/trade-backend
     restart: unless-stopped
+    logging: *default-logging
     env_file: [.env]
     environment:
       - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/app
@@ -175,6 +187,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
+    logging: *default-logging
     env_file: [.env]
     deploy:
       resources:
@@ -202,6 +215,7 @@ services:
     command: server /data --console-address ":9001"
     container_name: jdp-minio
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -242,6 +256,7 @@ services:
     build: ./airflow
     container_name: jdp-airflow
     restart: unless-stopped
+    logging: *default-logging
     user: root
     env_file: [.env]
     deploy:
@@ -287,6 +302,7 @@ services:
     build: ./apps/shop-generator
     container_name: shop-generator
     restart: unless-stopped
+    logging: *default-logging
     deploy:
       resources:
         limits:
@@ -308,6 +324,7 @@ services:
     container_name: jdp-shop-streaming
     user: root
     restart: unless-stopped
+    logging: *default-logging
     depends_on: [kafka, minio, postgres]
     env_file: [.env]
     deploy:
@@ -335,6 +352,7 @@ services:
     build: ./apps/shop-backend
     container_name: jdp-shop-api
     restart: unless-stopped
+    logging: *default-logging
     env_file: [.env]
     environment:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
@@ -364,6 +382,7 @@ services:
     build: ./apps/shop-analytics
     container_name: jdp-shop-analytics
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3001:80"
     deploy:
@@ -381,6 +400,7 @@ services:
     build: ./apps/shop-admin
     container_name: jdp-shop-admin
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "3003:80"
     deploy:
@@ -457,12 +477,14 @@ services:
       - "9090:9090"
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infra/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
     networks: [appnet]
 
   # === Infrastructure Monitor ===
   infra-monitor:
     build: ./apps/infra-monitor
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
@@ -480,6 +502,7 @@ services:
     build: ./apps/onchain-ingest
     container_name: jdp-onchain-ingest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -500,6 +523,7 @@ services:
     build: ./apps/exchange-ingest
     container_name: jdp-exchange-ingest
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -519,6 +543,7 @@ services:
   listing-monitor:
     build: ./apps/listing-monitor
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -543,6 +568,7 @@ services:
   journal-bot:
     build: ./apps/journal-bot
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -566,6 +592,7 @@ services:
   whale-monitor:
     build: ./apps/whale-monitor
     restart: unless-stopped
+    logging: *default-logging
     environment:
       - DB_HOST=postgres
       - DB_PORT=5432
@@ -592,6 +619,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: jdp-tunnel
     restart: unless-stopped
+    logging: *default-logging
     command: tunnel --config /etc/cloudflared/config.yml run
     volumes:
       - ./infra/tunnel:/etc/cloudflared:ro

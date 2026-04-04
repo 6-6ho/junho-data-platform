@@ -27,6 +27,13 @@
 #   shop-api      → 노트북 Postgres (${LAPTOP_IP}:5432)
 
 name: jdp
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "50m"
+    max-file: "3"
+
 services:
   # === Messaging ===
   kafka:
@@ -126,6 +133,7 @@ services:
     build: ./airflow
     container_name: jdp-airflow
     restart: unless-stopped
+    logging: *default-logging
     user: root
     env_file: [.env]
     deploy:
@@ -249,6 +257,7 @@ services:
       shop-api:
         condition: service_healthy
     restart: always
+    logging: *default-logging
 
   shop-admin:
     build: ./apps/shop-admin
@@ -265,6 +274,7 @@ services:
       shop-api:
         condition: service_healthy
     restart: always
+    logging: *default-logging
 
   shop-analytics-job:
     build: ./spark
@@ -294,6 +304,7 @@ services:
       - SPARK_SHUFFLE_PARTITIONS=8
     networks: [appnet]
     restart: always
+    logging: *default-logging
     command: ./start.sh
 
   shop-generator:
@@ -305,6 +316,7 @@ services:
       shop-api:
         condition: service_healthy
     restart: always
+    logging: *default-logging
     networks: [appnet]
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
@@ -357,6 +369,7 @@ services:
       dockerfile: Dockerfile
     container_name: jdp-ttyd
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - /home/junho/junho-data-platform:/home/junho/junho-data-platform
       - /home/junho/.claude:/home/node/.claude
