@@ -473,8 +473,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: jdp-prometheus
-    ports:
-      - "9090:9090"
+    # 호스트 포트 바인딩 제거 — Grafana는 Docker 내부 네트워크(prometheus:9090)로 접근
     volumes:
       - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./infra/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
