@@ -392,7 +392,7 @@ services:
           memory: 128M
     depends_on:
       shop-api:
-        condition: service_healthy
+        condition: service_started
     networks: [appnet]
 
   # === Shop: Admin (Generator Control) ===
@@ -410,7 +410,7 @@ services:
           memory: 128M
     depends_on:
       shop-api:
-        condition: service_healthy
+        condition: service_started
     networks: [appnet]
 
   # === Monitoring UI ===
