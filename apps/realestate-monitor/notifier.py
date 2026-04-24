@@ -90,8 +90,8 @@ def format_message(items: list[dict], target: date, stats: dict) -> str:
 
 
 def send(items: list[dict], target: date, stats: dict) -> None:
-    token = os.getenv("TELEGRAM_BOT_TOKEN")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    token = os.getenv("REALESTATE_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("REALESTATE_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
     message = format_message(items, target, stats)
 
     if not token or not chat_id:

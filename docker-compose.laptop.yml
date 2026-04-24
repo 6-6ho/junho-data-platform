@@ -2,7 +2,7 @@
 #
 # 사용법: docker compose -f docker-compose.laptop.yml up -d
 #
-# 서비스 목록 (21개):
+# 서비스 목록 (22개):
 #   === Infra ===
 #   kafka              - 9092 (메시지 브로커, Trade + Shop 토픽 통합)
 #   postgres           - 5432 (pgvector, LAN 접근 허용)
@@ -17,6 +17,7 @@
 #   whale-monitor      - BTC 에피소드 분석
 #   listing-monitor    - 업비트/빗썸 상장 감지
 #   journal-bot        - 텔레그램 저널 봇
+#   realestate-monitor - 성북구 월세 일일 알림 (08:00 KST)
 #
 #   === Shop ===
 #   shop-generator     - 이벤트 생성 (24/7)
@@ -585,6 +586,26 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks: [appnet]
+
+  # === Realestate Monitor (성북구 월세 일일 알림) ===
+  realestate-monitor:
+    build: ./apps/realestate-monitor
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - TZ=Asia/Seoul
+      - REALESTATE_BOT_TOKEN=${REALESTATE_BOT_TOKEN:-}
+      - REALESTATE_CHAT_ID=${REALESTATE_CHAT_ID:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
+      - RUN_HOUR_KST=8
+      - RUN_MINUTE_KST=0
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 96M
     networks: [appnet]
 
   # === Whale Monitor ===

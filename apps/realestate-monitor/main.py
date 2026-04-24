@@ -1,17 +1,16 @@
 """
 성북구 투룸/쓰리룸 월세 신규 매물 일일 알림.
 
-매일 08:00 KST 기준, 어제(어제 00:00~24:00 KST) 등록된 매물을
-직방+다방에서 수집해 중복 제거 후 텔레그램으로 보낸다.
+docker-compose 에서 상시 가동되는 데몬. 매일 08:00 KST 에 기상 →
+어제(00:00~24:00 KST) 등록된 직방·다방 매물을 수집·중복제거 → 텔레그램 발송.
 
-GitHub Actions 크론에서 호출되는 엔트리포인트 (python -m apps.realestate-monitor.main
-또는 workflow 가 apps/realestate-monitor 로 cd 한 뒤 python main.py).
+수동 1회 실행이 필요하면 `RUN_ONCE=true` 환경변수로 기동.
 """
 import logging
+import os
 import sys
-from datetime import datetime
-
-from dotenv import load_dotenv
+import time
+from datetime import datetime, timedelta
 
 from dedupe import dedupe
 from filters import KST, apply_all, yesterday_kst
@@ -25,6 +24,10 @@ logging.basicConfig(
 )
 log = logging.getLogger("realestate")
 
+RUN_HOUR = int(os.getenv("RUN_HOUR_KST", "8"))
+RUN_MINUTE = int(os.getenv("RUN_MINUTE_KST", "0"))
+RUN_ONCE = os.getenv("RUN_ONCE", "false").lower() == "true"
+
 
 def _safe_fetch(name: str, fn):
     try:
@@ -34,8 +37,7 @@ def _safe_fetch(name: str, fn):
         return []
 
 
-def run_daily() -> int:
-    load_dotenv()
+def run_daily() -> None:
     now = datetime.now(KST)
     target = yesterday_kst(now)
     log.info("실행 시각 %s (KST) — 어제(%s) 등록 매물 조회", now.isoformat(), target.isoformat())
@@ -57,13 +59,42 @@ def run_daily() -> int:
     log.info("최종: %d건", len(deduped))
 
     send(deduped, target, stats)
-    return 0
+
+
+def _sleep_until_next_run() -> None:
+    now = datetime.now(KST)
+    next_run = now.replace(hour=RUN_HOUR, minute=RUN_MINUTE, second=0, microsecond=0)
+    if next_run <= now:
+        next_run += timedelta(days=1)
+    secs = (next_run - now).total_seconds()
+    log.info("다음 실행: %s KST (%.1f시간 뒤)", next_run.isoformat(), secs / 3600)
+    # 15분씩 쪼개서 대기 — 컨테이너 시계 drift 를 주기적으로 재확인
+    while True:
+        remaining = (next_run - datetime.now(KST)).total_seconds()
+        if remaining <= 0:
+            return
+        time.sleep(min(remaining, 900))
+
+
+def main_loop() -> None:
+    log.info("realestate-monitor 시작 (매일 %02d:%02d KST 실행)", RUN_HOUR, RUN_MINUTE)
+    while True:
+        _sleep_until_next_run()
+        try:
+            run_daily()
+        except Exception as e:
+            log.exception("run_daily 실패: %s", e)
+        # 한 번 실행 후 1분 대기(같은 분에 두 번 실행 방지)
+        time.sleep(60)
 
 
 if __name__ == "__main__":
+    if RUN_ONCE:
+        log.info("RUN_ONCE 모드 — 1회만 실행")
+        run_daily()
+        sys.exit(0)
     try:
-        sys.exit(run_daily())
-    except Exception as e:
-        log.exception("치명적 오류: %s", e)
-        # 크론 실행 실패도 텔레그램으로 알리고 싶으면 여기서 send([], ...) 호출 가능
-        sys.exit(1)
+        main_loop()
+    except KeyboardInterrupt:
+        log.info("종료 신호 수신")
+        sys.exit(0)

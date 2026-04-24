@@ -9,37 +9,52 @@
 - 타입: 투룸/쓰리룸 (빌라·다세대)
 - 거래: 월세 / 보증금 ≤ 3,000만 / 월세 ≤ 120만
 - 소스: 직방 + 다방 (네이버 제외 — 빌라 커버 약함, rate limit 타이트)
-- 실행: GitHub Actions cron `0 23 * * *` UTC = 08:00 KST
+- 실행: 랩탑 docker-compose 서비스, 내부 스케줄러가 매일 08:00 KST 기상
 
 ## 구조
 
 ```
 apps/realestate-monitor/
-├── sources/
-│   ├── zigbang.py   # geohash 기반 수집
-│   └── dabang.py    # bbox 기반 수집
+├── Dockerfile
+├── requirements.txt
+├── main.py          # 데몬 루프 (08:00 KST 기상)
 ├── filters.py       # 날짜(어제 KST) / 가격 / 지역 필터
 ├── dedupe.py        # 직방-다방 중복 제거 (직방 우선)
 ├── notifier.py      # 텔레그램 전송
-├── main.py          # 엔트리포인트
-└── requirements.txt
+└── sources/
+    ├── zigbang.py   # geohash 기반 수집
+    └── dabang.py    # bbox 기반 수집
 ```
 
-## 로컬 실행
+## 배포 (랩탑)
+
+`docker-compose.laptop.yml` 에 서비스 등록되어 있음. `.github/workflows/deploy.yml`
+의 기존 파이프라인(SSH → pull → `docker compose up -d --build`) 에 자동으로 포함된다.
 
 ```bash
-cd apps/realestate-monitor
-cp .env.example .env   # 토큰 / 챗ID 채우기
-pip install -r requirements.txt
-python main.py
+# 랩탑에서 수동 재기동
+docker compose -f docker-compose.laptop.yml up -d --build realestate-monitor
+docker compose -f docker-compose.laptop.yml logs -f realestate-monitor
 ```
 
-환경변수가 없으면 메시지를 stdout 에 그대로 출력하므로 dry-run 가능.
+## 환경변수 (루트 `.env`)
 
-## 배포
+| 키 | 설명 |
+|---|---|
+| `REALESTATE_BOT_TOKEN` | 전용 봇 토큰. 비우면 `TELEGRAM_BOT_TOKEN` 폴백 |
+| `REALESTATE_CHAT_ID` | 전용 채팅 ID. 비우면 `TELEGRAM_CHAT_ID` 폴백 |
+| `RUN_HOUR_KST` (opt) | 기본 8 |
+| `RUN_MINUTE_KST` (opt) | 기본 0 |
+| `RUN_ONCE` (opt) | `true` 면 1회 실행 후 종료 (수동 검증용) |
 
-GitHub Actions `.github/workflows/seongbuk-rental-daily.yml` 로 스케줄. 시크릿으로
-`TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` 등록 필요.
+## 수동 1회 실행
+
+```bash
+# 컨테이너 내부에서
+docker compose -f docker-compose.laptop.yml run --rm -e RUN_ONCE=true realestate-monitor
+```
+
+봇 토큰/챗ID 미설정이면 stdout 으로만 메시지를 뽑으므로 dry-run 으로도 쓸 수 있다.
 
 ## ⚠️ API 주의
 
