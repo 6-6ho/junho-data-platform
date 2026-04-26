@@ -10,7 +10,7 @@ async def listings_grouped_by_day(days: int = 14) -> list[dict]:
             """
             SELECT
                 (first_seen_at AT TIME ZONE 'Asia/Seoul')::date AS day,
-                id, source, item_id, room_type, deposit, rent, manage_cost,
+                id, source, item_id, room_type, service_type, deposit, rent, manage_cost,
                 area_m2, floor, all_floors, title, address_local, jibun_address,
                 image_thumbnail, detail_url, first_seen_at, status
             FROM realestate.listings

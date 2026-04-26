@@ -21,7 +21,7 @@ from .db import get_pool
 log = logging.getLogger(__name__)
 
 
-async def fetch_list_for_geohash(client: httpx.AsyncClient, geohash: str) -> list[int]:
+async def fetch_list(client: httpx.AsyncClient, url: str, geohash: str) -> list[int]:
     params = {
         "domain": "zigbang",
         "geohash": geohash,
@@ -31,7 +31,7 @@ async def fetch_list_for_geohash(client: httpx.AsyncClient, geohash: str) -> lis
         "rent_gteq": 0,
         "rent_lteq": config.RENT_MAX,
     }
-    r = await client.get(config.ZIGBANG_LIST_URL, params=params, timeout=15)
+    r = await client.get(url, params=params, timeout=15)
     r.raise_for_status()
     items = r.json().get("items", [])
     return [int(it["itemId"]) for it in items if "itemId" in it]
@@ -39,13 +39,14 @@ async def fetch_list_for_geohash(client: httpx.AsyncClient, geohash: str) -> lis
 
 async def fetch_all_item_ids(client: httpx.AsyncClient) -> set[int]:
     ids: set[int] = set()
-    for h in config.SEONGBUK_GEOHASHES:
-        try:
-            geo_ids = await fetch_list_for_geohash(client, h)
-            ids.update(geo_ids)
-            log.info("list geohash=%s items=%d", h, len(geo_ids))
-        except Exception as e:
-            log.warning("list geohash=%s failed: %s", h, e)
+    for category, url in config.ZIGBANG_LIST_URLS.items():
+        for h in config.GEOHASHES:
+            try:
+                geo_ids = await fetch_list(client, url, h)
+                ids.update(geo_ids)
+                log.info("list cat=%s geohash=%s items=%d", category, h, len(geo_ids))
+            except Exception as e:
+                log.warning("list cat=%s geohash=%s failed: %s", category, h, e)
     return ids
 
 
@@ -68,7 +69,7 @@ def _matches_filter(item: dict) -> bool:
     if item.get("roomType") not in config.ROOM_TYPES:
         return False
     bjd = (item.get("bjdCode") or "")
-    if not bjd.startswith(config.SEONGBUK_BJD_PREFIX):
+    if not bjd.startswith(config.ALLOWED_BJD_PREFIXES):
         return False
     if item.get("status") != "open":
         return False
@@ -95,11 +96,16 @@ def _flatten(detail: dict) -> dict:
             src_updated = datetime.fromisoformat(updated_at.replace(" ", "T")).replace(tzinfo=timezone.utc)
         except Exception:
             src_updated = None
+    service_type = item.get("serviceType")
+    web_url_tpl = (
+        config.ZIGBANG_OFFICETEL_WEB_URL if service_type == "오피스텔"
+        else config.ZIGBANG_VILLA_WEB_URL
+    )
     return {
         "source": "zigbang",
         "item_id": str(item["itemId"]),
         "sales_type": item.get("salesType"),
-        "service_type": item.get("serviceType"),
+        "service_type": service_type,
         "room_type": item.get("roomType"),
         "deposit": price.get("deposit"),
         "rent": price.get("rent"),
@@ -118,7 +124,7 @@ def _flatten(detail: dict) -> dict:
         "options": json.dumps(item.get("options") or [], ensure_ascii=False),
         "movein_date": item.get("moveinDate"),
         "status": item.get("status"),
-        "detail_url": config.ZIGBANG_WEB_URL.format(item_id=item["itemId"]),
+        "detail_url": web_url_tpl.format(item_id=item["itemId"]),
         "raw": json.dumps(detail, ensure_ascii=False),
         "source_updated_at": src_updated,
     }
