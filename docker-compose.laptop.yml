@@ -613,6 +613,89 @@ services:
         condition: service_healthy
     networks: [appnet]
 
+  # === Personal RAG + MCP server (rag.6-6ho.com) ===
+  rag-server:
+    build: ./apps/rag-server
+    container_name: jdp-rag
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: [.env]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      - VOYAGE_MODEL=voyage-3-large
+      - VOYAGE_DIM=1024
+      - OAUTH_ISSUER=https://rag.6-6ho.com
+      - RAG_JWT_SIGNING_KEY=${RAG_JWT_SIGNING_KEY:-}
+      - RAG_LOGIN_TOKEN=${RAG_LOGIN_TOKEN:-}
+      - RAG_ALLOWED_USER_SUB=${RAG_ALLOWED_USER_SUB:-junho}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 384M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; exit(0 if urllib.request.urlopen('http://localhost:8000/health').getcode() == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    volumes:
+      # OAuth state persistence (Phase 3) — survives container restart
+      - rag-oauth-state:/data/oauth-state
+      # RAG ingestion source dir — everything under /home/junho/rag-data/ on the laptop.
+      # Populated by WSL→laptop rsync before each ingestion run.
+      #   rag-data/claude-projects/...  Claude Code session JSONL files
+      #   rag-data/jdp-docs/*.md        junho-data-platform CLAUDE.md + .claude docs + docs/*.md
+      #   rag-data/plans/*.md           ~/.claude/plans (WSL) history
+      - /home/junho/rag-data:/mnt/host/rag-data:ro
+      - ./:/mnt/host/jdp:ro
+    networks: [appnet]
+
+  # === RAG background embedding worker ===
+  # Persistent daemon that fills NULL embeddings. Priority queue places
+  # manual_note chunks first (newest id), so notes saved via `add_note` become
+  # semantically searchable within ~1-2s. Idle when the queue is empty (near-
+  # zero API usage).
+  rag-worker:
+    build: ./apps/rag-server
+    container_name: jdp-rag-worker
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: [.env]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - VOYAGE_API_KEY=${VOYAGE_API_KEY:-}
+      - VOYAGE_MODEL=voyage-3-large
+      - VOYAGE_DIM=1024
+      - REEMBED_BATCH=32
+      - REEMBED_IDLE_SLEEP=15
+      - REEMBED_BUSY_SLEEP=1
+      - REEMBED_RETRY_SLEEP=10
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 256M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "/app/scripts/reembed_worker_daemon.py"]
+    networks: [appnet]
+
   # === Realestate Monitor — 성북구 일별 신규 매물 (6-6ho.com 메인) ===
   realestate-monitor:
     build: ./apps/realestate-monitor
@@ -661,6 +744,7 @@ volumes:
   grafana-data:
   miniodata:
   airflow_logs:
+  rag-oauth-state:
 
 networks:
   appnet:
