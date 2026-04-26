@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>성북구 월세 신규 매물</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+</style>
+</head>
+<body class="bg-zinc-50 text-zinc-900">
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+
+  <header class="mb-8 flex items-end justify-between">
+    <div>
+      <h1 class="text-2xl font-bold">성북구 월세 신규 매물</h1>
+      <p class="text-sm text-zinc-500 mt-1">
+        투룸·쓰리룸 · 보증금 ≤ {{ deposit_max }}만 · 월세 ≤ {{ rent_max }}만 · 직방
+      </p>
+    </div>
+    <div class="text-right text-xs text-zinc-500">
+      <div>활성 매물 <span class="font-semibold text-zinc-700">{{ total }}</span>건</div>
+      {% if last_run %}
+        <div>최근 갱신 {{ last_run.started_at.strftime('%m/%d %H:%M') }}
+          {% if last_run.status == 'ok' %}
+            <span class="text-emerald-600">✓</span>
+          {% else %}
+            <span class="text-red-600">⚠ {{ last_run.error_message or 'error' }}</span>
+          {% endif %}
+        </div>
+      {% endif %}
+    </div>
+  </header>
+
+  {% if not days %}
+    <div class="bg-white border border-zinc-200 rounded-lg p-8 text-center text-zinc-500">
+      아직 데이터 없음. 매일 08:00 KST 자동 갱신.
+    </div>
+  {% endif %}
+
+  {% for d in days %}
+  <section class="mb-8">
+    <div class="flex items-baseline gap-3 mb-3 border-b border-zinc-200 pb-2">
+      <h2 class="text-lg font-semibold">
+        {{ d.day.strftime('%Y-%m-%d') }}
+        <span class="text-sm text-zinc-400 font-normal">{{ ['월','화','수','목','금','토','일'][d.day.weekday()] }}</span>
+      </h2>
+      <span class="text-sm text-zinc-500">신규 {{ d.listings|length }}건</span>
+    </div>
+
+    {% if not d.listings %}
+      <p class="text-sm text-zinc-400 italic">신규 매물 없음</p>
+    {% else %}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      {% for it in d.listings %}
+        <a href="{{ it.detail_url }}" target="_blank" rel="noopener"
+           class="block bg-white border border-zinc-200 rounded-lg overflow-hidden hover:border-zinc-400 hover:shadow-sm transition">
+          <div class="flex">
+            {% if it.image_thumbnail %}
+              <img src="{{ it.image_thumbnail }}" alt=""
+                   class="w-32 h-32 object-cover flex-shrink-0 bg-zinc-100"
+                   loading="lazy" referrerpolicy="no-referrer">
+            {% else %}
+              <div class="w-32 h-32 bg-zinc-100 flex-shrink-0 flex items-center justify-center text-zinc-300 text-xs">no image</div>
+            {% endif %}
+            <div class="p-3 flex-1 min-w-0">
+              <div class="flex items-baseline gap-2 mb-1">
+                <span class="text-base font-bold text-zinc-900">
+                  {{ it.deposit }}<span class="text-zinc-400">/</span>{{ it.rent }}
+                </span>
+                <span class="text-xs text-zinc-500">{{ it.room_type }}</span>
+              </div>
+              <div class="text-sm text-zinc-700 mb-1 truncate">{{ it.title or '-' }}</div>
+              <div class="text-xs text-zinc-500 truncate">
+                {{ it.address_local }}
+                {% if it.area_m2 %} · {{ '%.1f'|format(it.area_m2|float) }}㎡{% endif %}
+                {% if it.floor %} · {{ it.floor }}/{{ it.all_floors }}층{% endif %}
+                {% if it.manage_cost %} · 관리비 {{ it.manage_cost }}만{% endif %}
+              </div>
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  <footer class="mt-12 pt-6 border-t border-zinc-200 text-xs text-zinc-400 text-center">
+    매일 08:00 KST 자동 갱신 · 매물 클릭 시 직방 원본 새 창 열림
+  </footer>
+
+</div>
+</body>
+</html>
