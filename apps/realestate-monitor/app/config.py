@@ -15,8 +15,8 @@ GEOHASHES = ["wydmc", "wydmf", "wydmg", "wydq1", "wydq4", "wydq5"]
 ALLOWED_BJD_PREFIXES = ("11290",)
 
 # 조건
-DEPOSIT_MAX = int(os.getenv("DEPOSIT_MAX", "5000"))
-RENT_MAX = int(os.getenv("RENT_MAX", "150"))
+DEPOSIT_MAX = int(os.getenv("DEPOSIT_MAX", "3000"))
+RENT_MAX = int(os.getenv("RENT_MAX", "120"))
 ROOM_TYPES = {"투룸", "쓰리룸"}  # zigbang은 1.5룸을 투룸으로 분류
 SALES_TYPE = "월세"
 
