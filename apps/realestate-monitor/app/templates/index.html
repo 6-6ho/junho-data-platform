@@ -73,9 +73,11 @@
            class="listing-card block bg-white border border-zinc-200 rounded-lg overflow-hidden hover:border-zinc-400 hover:shadow-sm transition">
           <div class="flex">
             {% if it.image_thumbnail %}
-              <img src="{{ it.image_thumbnail }}" alt=""
+              <img src="{{ it.image_thumbnail }}?w=400" alt=""
                    class="w-32 h-32 object-cover flex-shrink-0 bg-zinc-100"
-                   loading="lazy" referrerpolicy="no-referrer">
+                   loading="lazy" referrerpolicy="no-referrer"
+                   onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+              <div class="w-32 h-32 bg-zinc-100 flex-shrink-0 items-center justify-center text-zinc-300 text-xs hidden">no image</div>
             {% else %}
               <div class="w-32 h-32 bg-zinc-100 flex-shrink-0 flex items-center justify-center text-zinc-300 text-xs">no image</div>
             {% endif %}
