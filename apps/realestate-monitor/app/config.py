@@ -8,11 +8,17 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
 
 DSN = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# 성북구 커버하는 geohashes (precision 5)
-GEOHASHES = ["wydmc", "wydmf", "wydmg", "wydq1", "wydq4", "wydq5"]
+# 성북·동대문·중·성동 커버하는 geohashes (precision 5)
+GEOHASHES = ["wydm9", "wydmc", "wydmd", "wydme", "wydmf", "wydmg",
+             "wydq1", "wydq4", "wydq5"]
 
-# 법정동 코드 prefix — 성북구만
-ALLOWED_BJD_PREFIXES = ("11290",)
+# 법정동 코드 prefix
+ALLOWED_BJD_PREFIXES = (
+    "11290",  # 성북구
+    "11230",  # 동대문구
+    "11140",  # 중구
+    "11200",  # 성동구
+)
 
 # 조건
 DEPOSIT_MAX = int(os.getenv("DEPOSIT_MAX", "3000"))
