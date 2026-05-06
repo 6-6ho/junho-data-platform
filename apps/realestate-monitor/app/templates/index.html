@@ -14,7 +14,7 @@
 
 <div class="max-w-5xl mx-auto px-4 py-8">
 
-  <header class="mb-8 flex items-end justify-between">
+  <header class="mb-4 flex items-end justify-between">
     <div>
       <h1 class="text-2xl font-bold">성북·동대문·중·성동구 월세 신규 매물</h1>
       <p class="text-sm text-zinc-500 mt-1">
@@ -35,6 +35,18 @@
     </div>
   </header>
 
+  <!-- District filter pills -->
+  <div class="mb-6 flex flex-wrap gap-2" id="district-filter">
+    <button data-d="all" class="pill pill-active px-3 py-1.5 text-sm rounded-full border border-zinc-300 bg-white hover:border-zinc-400 transition">
+      전체 <span class="text-zinc-400 ml-1">{{ total }}</span>
+    </button>
+    {% for d in districts %}
+    <button data-d="{{ d.name }}" class="pill px-3 py-1.5 text-sm rounded-full border border-zinc-300 bg-white hover:border-zinc-400 transition">
+      {{ d.name }} <span class="text-zinc-400 ml-1">{{ d.count }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
   {% if not days %}
     <div class="bg-white border border-zinc-200 rounded-lg p-8 text-center text-zinc-500">
       아직 데이터 없음. 매일 08:00 KST 자동 갱신.
@@ -42,13 +54,13 @@
   {% endif %}
 
   {% for d in days %}
-  <section class="mb-8">
+  <section class="mb-8 day-section" data-day="{{ d.day }}">
     <div class="flex items-baseline gap-3 mb-3 border-b border-zinc-200 pb-2">
       <h2 class="text-lg font-semibold">
         {{ d.day.strftime('%Y-%m-%d') }}
         <span class="text-sm text-zinc-400 font-normal">{{ ['월','화','수','목','금','토','일'][d.day.weekday()] }}</span>
       </h2>
-      <span class="text-sm text-zinc-500">신규 {{ d.listings|length }}건</span>
+      <span class="text-sm text-zinc-500 day-count" data-total="{{ d.listings|length }}">신규 {{ d.listings|length }}건</span>
     </div>
 
     {% if not d.listings %}
@@ -57,7 +69,8 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
       {% for it in d.listings %}
         <a href="{{ it.detail_url }}" target="_blank" rel="noopener"
-           class="block bg-white border border-zinc-200 rounded-lg overflow-hidden hover:border-zinc-400 hover:shadow-sm transition">
+           data-district="{{ it.district }}"
+           class="listing-card block bg-white border border-zinc-200 rounded-lg overflow-hidden hover:border-zinc-400 hover:shadow-sm transition">
           <div class="flex">
             {% if it.image_thumbnail %}
               <img src="{{ it.image_thumbnail }}" alt=""
@@ -72,6 +85,7 @@
                   {{ it.deposit }}<span class="text-zinc-400">/</span>{{ it.rent }}
                 </span>
                 <span class="text-xs text-zinc-500">{{ it.room_type }}</span>
+                <span class="text-[10px] px-1.5 py-0.5 bg-zinc-100 text-zinc-700 rounded">{{ it.district }}</span>
                 {% if it.service_type == '오피스텔' %}
                   <span class="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-800 rounded">오피스텔</span>
                 {% endif %}
@@ -97,5 +111,43 @@
   </footer>
 
 </div>
+
+<style>
+  .pill-active { background-color: #18181b !important; color: #fff !important; border-color: #18181b !important; }
+  .pill-active span { color: #a1a1aa !important; }
+</style>
+<script>
+  (function() {
+    const pills = document.querySelectorAll('#district-filter .pill');
+    const cards = document.querySelectorAll('.listing-card');
+    const sections = document.querySelectorAll('.day-section');
+
+    function applyFilter(target) {
+      cards.forEach(c => {
+        c.style.display = (target === 'all' || c.dataset.district === target) ? '' : 'none';
+      });
+      sections.forEach(s => {
+        const visible = s.querySelectorAll('.listing-card:not([style*="none"])').length;
+        const totalEl = s.querySelector('.day-count');
+        if (totalEl) {
+          const total = totalEl.dataset.total;
+          totalEl.textContent = (target === 'all')
+            ? `신규 ${total}건`
+            : `신규 ${visible}건`;
+        }
+        // hide entire day section if no cards visible (only when filtering)
+        s.style.display = (target !== 'all' && visible === 0) ? 'none' : '';
+      });
+    }
+
+    pills.forEach(p => {
+      p.addEventListener('click', () => {
+        pills.forEach(x => x.classList.remove('pill-active'));
+        p.classList.add('pill-active');
+        applyFilter(p.dataset.d);
+      });
+    });
+  })();
+</script>
 </body>
 </html>

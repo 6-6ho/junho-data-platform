@@ -57,11 +57,13 @@ async def index():
     days = await queries.listings_grouped_by_day(days=14)
     last_run = await queries.latest_run()
     total = await queries.total_active()
+    districts = await queries.district_counts()
     template = TPL.get_template("index.html")
     html = template.render(
         days=days,
         last_run=last_run,
         total=total,
+        districts=districts,
         deposit_max=config.DEPOSIT_MAX,
         total_rent_min=config.TOTAL_RENT_MIN,
         total_rent_max=config.TOTAL_RENT_MAX,
