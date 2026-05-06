@@ -22,7 +22,9 @@ ALLOWED_BJD_PREFIXES = (
 
 # 조건
 DEPOSIT_MAX = int(os.getenv("DEPOSIT_MAX", "3000"))
-RENT_MAX = int(os.getenv("RENT_MAX", "120"))
+# 월세 + 관리비 합계 기준
+TOTAL_RENT_MIN = int(os.getenv("TOTAL_RENT_MIN", "80"))
+TOTAL_RENT_MAX = int(os.getenv("TOTAL_RENT_MAX", "120"))
 ROOM_TYPES = {"투룸", "쓰리룸"}  # zigbang은 1.5룸을 투룸으로 분류
 SALES_TYPE = "월세"
 

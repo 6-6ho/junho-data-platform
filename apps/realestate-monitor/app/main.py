@@ -63,7 +63,8 @@ async def index():
         last_run=last_run,
         total=total,
         deposit_max=config.DEPOSIT_MAX,
-        rent_max=config.RENT_MAX,
+        total_rent_min=config.TOTAL_RENT_MIN,
+        total_rent_max=config.TOTAL_RENT_MAX,
     )
     return HTMLResponse(html, headers={"X-Robots-Tag": "noindex, nofollow"})
 

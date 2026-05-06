@@ -63,6 +63,14 @@ async def fetch_detail(client: httpx.AsyncClient, item_id: int) -> dict | None:
         return None
 
 
+_WOMEN_ONLY_PATTERNS = ("여성전용", "여성 전용", "여자전용", "여성만", "여자만")
+
+
+def _is_women_only(item: dict) -> bool:
+    blob = f"{item.get('title') or ''} {item.get('description') or ''}"
+    return any(p in blob for p in _WOMEN_ONLY_PATTERNS)
+
+
 def _matches_filter(item: dict) -> bool:
     if item.get("salesType") != config.SALES_TYPE:
         return False
@@ -76,7 +84,13 @@ def _matches_filter(item: dict) -> bool:
     price = item.get("price") or {}
     deposit = price.get("deposit", 0) or 0
     rent = price.get("rent", 0) or 0
-    if deposit > config.DEPOSIT_MAX or rent > config.RENT_MAX:
+    manage_cost = ((item.get("manageCost") or {}).get("amount") or 0)
+    total_rent = rent + manage_cost
+    if deposit > config.DEPOSIT_MAX:
+        return False
+    if total_rent < config.TOTAL_RENT_MIN or total_rent > config.TOTAL_RENT_MAX:
+        return False
+    if _is_women_only(item):
         return False
     return True
 
