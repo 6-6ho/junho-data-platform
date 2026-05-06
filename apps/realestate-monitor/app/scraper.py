@@ -29,7 +29,7 @@ async def fetch_list(client: httpx.AsyncClient, url: str, geohash: str) -> list[
         "deposit_gteq": 0,
         "deposit_lteq": config.DEPOSIT_MAX,
         "rent_gteq": 0,
-        "rent_lteq": config.RENT_MAX,
+        "rent_lteq": config.TOTAL_RENT_MAX,
     }
     r = await client.get(url, params=params, timeout=15)
     r.raise_for_status()
