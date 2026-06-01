@@ -25,6 +25,15 @@ COMPOSE_GLOB = "docker-compose*.yml"
 # 카테고리에서 빼고 싶은 이름 (도구/데이터 디렉터리 등)
 EXCLUDE = {"rag-data", "rag-backups", "rag-staging", "bin", "development", "lotto-preview"}
 
+# 이 접두사로 시작하는 프로젝트는 통째로 제외 (예: shop-admin, shop-analytics …)
+EXCLUDE_PREFIXES = ("shop",)
+
+
+def excluded(name: str) -> bool:
+    return name in EXCLUDE or any(
+        name == p or name.startswith(p + "-") for p in EXCLUDE_PREFIXES
+    )
+
 
 def is_project(d: Path) -> bool:
     if any((d / m).exists() for m in MARKERS):
@@ -35,7 +44,7 @@ def is_project(d: Path) -> bool:
 def top_level_projects() -> list[str]:
     out = []
     for d in HOME.iterdir():
-        if not d.is_dir() or d.name.startswith(".") or d.name in EXCLUDE:
+        if not d.is_dir() or d.name.startswith(".") or excluded(d.name):
             continue
         if is_project(d):
             out.append(d.name)
@@ -46,7 +55,10 @@ def jdp_apps() -> list[str]:
     apps = JDP / "apps"
     if not apps.is_dir():
         return []
-    return [d.name for d in apps.iterdir() if d.is_dir() and not d.name.startswith(".")]
+    return [
+        d.name for d in apps.iterdir()
+        if d.is_dir() and not d.name.startswith(".") and not excluded(d.name)
+    ]
 
 
 def main() -> None:
