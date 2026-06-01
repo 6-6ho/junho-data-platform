@@ -32,6 +32,20 @@ TPL = Environment(
 PRESET_CATEGORIES = ["trade", "shop", "realestate", "rag", "infra", "개인"]
 
 
+def load_projects() -> list[str]:
+    """gen_projects.py 가 갱신하는 프로젝트 목록 파일을 읽어 카테고리 프리셋으로.
+    파일이 없거나 깨졌으면 내장 fallback. 매 렌더마다 읽어 cron 갱신을 즉시 반영."""
+    try:
+        with open(config.PROJECTS_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+        names = [str(x).strip() for x in data if str(x).strip()]
+        if names:
+            return names
+    except Exception:
+        pass
+    return PRESET_CATEGORIES
+
+
 def _json_for_html(obj) -> str:
     """JSON safe to embed inside a <script> tag."""
     return json.dumps(obj, ensure_ascii=False, default=str).replace("<", "\\u003c")
@@ -72,7 +86,7 @@ async def robots(request: Request) -> PlainTextResponse:
 async def index(request: Request) -> HTMLResponse:
     tasks = await queries.all_tasks()
     cats = await queries.categories()
-    merged = list(dict.fromkeys(PRESET_CATEGORIES + cats))
+    merged = list(dict.fromkeys(load_projects() + cats))
     html = TPL.get_template("index.html").render(
         tasks_json=_json_for_html(tasks),
         categories_json=_json_for_html(merged),
