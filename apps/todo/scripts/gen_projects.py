@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """todo 카테고리용 프로젝트 목록 생성.
 
-/home/junho 직속 프로젝트 디렉터리 + junho-data-platform/apps/* 하위 앱 이름을
-스캔해 JSON 배열로 ~/.config/todo/projects.json 에 쓴다. 이 파일은 todo 컨테이너에
-read-only 로 마운트되어 datalist 프리셋이 된다 (홈 전체 마운트 회피).
+분류 정책 (도메인+제품, 12개 기준):
+- jdp(junho-data-platform)/apps 내부 마이크로서비스는 도메인으로 묶는다
+  (trade-* + 크립토 피드류 → trade, realestate-monitor → realestate, ...).
+  JDP_DOMAIN 에 없는 jdp 앱은 제외(노이즈 컷). 새 jdp 도메인은 여기 추가.
+- /home/junho 직속 독립 제품은 유지하되, 일부는 짧은 이름으로(RENAME).
+  메타/툴링(app-factory, claude-harness, junho-data-platform 자신)은 제외.
+  → 매핑/제외에 없는 새 최상위 프로젝트는 그대로 자동 등장(auto-sync 유지).
+- 항상 마지막에 '개인'.
 
-cron 으로 주기 실행 → 새 프로젝트가 자동으로 카테고리에 등장.
-파일 내용만 읽으므로 디렉터리 이름 외엔 아무것도 노출하지 않는다.
+출력: ~/.config/todo/projects.json (todo 컨테이너에 ro 마운트, 홈 미노출).
+cron 으로 주기 실행 → 새 제품 자동 반영.
 """
 from __future__ import annotations
 
@@ -18,21 +23,35 @@ HOME = Path(os.path.expanduser("~"))
 JDP = HOME / "junho-data-platform"
 OUT = HOME / ".config" / "todo" / "projects.json"
 
-# 프로젝트로 인정하는 마커 (하나라도 있으면 프로젝트)
 MARKERS = (".git", "Dockerfile", "package.json", "pyproject.toml")
 COMPOSE_GLOB = "docker-compose*.yml"
 
-# 카테고리에서 빼고 싶은 이름 (도구/데이터 디렉터리 등)
-EXCLUDE = {"rag-data", "rag-backups", "rag-staging", "bin", "development", "lotto-preview"}
+# jdp/apps 마이크로서비스 → 도메인 카테고리. 없는 앱은 제외.
+JDP_DOMAIN = {
+    "trade-backend": "trade",
+    "trade-frontend": "trade",
+    "trade-ingest": "trade",
+    "exchange-ingest": "trade",
+    "onchain-ingest": "trade",
+    "whale-monitor": "trade",
+    "listing-monitor": "trade",
+    "investment-agent": "trade",
+    "realestate-monitor": "realestate",
+    "rag-server": "rag",
+    "infra-monitor": "infra",
+}
 
-# 이 접두사로 시작하는 프로젝트는 통째로 제외 (예: shop-admin, shop-analytics …)
-EXCLUDE_PREFIXES = ("shop",)
+# 최상위 프로젝트 표시 이름 단축
+RENAME = {
+    "kkum-oracle": "kkum",
+    "seojin-master": "seojin",
+}
 
-
-def excluded(name: str) -> bool:
-    return name in EXCLUDE or any(
-        name == p or name.startswith(p + "-") for p in EXCLUDE_PREFIXES
-    )
+# 최상위에서 제외 (메타/툴링/데이터 디렉터리)
+TOP_EXCLUDE = {
+    "app-factory", "claude-harness", "junho-data-platform",
+    "rag-data", "rag-backups", "rag-staging", "bin", "development", "lotto-preview",
+}
 
 
 def is_project(d: Path) -> bool:
@@ -44,27 +63,28 @@ def is_project(d: Path) -> bool:
 def top_level_projects() -> list[str]:
     out = []
     for d in HOME.iterdir():
-        if not d.is_dir() or d.name.startswith(".") or excluded(d.name):
+        if not d.is_dir() or d.name.startswith(".") or d.name in TOP_EXCLUDE:
             continue
         if is_project(d):
-            out.append(d.name)
+            out.append(RENAME.get(d.name, d.name))
     return out
 
 
-def jdp_apps() -> list[str]:
+def jdp_domains() -> list[str]:
     apps = JDP / "apps"
     if not apps.is_dir():
         return []
-    return [
-        d.name for d in apps.iterdir()
-        if d.is_dir() and not d.name.startswith(".") and not excluded(d.name)
-    ]
+    out = []
+    for d in apps.iterdir():
+        if d.is_dir() and d.name in JDP_DOMAIN:
+            out.append(JDP_DOMAIN[d.name])
+    return out
 
 
 def main() -> None:
-    names = set(top_level_projects()) | set(jdp_apps())
+    names = set(top_level_projects()) | set(jdp_domains())
     ordered = sorted(names)
-    ordered.append("개인")  # 항상 마지막에 개인
+    ordered.append("개인")
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(ordered, ensure_ascii=False, indent=2))
     print(f"wrote {len(ordered)} categories -> {OUT}")
