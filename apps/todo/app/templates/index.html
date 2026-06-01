@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>할 일 보드</title>
+<script>
+  // theme before paint to avoid flash
+  if (localStorage.getItem('todo-theme') === 'dark'
+      || (!localStorage.getItem('todo-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.documentElement.classList.add('dark');
+  }
+</script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' };</script>
+<link rel="stylesheet" as="style" crossorigin
+      href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+<style>
+  body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+  .dragging { opacity: .4; }
+  .drop-hint { outline: 2px dashed rgba(16,185,129,.6); outline-offset: 2px; }
+</style>
+</head>
+<body class="bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 transition-colors">
+
+<div class="max-w-6xl mx-auto px-4 py-6">
+
+  <!-- Header -->
+  <header class="mb-5 flex items-center justify-between gap-3">
+    <h1 class="text-xl font-bold flex items-center gap-2">
+      할 일 보드
+      <span id="active-count" class="text-xs font-normal text-zinc-400"></span>
+    </h1>
+    <div class="flex items-center gap-2">
+      <div class="inline-flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden text-sm">
+        <button id="view-list" class="view-btn px-3 py-1.5">리스트</button>
+        <button id="view-board" class="view-btn px-3 py-1.5 border-l border-zinc-300 dark:border-zinc-700">칸반</button>
+      </div>
+      <button id="theme-toggle" title="테마"
+              class="w-9 h-9 rounded-lg border border-zinc-300 dark:border-zinc-700 flex items-center justify-center hover:bg-zinc-100 dark:hover:bg-zinc-800 transition">
+        <span class="dark:hidden">🌙</span><span class="hidden dark:inline">☀️</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Quick add -->
+  <form id="add-form" class="mb-6 grid grid-cols-1 sm:grid-cols-[1fr_140px_150px_110px_auto] gap-2">
+    <input id="add-title" type="text" autocomplete="off" maxlength="500" placeholder="할 일 입력…"
+           class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900
+                  focus:outline-none focus:border-zinc-900 dark:focus:border-zinc-300 transition">
+    <input id="add-category" type="text" list="cat-list" placeholder="프로젝트"
+           class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none">
+    <input id="add-due" type="date"
+           class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none text-zinc-600 dark:text-zinc-300">
+    <select id="add-priority"
+            class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none text-zinc-600 dark:text-zinc-300">
+      <option value="">우선순위</option>
+      <option value="high">높음</option>
+      <option value="med">보통</option>
+      <option value="low">낮음</option>
+    </select>
+    <button type="submit" class="px-4 py-2 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 text-sm font-medium hover:opacity-90 transition">추가</button>
+  </form>
+  <datalist id="cat-list"></datalist>
+
+  <!-- List view -->
+  <div id="list-view"></div>
+
+  <!-- Board view -->
+  <div id="board-view" class="hidden grid grid-cols-3 gap-3"></div>
+
+  <div id="empty" class="hidden text-center text-zinc-400 text-sm py-16">할 일이 없어요. 위에 적어보세요.</div>
+</div>
+
+<!-- Edit modal -->
+<div id="modal" class="hidden fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
+  <div class="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 w-full max-w-md p-5 space-y-3">
+    <h3 class="font-semibold text-sm text-zinc-500 dark:text-zinc-400">할 일 편집</h3>
+    <input id="m-title" type="text" maxlength="500" placeholder="제목"
+           class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none">
+    <div class="grid grid-cols-2 gap-2">
+      <input id="m-category" type="text" list="cat-list" placeholder="프로젝트"
+             class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none">
+      <input id="m-due" type="date"
+             class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none text-zinc-600 dark:text-zinc-300">
+      <select id="m-priority" class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none text-zinc-600 dark:text-zinc-300">
+        <option value="">우선순위 없음</option>
+        <option value="high">높음</option><option value="med">보통</option><option value="low">낮음</option>
+      </select>
+      <select id="m-status" class="px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none text-zinc-600 dark:text-zinc-300">
+        <option value="todo">할일</option><option value="doing">진행중</option><option value="done">완료</option>
+      </select>
+    </div>
+    <textarea id="m-memo" rows="3" placeholder="메모/설명"
+              class="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 focus:outline-none resize-y"></textarea>
+    <div class="flex items-center justify-between pt-1">
+      <button id="m-delete" class="text-sm text-red-500 hover:text-red-600">삭제</button>
+      <div class="flex gap-2">
+        <button id="m-cancel" class="px-3 py-1.5 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700">취소</button>
+        <button id="m-save" class="px-4 py-1.5 text-sm rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 font-medium">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="tasks-data" type="application/json">{{ tasks_json|safe }}</script>
+<script id="cats-data" type="application/json">{{ categories_json|safe }}</script>
+<script>
+(function () {
+  let TASKS = JSON.parse(document.getElementById('tasks-data').textContent || '[]');
+  const CATS = JSON.parse(document.getElementById('cats-data').textContent || '[]');
+  let view = localStorage.getItem('todo-view') || 'list';
+
+  const STATUS = {
+    todo:  { label: '할일',   dot: '○', ring: 'border-zinc-400 dark:border-zinc-500', text: 'text-zinc-500' },
+    doing: { label: '진행중', dot: '◐', ring: 'border-amber-500 text-amber-500',      text: 'text-amber-600 dark:text-amber-400' },
+    done:  { label: '완료',   dot: '●', ring: 'border-emerald-500 bg-emerald-500 text-white', text: 'text-emerald-600 dark:text-emerald-400' },
+  };
+  const PRI = {
+    high: { label: '높음', cls: 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300' },
+    med:  { label: '보통', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' },
+    low:  { label: '낮음', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300' },
+  };
+  const ORDER = ['todo', 'doing', 'done'];
+
+  const $ = (id) => document.getElementById(id);
+  const listView = $('list-view'), boardView = $('board-view'), empty = $('empty');
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+  function todayStr() {
+    const d = new Date(); const p = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  }
+  function dueBadge(due) {
+    if (!due) return '';
+    const t = todayStr();
+    let cls = 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400', label = due.slice(5);
+    if (due < t) { cls = 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-300'; label = '지남 ' + due.slice(5); }
+    else if (due === t) { cls = 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'; label = '오늘'; }
+    return `<span class="text-[11px] px-1.5 py-0.5 rounded ${cls}">${label}</span>`;
+  }
+  function priBadge(p) {
+    if (!PRI[p]) return '';
+    return `<span class="text-[11px] px-1.5 py-0.5 rounded ${PRI[p].cls}">${PRI[p].label}</span>`;
+  }
+  function catBadge(c) {
+    if (!c) return '';
+    return `<span class="text-[11px] px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">${esc(c)}</span>`;
+  }
+  function memoMark(m) {
+    if (!m) return '';
+    return `<span class="text-[11px] text-zinc-400" title="${esc(m)}">📝</span>`;
+  }
+
+  function updateDatalist() {
+    const used = [...new Set(TASKS.map(t => t.category).filter(Boolean))];
+    const all = [...new Set([...CATS, ...used])];
+    $('cat-list').innerHTML = all.map(c => `<option value="${esc(c)}">`).join('');
+  }
+
+  function counts() {
+    const a = TASKS.filter(t => t.status !== 'done').length;
+    const d = TASKS.filter(t => t.status === 'done').length;
+    $('active-count').textContent = `· 남은 일 ${a}` + (d ? ` · 완료 ${d}` : '');
+    empty.classList.toggle('hidden', TASKS.length > 0);
+  }
+
+  // ---------- LIST VIEW ----------
+  function statusDot(t) {
+    const s = STATUS[t.status];
+    return `<button data-act="cycle" data-id="${t.id}" title="${s.label} (클릭해 변경)"
+              class="flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center text-[11px] leading-none ${s.ring} transition">${t.status === 'done' ? '✓' : ''}</button>`;
+  }
+  function listCard(t) {
+    const doneCls = t.status === 'done' ? 'line-through text-zinc-400 dark:text-zinc-600' : '';
+    return `<div class="group flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
+      ${statusDot(t)}
+      <span class="flex-1 text-sm break-words ${doneCls}">${esc(t.title)} ${memoMark(t.memo)}</span>
+      ${dueBadge(t.due_date)} ${priBadge(t.priority)}
+      <button data-act="edit" data-id="${t.id}" class="text-zinc-300 hover:text-zinc-600 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition text-sm px-1" title="편집">✎</button>
+      <button data-act="del" data-id="${t.id}" class="text-zinc-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition text-lg leading-none px-1" title="삭제">×</button>
+    </div>`;
+  }
+  function renderList() {
+    const active = TASKS.filter(t => t.status !== 'done');
+    const done = TASKS.filter(t => t.status === 'done');
+    // group active by category
+    const groups = {};
+    for (const t of active) (groups[t.category || '기타'] ??= []).push(t);
+    const catKeys = Object.keys(groups).sort((a, b) => (a === '기타') - (b === '기타') || a.localeCompare(b));
+    const rank = { doing: 0, todo: 1 };
+    let html = '';
+    for (const c of catKeys) {
+      const items = groups[c].sort((a, b) =>
+        (rank[a.status] - rank[b.status]) ||
+        ((a.due_date || '9999') < (b.due_date || '9999') ? -1 : 1));
+      html += `<section class="mb-5">
+        <div class="flex items-baseline gap-2 mb-2 border-b border-zinc-200 dark:border-zinc-800 pb-1.5">
+          <h2 class="text-sm font-semibold">${esc(c)}</h2>
+          <span class="text-xs text-zinc-400">${items.length}</span>
+        </div>
+        <div class="space-y-1.5">${items.map(listCard).join('')}</div>
+      </section>`;
+    }
+    if (done.length) {
+      done.sort((a, b) => (b.done_at || '').localeCompare(a.done_at || ''));
+      html += `<section class="mb-5">
+        <button id="done-toggle" class="flex items-center gap-2 mb-2 text-sm font-semibold text-zinc-500">
+          <span id="done-caret">▸</span> 완료 <span class="text-xs text-zinc-400">${done.length}</span>
+          <span class="ml-2 text-xs font-normal text-zinc-400 hover:text-red-500" id="clear-done">비우기</span>
+        </button>
+        <div id="done-list" class="space-y-1.5 hidden">${done.map(listCard).join('')}</div>
+      </section>`;
+    }
+    listView.innerHTML = html;
+  }
+
+  // ---------- BOARD VIEW ----------
+  function boardCard(t) {
+    const doneCls = t.status === 'done' ? 'line-through text-zinc-400 dark:text-zinc-600' : '';
+    return `<div draggable="true" data-id="${t.id}"
+      class="board-card group bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg p-2.5 cursor-grab active:cursor-grabbing">
+      <div class="flex items-start gap-2">
+        <span class="flex-1 text-sm break-words ${doneCls}">${esc(t.title)}</span>
+        <button data-act="edit" data-id="${t.id}" class="text-zinc-300 hover:text-zinc-600 dark:hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition text-sm" title="편집">✎</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-1 mt-1.5">${catBadge(t.category)} ${dueBadge(t.due_date)} ${priBadge(t.priority)} ${memoMark(t.memo)}</div>
+    </div>`;
+  }
+  function renderBoard() {
+    let html = '';
+    for (const st of ORDER) {
+      const items = TASKS.filter(t => t.status === st).sort((a, b) => a.sort_order - b.sort_order);
+      const s = STATUS[st];
+      html += `<div class="flex flex-col">
+        <div class="flex items-center gap-2 mb-2 px-1">
+          <span class="text-sm font-semibold ${s.text}">${s.label}</span>
+          <span class="text-xs text-zinc-400">${items.length}</span>
+        </div>
+        <div class="board-col flex-1 min-h-[120px] space-y-2 p-2 rounded-lg bg-zinc-100/60 dark:bg-zinc-900/40" data-status="${st}">
+          ${items.map(boardCard).join('')}
+        </div>
+      </div>`;
+    }
+    boardView.innerHTML = html;
+    wireDrag();
+  }
+
+  function wireDrag() {
+    let dragId = null;
+    document.querySelectorAll('.board-card').forEach(card => {
+      card.addEventListener('dragstart', () => { dragId = card.dataset.id; card.classList.add('dragging'); });
+      card.addEventListener('dragend', () => { dragId = null; card.classList.remove('dragging'); document.querySelectorAll('.board-col').forEach(c => c.classList.remove('drop-hint')); });
+    });
+    document.querySelectorAll('.board-col').forEach(col => {
+      col.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        col.classList.add('drop-hint');
+        const after = afterElement(col, e.clientY);
+        const dragged = document.querySelector('.dragging');
+        if (!dragged) return;
+        if (after == null) col.appendChild(dragged);
+        else col.insertBefore(dragged, after);
+      });
+      col.addEventListener('dragleave', () => col.classList.remove('drop-hint'));
+      col.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        col.classList.remove('drop-hint');
+        const status = col.dataset.status;
+        const ids = [...col.querySelectorAll('.board-card')].map(c => Number(c.dataset.id));
+        await api('/api/reorder', { status, ids });
+        // update local state to match
+        ids.forEach((id, idx) => {
+          const t = TASKS.find(x => x.id === id);
+          if (t) { t.status = status; t.sort_order = idx; if (status === 'done' && !t.done_at) t.done_at = new Date().toISOString(); if (status !== 'done') t.done_at = null; }
+        });
+        counts(); render();
+      });
+    });
+  }
+  function afterElement(col, y) {
+    const els = [...col.querySelectorAll('.board-card:not(.dragging)')];
+    let closest = { offset: -Infinity, el: null };
+    for (const el of els) {
+      const box = el.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) closest = { offset, el };
+    }
+    return closest.el;
+  }
+
+  // ---------- render switch ----------
+  function render() {
+    updateDatalist(); counts();
+    const list = view === 'list';
+    listView.classList.toggle('hidden', !list);
+    boardView.classList.toggle('hidden', list);
+    $('view-list').classList.toggle('font-semibold', list);
+    $('view-board').classList.toggle('font-semibold', !list);
+    $('view-list').classList.toggle('bg-zinc-900', list);
+    $('view-list').classList.toggle('text-white', list);
+    $('view-list').classList.toggle('dark:bg-zinc-100', list);
+    $('view-list').classList.toggle('dark:text-zinc-900', list);
+    $('view-board').classList.toggle('bg-zinc-900', !list);
+    $('view-board').classList.toggle('text-white', !list);
+    $('view-board').classList.toggle('dark:bg-zinc-100', !list);
+    $('view-board').classList.toggle('dark:text-zinc-900', !list);
+    if (list) renderList(); else renderBoard();
+  }
+
+  // ---------- API ----------
+  async function api(path, body) {
+    const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+    if (!r.ok) throw new Error(path + ' failed');
+    return r.json();
+  }
+
+  // ---------- events ----------
+  $('add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = $('add-title').value.trim();
+    if (!title) return;
+    try {
+      const t = await api('/api/add', {
+        title, category: $('add-category').value.trim(),
+        due_date: $('add-due').value || null, priority: $('add-priority').value || null,
+      });
+      TASKS.unshift(t);
+      $('add-title').value = ''; $('add-due').value = ''; $('add-priority').value = '';
+      render();
+    } catch (err) { alert('추가 실패'); }
+  });
+
+  async function cycle(id) {
+    const t = TASKS.find(x => x.id === id); if (!t) return;
+    const next = { todo: 'doing', doing: 'done', done: 'todo' }[t.status];
+    try {
+      const updated = await api('/api/status', { id, status: next });
+      Object.assign(t, updated);
+      render();
+    } catch (err) { alert('상태 변경 실패'); }
+  }
+  async function del(id) {
+    if (!confirm('삭제할까요?')) return;
+    try { await api('/api/delete', { id }); TASKS = TASKS.filter(x => x.id !== id); render(); }
+    catch (err) { alert('삭제 실패'); }
+  }
+
+  document.body.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-act]');
+    if (btn) {
+      const id = Number(btn.dataset.id), act = btn.dataset.act;
+      if (act === 'cycle') cycle(id);
+      else if (act === 'del') del(id);
+      else if (act === 'edit') openModal(id);
+      return;
+    }
+    if (e.target.id === 'done-toggle' || e.target.closest('#done-toggle')) {
+      if (e.target.id === 'clear-done') return;
+      const dl = $('done-list'), caret = $('done-caret');
+      if (dl) { dl.classList.toggle('hidden'); if (caret) caret.textContent = dl.classList.contains('hidden') ? '▸' : '▾'; }
+    }
+    if (e.target.id === 'clear-done') {
+      e.stopPropagation();
+      if (!confirm('완료된 항목을 모두 영구 삭제할까요?')) return;
+      api('/api/clear-done', {}).then(() => { TASKS = TASKS.filter(t => t.status !== 'done'); render(); }).catch(() => alert('실패'));
+    }
+  });
+
+  // view + theme toggles
+  $('view-list').addEventListener('click', () => { view = 'list'; localStorage.setItem('todo-view', view); render(); });
+  $('view-board').addEventListener('click', () => { view = 'board'; localStorage.setItem('todo-view', view); render(); });
+  $('theme-toggle').addEventListener('click', () => {
+    const dark = document.documentElement.classList.toggle('dark');
+    localStorage.setItem('todo-theme', dark ? 'dark' : 'light');
+  });
+
+  // ---------- modal ----------
+  let editing = null;
+  function openModal(id) {
+    const t = TASKS.find(x => x.id === id); if (!t) return;
+    editing = id;
+    $('m-title').value = t.title || '';
+    $('m-category').value = t.category || '';
+    $('m-due').value = t.due_date || '';
+    $('m-priority').value = t.priority || '';
+    $('m-status').value = t.status || 'todo';
+    $('m-memo').value = t.memo || '';
+    $('modal').classList.remove('hidden');
+    $('m-title').focus();
+  }
+  function closeModal() { editing = null; $('modal').classList.add('hidden'); }
+  $('m-cancel').addEventListener('click', closeModal);
+  $('modal').addEventListener('click', (e) => { if (e.target.id === 'modal') closeModal(); });
+  $('m-save').addEventListener('click', async () => {
+    if (editing == null) return;
+    const title = $('m-title').value.trim();
+    if (!title) { $('m-title').focus(); return; }
+    const t = TASKS.find(x => x.id === editing);
+    const newStatus = $('m-status').value;
+    try {
+      const updated = await api('/api/update', {
+        id: editing, title,
+        category: $('m-category').value.trim(),
+        due_date: $('m-due').value || '',
+        priority: $('m-priority').value,
+        memo: $('m-memo').value,
+      });
+      Object.assign(t, updated);
+      if (newStatus !== t.status) {
+        const s = await api('/api/status', { id: editing, status: newStatus });
+        Object.assign(t, s);
+      }
+      closeModal(); render();
+    } catch (err) { alert('저장 실패'); }
+  });
+  $('m-delete').addEventListener('click', async () => {
+    if (editing == null) return;
+    if (!confirm('삭제할까요?')) return;
+    try { await api('/api/delete', { id: editing }); TASKS = TASKS.filter(x => x.id !== editing); closeModal(); render(); }
+    catch (err) { alert('삭제 실패'); }
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
