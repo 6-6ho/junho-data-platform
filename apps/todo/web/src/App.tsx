@@ -18,6 +18,9 @@ export default function App() {
   const [loaded, setLoaded] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const firstSave = useRef(true)
+  const rev = useRef(0) // 서버 보드 버전 (낙관적 잠금)
+  const dirty = useRef(false) // 내 미저장 변경 있음 → 폴링이 덮어쓰지 않게
+  const applyingRemote = useRef(false) // 서버 상태 수용 중 → 되-저장(echo) 방지
 
   // view / theme / filters
   const [view, setView] = useState<'kanban' | 'list'>(
@@ -47,6 +50,7 @@ export default function App() {
         setTasks(d.tasks || [])
         setMembers(d.members || [])
         setProjects(d.projects || [])
+        rev.current = d.rev || 0
         setLoaded(true)
       })
       .catch((e) => {
@@ -57,18 +61,60 @@ export default function App() {
     if (m) setMe(m)
   }, [])
 
-  // --- save (debounced, last-write-wins) ---
+  // --- save (debounced, 낙관적 잠금 rev) ---
   useEffect(() => {
     if (!loaded) return
     if (firstSave.current) {
       firstSave.current = false
       return
     }
-    const id = setTimeout(() => {
-      saveBoard(tasks, me).catch((e) => setErr(String(e)))
+    // 폴링/충돌로 서버 상태를 받아 적용한 turn 이면 되-저장하지 않는다 (echo 방지)
+    if (applyingRemote.current) {
+      applyingRemote.current = false
+      return
+    }
+    dirty.current = true
+    const id = setTimeout(async () => {
+      try {
+        const res = await saveBoard(tasks, rev.current, me)
+        if (res.ok) {
+          rev.current = res.rev
+          dirty.current = false
+        } else {
+          // 다른 사람이 먼저 저장 → 최신본 수용 (내 미저장 변경은 덮임 → 토스트로 알림)
+          applyingRemote.current = true
+          rev.current = res.rev
+          dirty.current = false
+          setTasks(res.tasks)
+          setErr('다른 사람이 먼저 저장해서 최신본으로 갱신했어요. 방금 변경은 다시 확인하세요.')
+        }
+      } catch (e) {
+        setErr(String(e))
+      }
     }, 600)
     return () => clearTimeout(id)
   }, [tasks, loaded, me])
+
+  // --- 라이브 동기화: 5초마다 서버 rev 확인. 내 미저장 변경/카드 편집 중이 아니면 최신본 반영 ---
+  useEffect(() => {
+    if (!loaded) return
+    const id = setInterval(async () => {
+      if (dirty.current || editingId) return
+      try {
+        const d = await fetchBoard()
+        if ((d.rev || 0) !== rev.current) {
+          applyingRemote.current = true
+          rev.current = d.rev || 0
+          setTasks(d.tasks || [])
+          setMembers(d.members || [])
+          setProjects(d.projects || [])
+        }
+      } catch {
+        /* 폴링 실패는 조용히 무시 */
+      }
+    }, 5000)
+    return () => clearInterval(id)
+  }, [loaded, editingId])
 
   const meMember = members.find((m) => m.id === me) || null
   const meSnap = (): ActivityWho =>

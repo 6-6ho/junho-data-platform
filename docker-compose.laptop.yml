@@ -173,9 +173,6 @@ services:
       - DB_NAME=app
       - DB_USER=postgres
       - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - OAUTH_ISSUER=https://todo.6-6ho.com
-      - TODO_LOGIN_TOKEN=${TODO_LOGIN_TOKEN:-}
-      - OAUTH_STATE_DIR=/data/oauth-state
       - TODO_PROJECTS_FILE=/data/projects.json
     deploy:
       resources:
@@ -192,8 +189,6 @@ services:
       retries: 3
       start_period: 15s
     volumes:
-      # OAuth state persistence (MCP) — survives container restart
-      - todo-oauth-state:/data/oauth-state
       # 프로젝트 카테고리 목록 (gen_projects.py + cron 갱신). 파일 하나만 ro, 홈 미노출
       - /home/junho/.config/todo/projects.json:/data/projects.json:ro
     networks: [appnet]
@@ -211,7 +206,6 @@ services:
 volumes:
   pgdata:
   rag-oauth-state:
-  todo-oauth-state:
 
 networks:
   appnet:

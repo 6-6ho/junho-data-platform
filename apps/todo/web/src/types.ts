@@ -56,4 +56,5 @@ export interface BoardData {
   tasks: Card[]
   members: Member[]
   projects: Project[]
+  rev: number
 }
