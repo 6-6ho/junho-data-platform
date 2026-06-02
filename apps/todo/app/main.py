@@ -29,7 +29,29 @@ TPL = Environment(
     autoescape=select_autoescape(["html"]),
 )
 
+# React(Vite singlefile) 빌드 산출물. Dockerfile 멀티스테이지가 여기에 떨군다.
+WEB_INDEX = BASE_DIR.parent / "web" / "dist" / "index.html"
+
 PRESET_CATEGORIES = ["trade", "shop", "realestate", "rag", "infra", "개인"]
+
+# 공유 칸반 보드 seed — 서버가 프론트에 주입 (멤버=담당자, 프로젝트=카테고리).
+MEMBERS = [
+    {"id": "junho",  "name": "준호", "initial": "준", "tone": "t1"},
+    {"id": "taegyu", "name": "태규", "initial": "태", "tone": "t2"},
+    {"id": "uiyeol", "name": "의열", "initial": "의", "tone": "t3"},
+]
+PROJECTS = [
+    {"key": "TRADE",      "label": "트레이딩 봇"},
+    {"key": "REALESTATE", "label": "부동산 분석"},
+    {"key": "RAG",        "label": "RAG 파이프라인"},
+    {"key": "BAENAE",     "label": "배내"},
+    {"key": "SAJU",       "label": "사주댕"},
+    {"key": "INFRA",      "label": "인프라"},
+    {"key": "ETL",        "label": "데이터 ETL"},
+    {"key": "CRAWLER",    "label": "크롤러"},
+    {"key": "DASH",       "label": "대시보드"},
+    {"key": "ML",         "label": "ML"},
+]
 
 
 def load_projects() -> list[str]:
@@ -84,14 +106,35 @@ async def robots(request: Request) -> PlainTextResponse:
 
 @mcp.custom_route("/", methods=["GET"])
 async def index(request: Request) -> HTMLResponse:
-    tasks = await queries.all_tasks()
-    cats = await queries.categories()
-    merged = list(dict.fromkeys(load_projects() + cats))
-    html = TPL.get_template("index.html").render(
-        tasks_json=_json_for_html(tasks),
-        categories_json=_json_for_html(merged),
-    )
+    """React(Vite singlefile) 빌드 결과를 통째로 서빙. seed 는 /api/board 로 가져간다."""
+    try:
+        html = WEB_INDEX.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return HTMLResponse(
+            "<h1>칸반 빌드 없음</h1><p>web/dist/index.html 이 없습니다 (Dockerfile 빌드 단계 확인).</p>",
+            status_code=503,
+        )
     return HTMLResponse(html, headers={"X-Robots-Tag": "noindex, nofollow"})
+
+
+# ============================ 공유 칸반 보드 API ============================
+
+@mcp.custom_route("/api/board", methods=["GET"])
+async def api_board_get(request: Request) -> JSONResponse:
+    """공유 보드 전체 + seed(멤버·프로젝트). 프론트가 부팅 시 1회 호출."""
+    tasks = await queries.get_board()
+    return JSONResponse({"tasks": tasks, "members": MEMBERS, "projects": PROJECTS})
+
+
+@mcp.custom_route("/api/board", methods=["PUT"])
+async def api_board_put(request: Request) -> JSONResponse:
+    """카드 배열 전체를 통째 저장 (last-write-wins). 변경 발생 시 프론트가 디바운스 호출."""
+    body = await request.json()
+    tasks = body.get("tasks")
+    if not isinstance(tasks, list):
+        return JSONResponse({"error": "tasks must be an array"}, status_code=400)
+    await queries.save_board(tasks, updated_by=(body.get("by") or None))
+    return JSONResponse({"ok": True, "count": len(tasks)})
 
 
 def _clean_status(s: str | None) -> str:

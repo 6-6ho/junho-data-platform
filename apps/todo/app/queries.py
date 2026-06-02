@@ -1,3 +1,4 @@
+import json
 from datetime import date
 
 from . import db
@@ -171,3 +172,31 @@ async def categories() -> list[str]:
             "WHERE category IS NOT NULL AND category <> '' ORDER BY category"
         )
     return [r["category"] for r in rows]
+
+
+# ===================== 공유 칸반 보드 (JSONB single-row) =====================
+
+async def get_board() -> list[dict]:
+    """공유 보드의 카드 배열 전체를 반환. asyncpg 는 jsonb 를 str 로 주므로 파싱."""
+    pool = await db.get_pool()
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT data FROM todo.board WHERE id = 1")
+    if not row or row["data"] is None:
+        return []
+    data = row["data"]
+    return data if isinstance(data, list) else json.loads(data)
+
+
+async def save_board(tasks: list, updated_by: str | None = None) -> None:
+    """카드 배열 전체를 통째로 저장 (last-write-wins)."""
+    pool = await db.get_pool()
+    payload = json.dumps(tasks, ensure_ascii=False)
+    async with pool.acquire() as conn:
+        await conn.execute(
+            """
+            INSERT INTO todo.board (id, data, updated_at, updated_by)
+            VALUES (1, $1::jsonb, NOW(), $2)
+            ON CONFLICT (id) DO UPDATE SET data = $1::jsonb, updated_at = NOW(), updated_by = $2
+            """,
+            payload, updated_by,
+        )
