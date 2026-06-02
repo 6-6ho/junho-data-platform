@@ -256,7 +256,7 @@ export default function App() {
 
   return (
     <div className="app">
-      <header className="topbar" style={topbarStyle}>
+      <header className="topbar">
         <span className="brand" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="brand-mark">칸</span>
           <span className="brand-name">
@@ -264,19 +264,12 @@ export default function App() {
           </span>
         </span>
 
-        <div style={{ position: 'relative', flex: '0 1 220px' }}>
-          <span style={{ position: 'absolute', left: 8, top: 7, opacity: 0.5 }}>
-            <Svg name="search" />
-          </span>
-          <input
-            value={search}
-            placeholder="검색"
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ width: '100%', paddingLeft: 28 }}
-          />
+        <div className="search">
+          <Svg name="search" />
+          <input value={search} placeholder="검색" onChange={(e) => setSearch(e.target.value)} />
         </div>
 
-        <select value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
+        <select className="filter-select" value={filterProject} onChange={(e) => setFilterProject(e.target.value)}>
           <option value="all">전체 프로젝트</option>
           {projects.map((p) => (
             <option key={p.key} value={p.key}>
@@ -288,20 +281,18 @@ export default function App() {
         <span style={{ flex: 1 }} />
 
         {/* view toggle */}
-        <div className="seg" style={{ display: 'flex', gap: 2 }}>
+        <div className="seg">
           <button
-            className={'btn icon ghost' + (view === 'kanban' ? ' active-toggle' : '')}
+            className={view === 'kanban' ? 'active' : ''}
             title="칸반"
             onClick={() => setView('kanban')}
-            style={view === 'kanban' ? activeBtn : undefined}
           >
             <Svg name="kanban" />
           </button>
           <button
-            className={'btn icon ghost' + (view === 'list' ? ' active-toggle' : '')}
+            className={view === 'list' ? 'active' : ''}
             title="리스트"
             onClick={() => setView('list')}
-            style={view === 'list' ? activeBtn : undefined}
           >
             <Svg name="list" />
           </button>
@@ -311,7 +302,6 @@ export default function App() {
           className={'btn icon ghost' + (showArchive ? ' active-toggle' : '')}
           title={showArchive ? '활성 보기' : '아카이브 보기'}
           onClick={() => setShowArchive((v) => !v)}
-          style={showArchive ? activeBtn : undefined}
         >
           <Svg name="archive" />
         </button>
@@ -402,7 +392,7 @@ export default function App() {
         )}
       </div>
 
-      <footer className="statusbar" style={statusbarStyle}>
+      <footer className="statusbar">
         <span>진행 {activeCount}</span>
         <span>완료 {doneCount}</span>
         <span style={{ flex: 1 }} />
@@ -425,20 +415,3 @@ export default function App() {
   )
 }
 
-const topbarStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  padding: '8px 16px',
-  borderBottom: '1px solid var(--border)',
-  background: 'var(--surface)',
-}
-const statusbarStyle: React.CSSProperties = {
-  padding: '6px 16px',
-  borderTop: '1px solid var(--border)',
-  fontSize: 12,
-  color: 'var(--text-muted)',
-  display: 'flex',
-  gap: 14,
-}
-const activeBtn: React.CSSProperties = { color: 'var(--accent)', background: 'var(--accent-subtle)' }
