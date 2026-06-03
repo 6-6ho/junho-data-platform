@@ -2,6 +2,7 @@ import type { Card, Member, Project } from '../types'
 import {
   STATUSES,
   Avatar,
+  Dot,
   PriIcon,
   Due,
   Lozenge,
@@ -27,21 +28,27 @@ function buildGroups(
       id: m.id,
       items: tasks.filter((t) => t.assignee === m.id),
       head: (
-        <span
-          className="col-title"
-          style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12, color: 'var(--text)' }}
-        >
-          {m.name}
-        </span>
+        <>
+          <Dot who={m} />
+          <span
+            className="col-title"
+            style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12, color: 'var(--text)' }}
+          >
+            {m.name}
+          </span>
+        </>
       ),
     }))
     groups.push({
       id: '__none__',
       items: tasks.filter((t) => !t.assignee),
       head: (
-        <span className="col-title" style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12 }}>
-          미할당
-        </span>
+        <>
+          <Dot who={null} />
+          <span className="col-title" style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12 }}>
+            미할당
+          </span>
+        </>
       ),
     })
     return groups

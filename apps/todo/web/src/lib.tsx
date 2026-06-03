@@ -98,6 +98,11 @@ export function Avatar({ who, size }: { who: WhoLike; size?: string }) {
   )
 }
 
+// 멤버 색 점 (글자 없는 색 식별자) — 이름과 함께 쓰는 자리용
+export function Dot({ who }: { who: { tone?: string } | null }) {
+  return <span className={who ? `mdot ${who.tone || 'tx'}` : 'mdot none'} />
+}
+
 export function Lozenge({ status }: { status: Status }) {
   const s = STATUSES.find((x) => x.key === status)
   return <span className={`lozenge ${status}`}>{s ? s.label : status}</span>

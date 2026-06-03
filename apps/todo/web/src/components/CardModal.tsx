@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { Activity, Card, Member, Project } from '../types'
 import {
   Avatar,
+  Dot,
   PriIcon,
   Svg,
   Lozenge,
@@ -169,6 +170,7 @@ export function CardModal({
                         onChange({ assignee: to }, { type: 'assignee', from: t.assignee, to })
                     }}
                   >
+                    <Dot who={m} />
                     <span>{m ? m.name : '미할당'}</span>
                   </button>
                 )

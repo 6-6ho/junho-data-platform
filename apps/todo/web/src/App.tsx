@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Activity, ActivityWho, Card, Member, Priority, Project, Status } from './types'
 import { fetchBoard, saveBoard, saveProjects } from './api'
-import { STATUSES, Svg, keyOf, nowIso, uid, fmtDue, dueInDays } from './lib'
+import { STATUSES, Svg, Dot, keyOf, nowIso, uid, fmtDue, dueInDays } from './lib'
 import { Column } from './components/Column'
 import { CardModal } from './components/CardModal'
 import { Subbar } from './components/Subbar'
@@ -348,6 +348,7 @@ export default function App() {
               onClick={() => pickMe(m.id)}
               title={me === m.id ? `${m.name} (나) — 클릭 시 해제` : `${m.name} 로 지정`}
             >
+              <Dot who={m} />
               <span className="me-opt-name">{m.name}</span>
               {me === m.id && <Svg name="check" className="me-opt-check" />}
             </button>

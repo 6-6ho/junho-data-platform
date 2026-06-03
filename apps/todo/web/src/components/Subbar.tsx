@@ -1,5 +1,5 @@
 import type { Member, Priority } from '../types'
-import { PRIORITIES, Avatar, PriIcon } from '../lib'
+import { PRIORITIES, Avatar, Dot, PriIcon } from '../lib'
 
 export function Subbar({
   me,
@@ -97,6 +97,7 @@ export function Subbar({
         const on = filterMembers.has(m.id)
         return (
           <button key={m.id} className={'chip' + (on ? ' on' : '')} onClick={() => toggleMember(m.id)}>
+            <Dot who={m} />
             <span>{m.name}</span>
           </button>
         )

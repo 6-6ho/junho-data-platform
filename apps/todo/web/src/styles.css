@@ -892,6 +892,14 @@ kbd {
   color: var(--text-muted);
 }
 
+/* 멤버 색 점 (이름과 함께 쓰는 식별자 — 글자 없음) */
+.mdot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; display: inline-block; background: var(--av-extra-bg); }
+.mdot.t1 { background: var(--av-1-bg); }
+.mdot.t2 { background: var(--av-2-bg); }
+.mdot.t3 { background: var(--av-3-bg); }
+.mdot.tx { background: var(--av-extra-bg); }
+.mdot.none { background: transparent; border: 1.5px solid var(--border-bold); }
+
 /* me-picker — "나는 누구" 명확한 선택 (topbar 우측) */
 .me-picker {
   display: inline-flex; align-items: center; gap: 4px;
