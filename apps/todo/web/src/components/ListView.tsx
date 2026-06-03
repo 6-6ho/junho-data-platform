@@ -27,27 +27,21 @@ function buildGroups(
       id: m.id,
       items: tasks.filter((t) => t.assignee === m.id),
       head: (
-        <>
-          <Avatar who={m} size="sm" />
-          <span
-            className="col-title"
-            style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12, color: 'var(--text)' }}
-          >
-            {m.name}
-          </span>
-        </>
+        <span
+          className="col-title"
+          style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12, color: 'var(--text)' }}
+        >
+          {m.name}
+        </span>
       ),
     }))
     groups.push({
       id: '__none__',
       items: tasks.filter((t) => !t.assignee),
       head: (
-        <>
-          <Avatar who={null} size="sm" />
-          <span className="col-title" style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12 }}>
-            미할당
-          </span>
-        </>
+        <span className="col-title" style={{ letterSpacing: 0, textTransform: 'none', fontSize: 12 }}>
+          미할당
+        </span>
       ),
     })
     return groups

@@ -97,7 +97,6 @@ export function Subbar({
         const on = filterMembers.has(m.id)
         return (
           <button key={m.id} className={'chip' + (on ? ' on' : '')} onClick={() => toggleMember(m.id)}>
-            <Avatar who={m} size="sm" />
             <span>{m.name}</span>
           </button>
         )

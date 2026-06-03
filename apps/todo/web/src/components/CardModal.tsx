@@ -169,7 +169,6 @@ export function CardModal({
                         onChange({ assignee: to }, { type: 'assignee', from: t.assignee, to })
                     }}
                   >
-                    <Avatar who={m} size="sm" />
                     <span>{m ? m.name : '미할당'}</span>
                   </button>
                 )
