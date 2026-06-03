@@ -21,6 +21,30 @@ CREATE TABLE IF NOT EXISTS todo.board (
 INSERT INTO todo.board (id, data) VALUES (1, '[]'::jsonb) ON CONFLICT (id) DO NOTHING;
 -- 기존 보드 행에 rev 컬럼 보강 (이미 있으면 무시).
 ALTER TABLE todo.board ADD COLUMN IF NOT EXISTS rev BIGINT NOT NULL DEFAULT 0;
+
+-- 그 달의 목표 (자유 메모) — 월(YYYY-MM)별 단일 텍스트. board 와 분리(잠금 없음, LWW).
+CREATE TABLE IF NOT EXISTS todo.goals (
+    month       TEXT PRIMARY KEY,            -- 'YYYY-MM'
+    text        TEXT NOT NULL DEFAULT '',
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by  TEXT
+);
+
+-- 앱 설정: 프로젝트 목록을 JSONB 로 (사용자가 추가/제거). 단일 행(id=1).
+CREATE TABLE IF NOT EXISTS todo.settings (
+    id          INT PRIMARY KEY DEFAULT 1,
+    projects    JSONB NOT NULL DEFAULT '[]'::jsonb,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_by  TEXT,
+    CONSTRAINT settings_singleton CHECK (id = 1)
+);
+-- 기본 프로젝트 seed (행이 없을 때만).
+INSERT INTO todo.settings (id, projects) VALUES (1, '[
+    {"key": "OPS",    "label": "공통/운영"},
+    {"key": "LOTTO",  "label": "로또풀이"},
+    {"key": "SAJU",   "label": "사주댕냥"},
+    {"key": "BAENAE", "label": "첫이름"}
+]'::jsonb) ON CONFLICT (id) DO NOTHING;
 """
 
 

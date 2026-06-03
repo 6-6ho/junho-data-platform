@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Activity, ActivityWho, Card, Member, Priority, Project, Status } from './types'
-import { fetchBoard, saveBoard } from './api'
+import { fetchBoard, saveBoard, saveProjects } from './api'
 import { STATUSES, Svg, Avatar, keyOf, nowIso, uid, fmtDue, dueInDays } from './lib'
 import { Column } from './components/Column'
 import { CardModal } from './components/CardModal'
 import { Subbar } from './components/Subbar'
 import { ListView } from './components/ListView'
+import { CalendarView } from './components/CalendarView'
+import { ProjectManager } from './components/ProjectManager'
 
 export default function App() {
   const [tasks, setTasks] = useState<Card[]>([])
@@ -15,6 +17,8 @@ export default function App() {
   const [search, setSearch] = useState('')
   const [filterProject, setFilterProject] = useState('all')
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [creating, setCreating] = useState<Card | null>(null) // 미커밋 새 카드 초안
+  const [showProjMgr, setShowProjMgr] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const firstSave = useRef(true)
@@ -23,8 +27,8 @@ export default function App() {
   const applyingRemote = useRef(false) // 서버 상태 수용 중 → 되-저장(echo) 방지
 
   // view / theme / filters
-  const [view, setView] = useState<'kanban' | 'list'>(
-    () => (localStorage.getItem('kanban.view') as 'kanban' | 'list') || 'kanban',
+  const [view, setView] = useState<'kanban' | 'list' | 'calendar'>(
+    () => (localStorage.getItem('kanban.view') as 'kanban' | 'list' | 'calendar') || 'kanban',
   )
   const [theme, setTheme] = useState(() => localStorage.getItem('kanban.theme') || 'light')
   const [filterMembers, setFilterMembers] = useState<Set<string | null>>(new Set())
@@ -140,18 +144,17 @@ export default function App() {
     )
   }
 
-  function createTask(status: Status) {
+  // 만들기 → 초안 모달만 띄운다 (확인=생성 누르기 전엔 보드/서버에 안 들어감)
+  function startCreate(status: Status) {
     if (!me) {
-      setErr('먼저 본인(담당자)을 선택하세요 — 우측 상단 멤버 클릭')
+      setErr('먼저 본인(담당자)을 선택하세요 — 우측 상단 "나는" 에서 선택')
       return
     }
-    const proj = filterProject !== 'all' ? filterProject : 'OPS'
-    const nums = tasks.filter((t) => t.project === proj).map((t) => t.num)
-    const num = (nums.length ? Math.max(...nums) : 0) + 1
-    const t: Card = {
+    const proj = filterProject !== 'all' ? filterProject : projects[0]?.key || 'OPS'
+    setCreating({
       id: uid(),
       project: proj,
-      num,
+      num: 0, // 생성 확정 시점에 프로젝트 기준으로 다시 매김
       summary: '',
       status,
       priority: 'med',
@@ -160,9 +163,21 @@ export default function App() {
       memo: '',
       archived: false,
       activity: [{ type: 'created', who: meSnap(), ts: nowIso() }],
-    }
-    setTasks((prev) => [t, ...prev])
-    setEditingId(t.id)
+    })
+  }
+
+  function patchCreating(patch: Partial<Card>) {
+    setCreating((c) => (c ? { ...c, ...patch } : c))
+  }
+
+  // 생성 확인 → 이때 비로소 보드에 추가 (프로젝트 기준 번호 부여)
+  function commitCreate() {
+    if (!creating) return
+    const proj = creating.project
+    const nums = tasks.filter((t) => t.project === proj).map((t) => t.num)
+    const num = (nums.length ? Math.max(...nums) : 0) + 1
+    setTasks((prev) => [{ ...creating, num }, ...prev])
+    setCreating(null)
   }
 
   function deleteTask(id: string) {
@@ -258,10 +273,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <span className="brand" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span className="brand-mark">칸</span>
-          <span className="brand-name">
-            칸반보드 <span className="dim">/ 공유</span>
-          </span>
+          <span className="brand-name">성북반상회</span>
         </span>
 
         <div className="search">
@@ -277,6 +289,13 @@ export default function App() {
             </option>
           ))}
         </select>
+        <button
+          className="btn icon ghost"
+          title="프로젝트 관리"
+          onClick={() => setShowProjMgr(true)}
+        >
+          <Svg name="gear" />
+        </button>
 
         <span style={{ flex: 1 }} />
 
@@ -296,6 +315,13 @@ export default function App() {
           >
             <Svg name="list" />
           </button>
+          <button
+            className={view === 'calendar' ? 'active' : ''}
+            title="달력"
+            onClick={() => setView('calendar')}
+          >
+            <Svg name="cal" />
+          </button>
         </div>
 
         <button
@@ -313,21 +339,18 @@ export default function App() {
           <Svg name="theme" />
         </button>
 
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4 }}>
+        <span className="me-picker" title="나로 지정 — 카드 담당자·작성자에 쓰임">
+          <span className="me-picker-label">나는</span>
           {members.map((m) => (
             <button
               key={m.id}
+              className={'me-opt' + (me === m.id ? ' on' : '')}
               onClick={() => pickMe(m.id)}
-              title={me === m.id ? `${m.name} (나)` : `${m.name} 로 지정`}
-              style={{
-                border: me === m.id ? '2px solid var(--accent)' : '2px solid transparent',
-                borderRadius: '50%',
-                padding: 0,
-                background: 'none',
-                cursor: 'pointer',
-              }}
+              title={me === m.id ? `${m.name} (나) — 클릭 시 해제` : `${m.name} 로 지정`}
             >
               <Avatar who={m} size="sm" />
+              <span className="me-opt-name">{m.name}</span>
+              {me === m.id && <Svg name="check" className="me-opt-check" />}
             </button>
           ))}
         </span>
@@ -363,24 +386,24 @@ export default function App() {
         </div>
       )}
 
-      <div className="board-wrap" style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+      <div className="board-wrap">
         {!loaded ? (
           <div style={{ padding: 40, color: 'var(--text-muted)' }}>불러오는 중…</div>
         ) : view === 'kanban' ? (
-          <div className="kanban" style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+          <div className="kanban">
             {STATUSES.map((col) => (
               <Column
                 key={col.key}
                 col={col}
                 items={visible.filter((t) => t.status === col.key)}
                 members={members}
-                onCreate={createTask}
+                onCreate={startCreate}
                 onOpen={setEditingId}
                 onMove={onMove}
               />
             ))}
           </div>
-        ) : (
+        ) : view === 'list' ? (
           <ListView
             tasks={visible}
             members={members}
@@ -389,6 +412,8 @@ export default function App() {
             listSort={listSort}
             onOpen={setEditingId}
           />
+        ) : (
+          <CalendarView tasks={visible} onOpen={setEditingId} me={me} />
         )}
       </div>
 
@@ -399,16 +424,41 @@ export default function App() {
         <span>{meMember ? `${meMember.name} 으로 작업 중` : '본인 미선택'}</span>
       </footer>
 
-      {editing && (
+      {showProjMgr && (
+        <ProjectManager
+          projects={projects}
+          onSave={async (list) => {
+            const saved = await saveProjects(list, me)
+            setProjects(saved)
+          }}
+          onClose={() => setShowProjMgr(false)}
+        />
+      )}
+
+      {creating && (
         <CardModal
-          t={editing}
+          t={creating}
+          mode="create"
           members={members}
           projects={projects}
           me={me}
-          onPatch={patchTask}
-          onDelete={deleteTask}
-          onClose={() => setEditingId(null)}
-          onComment={addComment}
+          onChange={patchCreating}
+          onPrimary={commitCreate}
+          onCancel={() => setCreating(null)}
+        />
+      )}
+
+      {editing && (
+        <CardModal
+          t={editing}
+          mode="edit"
+          members={members}
+          projects={projects}
+          me={me}
+          onChange={(patch, ev) => patchTask(editing.id, patch, ev)}
+          onCancel={() => setEditingId(null)}
+          onDelete={() => deleteTask(editing.id)}
+          onComment={(text) => addComment(editing.id, text)}
         />
       )}
     </div>

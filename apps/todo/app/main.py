@@ -11,7 +11,6 @@
 """
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 
@@ -21,7 +20,7 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from starlette.routing import Route
 
-from . import config, queries
+from . import queries
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 log = logging.getLogger("todo")
@@ -38,26 +37,14 @@ MEMBERS = [
 ]
 
 
-def load_projects() -> list[dict]:
-    """gen_projects.py 가 갱신하는 이름 목록(projects.json) → {key,label} 로 변환.
-    항상 'OPS'(공통/운영) 를 맨 앞에 둔다(미할당 카드 기본 프로젝트). 매 요청마다 읽어
-    cron 갱신을 즉시 반영. 파일이 없거나 깨졌으면 OPS 만."""
-    names: list[str] = []
-    try:
-        with open(config.PROJECTS_FILE, encoding="utf-8") as f:
-            data = json.load(f)
-        names = [str(x).strip() for x in data if str(x).strip()]
-    except Exception:
-        pass
-    projects = [{"key": "OPS", "label": "공통/운영"}]
-    seen = {"OPS"}
-    for n in names:
-        key = n.upper().replace(" ", "-")
-        if key in seen:
-            continue
-        seen.add(key)
-        projects.append({"key": key, "label": n})
-    return projects
+# 프로젝트 목록 (고정 seed). 카드 issue-key 는 key, 드롭다운 라벨은 한글.
+# createTask 기본값은 'OPS'(공통/운영).
+PROJECTS = [
+    {"key": "OPS",    "label": "공통/운영"},
+    {"key": "LOTTO",  "label": "로또풀이"},
+    {"key": "SAJU",   "label": "사주댕냥"},
+    {"key": "BAENAE", "label": "첫이름"},
+]
 
 
 async def health(request: Request) -> JSONResponse:
@@ -82,11 +69,12 @@ async def index(request: Request) -> HTMLResponse:
 async def board(request: Request) -> JSONResponse:
     if request.method == "GET":
         b = await queries.get_board()
+        projects = await queries.get_projects() or PROJECTS
         return JSONResponse({
             "tasks": b["tasks"],
             "rev": b["rev"],
             "members": MEMBERS,
-            "projects": load_projects(),
+            "projects": projects,
         })
 
     # PUT — 카드 배열 통째 저장 (낙관적 잠금)
@@ -108,11 +96,58 @@ async def board(request: Request) -> JSONResponse:
     return JSONResponse({"ok": True, "rev": result["rev"], "count": len(tasks)})
 
 
+async def goals(request: Request) -> JSONResponse:
+    """그 달의 목표(자유 메모). GET ?month=YYYY-MM → {month,text}. PUT {month,text,by}."""
+    if request.method == "GET":
+        month = request.query_params.get("month", "").strip()
+        if not month:
+            return JSONResponse({"error": "month required"}, status_code=400)
+        return JSONResponse({"month": month, "text": await queries.get_goal(month)})
+
+    body = await request.json()
+    month = (body.get("month") or "").strip()
+    if not month:
+        return JSONResponse({"error": "month required"}, status_code=400)
+    text = body.get("text") or ""
+    if not isinstance(text, str):
+        return JSONResponse({"error": "text must be a string"}, status_code=400)
+    await queries.set_goal(month, text[:5000], updated_by=(body.get("by") or None))
+    return JSONResponse({"ok": True})
+
+
+async def projects_route(request: Request) -> JSONResponse:
+    """프로젝트 목록(사용자 관리). GET → {projects}. PUT {projects:[{key,label}], by} 전체 교체."""
+    if request.method == "GET":
+        return JSONResponse({"projects": (await queries.get_projects()) or PROJECTS})
+
+    body = await request.json()
+    raw = body.get("projects")
+    if not isinstance(raw, list):
+        return JSONResponse({"error": "projects must be an array"}, status_code=400)
+    clean: list[dict] = []
+    seen: set[str] = set()
+    for p in raw:
+        if not isinstance(p, dict):
+            continue
+        key = str(p.get("key") or "").strip().upper()
+        label = str(p.get("label") or "").strip() or key
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        clean.append({"key": key, "label": label})
+    if not clean:
+        return JSONResponse({"error": "at least one project required"}, status_code=400)
+    await queries.set_projects(clean, updated_by=(body.get("by") or None))
+    return JSONResponse({"ok": True, "projects": clean})
+
+
 routes = [
     Route("/health", health, methods=["GET"]),
     Route("/robots.txt", robots, methods=["GET"]),
     Route("/", index, methods=["GET"]),
     Route("/api/board", board, methods=["GET", "PUT"]),
+    Route("/api/goals", goals, methods=["GET", "PUT"]),
+    Route("/api/projects", projects_route, methods=["GET", "PUT"]),
 ]
 
 app = Starlette(routes=routes)

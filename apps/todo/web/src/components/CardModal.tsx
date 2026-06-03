@@ -11,28 +11,41 @@ import {
   keyOf,
   relTime,
 } from '../lib'
+import { DueField } from './DueField'
 
 export function CardModal({
   t,
+  mode,
   members,
   projects,
   me,
-  onPatch,
+  onChange,
+  onPrimary,
+  onCancel,
   onDelete,
-  onClose,
   onComment,
 }: {
   t: Card
+  mode: 'create' | 'edit'
   members: Member[]
   projects: Project[]
   me: string | null
-  onPatch: (id: string, patch: Partial<Card>, ev?: Partial<Activity>) => void
-  onDelete: (id: string) => void
-  onClose: () => void
-  onComment: (id: string, text: string) => void
+  onChange: (patch: Partial<Card>, ev?: Partial<Activity>) => void
+  onPrimary?: () => void
+  onCancel: () => void
+  onDelete?: () => void
+  onComment?: (text: string) => void
 }) {
+  const isCreate = mode === 'create'
   const [tab, setTab] = useState<'all' | 'comment' | 'event'>('all')
   const [comment, setComment] = useState('')
+  const [actOpen, setActOpen] = useState(() => localStorage.getItem('kanban.actOpen') !== '0')
+  const toggleAct = () => {
+    setActOpen((v) => {
+      localStorage.setItem('kanban.actOpen', v ? '0' : '1')
+      return !v
+    })
+  }
   const meMember = members.find((m) => m.id === me) || { name: '게스트', initial: '?', tone: 'tx' }
 
   const acts = [...(t.activity || [])].sort(
@@ -43,17 +56,19 @@ export function CardModal({
     tab === 'all' ? true : tab === 'comment' ? a.type === 'comment' : a.type !== 'comment',
   )
 
+  const canCreate = (t.summary || '').trim().length > 0
+
   function submit() {
     const v = comment.trim()
-    if (!v) return
-    onComment(t.id, v)
+    if (!v || !onComment) return
+    onComment(v)
     setComment('')
   }
 
   return (
     <div
       className="overlay open"
-      onClick={onClose}
+      onClick={onCancel}
       style={{
         position: 'fixed',
         inset: 0,
@@ -68,12 +83,15 @@ export function CardModal({
     >
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-          <span className="keychip">{keyOf(t)}</span>
+          {isCreate ? (
+            <span className="modal-kind">새 카드</span>
+          ) : (
+            <span className="keychip">{keyOf(t)}</span>
+          )}
           <select
             className="filter-select"
-            style={{ fontSize: 11 }}
             value={t.project}
-            onChange={(e) => onPatch(t.id, { project: e.target.value }, { type: 'edit', field: 'project' })}
+            onChange={(e) => onChange({ project: e.target.value }, { type: 'edit', field: 'project' })}
           >
             {!projects.some((p) => p.key === t.project) && <option value={t.project}>{t.project}</option>}
             {projects.map((p) => (
@@ -83,23 +101,25 @@ export function CardModal({
             ))}
           </select>
           <div className="spacer" style={{ flex: 1 }} />
-          <button
-            className="btn ghost"
-            onClick={() => {
-              onPatch(t.id, { archived: !t.archived })
-              onClose()
-            }}
-          >
-            {t.archived ? (
-              '복원'
-            ) : (
-              <>
-                <Svg name="archive" />
-                아카이브
-              </>
-            )}
-          </button>
-          <button className="btn icon ghost" onClick={onClose}>
+          {!isCreate && (
+            <button
+              className="btn ghost"
+              onClick={() => {
+                onChange({ archived: !t.archived })
+                onCancel()
+              }}
+            >
+              {t.archived ? (
+                '복원'
+              ) : (
+                <>
+                  <Svg name="archive" />
+                  아카이브
+                </>
+              )}
+            </button>
+          )}
+          <button className="btn icon ghost" onClick={onCancel} title="닫기">
             <Svg name="close" />
           </button>
         </div>
@@ -110,9 +130,9 @@ export function CardModal({
               className="title-input"
               type="text"
               value={t.summary}
-              autoFocus={!t.summary}
-              placeholder="태스크 제목…"
-              onChange={(e) => onPatch(t.id, { summary: e.target.value })}
+              autoFocus={isCreate || !t.summary}
+              placeholder="할 일 제목을 입력하세요…"
+              onChange={(e) => onChange({ summary: e.target.value })}
             />
           </div>
 
@@ -125,7 +145,7 @@ export function CardModal({
                   className={'choice' + (t.status === s.key ? ' sel' : '')}
                   onClick={() => {
                     if (t.status !== s.key)
-                      onPatch(t.id, { status: s.key }, { type: 'status', from: t.status, to: s.key })
+                      onChange({ status: s.key }, { type: 'status', from: t.status, to: s.key })
                   }}
                 >
                   <Lozenge status={s.key} />
@@ -146,18 +166,18 @@ export function CardModal({
                     onClick={() => {
                       const to = m ? m.id : null
                       if (t.assignee !== to)
-                        onPatch(t.id, { assignee: to }, { type: 'assignee', from: t.assignee, to })
+                        onChange({ assignee: to }, { type: 'assignee', from: t.assignee, to })
                     }}
                   >
                     <Avatar who={m} size="sm" />
-                    <span style={{ fontSize: 11 }}>{m ? m.name : '미할당'}</span>
+                    <span>{m ? m.name : '미할당'}</span>
                   </button>
                 )
               })}
             </div>
           </div>
 
-          <div className="field-row" style={{ display: 'flex', gap: 12 }}>
+          <div className="field-row" style={{ display: 'flex', gap: 14 }}>
             <div className="field" style={{ flex: 1 }}>
               <label>우선순위</label>
               <div className="choices">
@@ -167,23 +187,21 @@ export function CardModal({
                     className={'choice' + (t.priority === p.key ? ' sel' : '')}
                     onClick={() => {
                       if (t.priority !== p.key)
-                        onPatch(t.id, { priority: p.key }, { type: 'priority', from: t.priority, to: p.key })
+                        onChange({ priority: p.key }, { type: 'priority', from: t.priority, to: p.key })
                     }}
                   >
                     <PriIcon p={p.key} />
-                    <span style={{ fontSize: 11 }}>{p.label}</span>
+                    <span>{p.label}</span>
                   </button>
                 ))}
               </div>
             </div>
             <div className="field" style={{ flex: 1 }}>
               <label>마감일</label>
-              <input
-                type="date"
-                value={t.due || ''}
-                onChange={(e) => {
-                  const to = e.target.value || null
-                  if ((t.due || null) !== to) onPatch(t.id, { due: to }, { type: 'due', from: t.due, to })
+              <DueField
+                value={t.due}
+                onChange={(to) => {
+                  if ((t.due || null) !== to) onChange({ due: to }, { type: 'due', from: t.due, to })
                 }}
               />
             </div>
@@ -194,60 +212,90 @@ export function CardModal({
             <textarea
               value={t.memo}
               placeholder="구현 메모, 재현 절차, 링크…"
-              onChange={(e) => onPatch(t.id, { memo: e.target.value })}
+              onChange={(e) => onChange({ memo: e.target.value })}
             />
           </div>
 
-          <div className="activity">
-            <div className="activity-head">
-              <label>활동</label>
-              <div className="spacer" style={{ flex: 1 }} />
-              <div className="tabs">
-                {(
-                  [
-                    ['all', '전체', acts.length],
-                    ['comment', '코멘트', comments.length],
-                    ['event', '변경 이력', acts.length - comments.length],
-                  ] as const
-                ).map(([k, lbl, n]) => (
-                  <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>
-                    {lbl}
-                    <span className="cnt">{n}</span>
-                  </button>
-                ))}
+          {!isCreate && (
+            <div className={'activity' + (actOpen ? '' : ' collapsed')}>
+              <div className="activity-head">
+                <button type="button" className="act-toggle" onClick={toggleAct}>
+                  <span className="act-caret">{actOpen ? '▾' : '▸'}</span>
+                  활동
+                  <span className="act-count">{acts.length}</span>
+                </button>
+                <div className="spacer" style={{ flex: 1 }} />
+                {actOpen && (
+                  <div className="tabs">
+                    {(
+                      [
+                        ['all', '전체', acts.length],
+                        ['comment', '코멘트', comments.length],
+                        ['event', '변경 이력', acts.length - comments.length],
+                      ] as const
+                    ).map(([k, lbl, n]) => (
+                      <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>
+                        {lbl}
+                        <span className="cnt">{n}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
 
-            <div className="stream">
-              {shown.length === 0 && <div className="col-empty">아직 활동이 없습니다.</div>}
-              {shown.map((a, i) => (
-                <ActivityItem key={i} a={a} members={members} />
-              ))}
-            </div>
+              {actOpen && (
+                <>
+                  <div className="stream">
+                    {shown.length === 0 && <div className="col-empty">아직 활동이 없습니다.</div>}
+                    {shown.map((a, i) => (
+                      <ActivityItem key={i} a={a} members={members} />
+                    ))}
+                  </div>
 
-            <div className="comment-box">
-              <Avatar who={meMember} size="md" />
-              <div className="grow">
-                <textarea
-                  value={comment}
-                  placeholder="코멘트 추가…  (⌘/Ctrl + Enter)"
-                  onChange={(e) => setComment(e.target.value)}
-                  onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                      e.preventDefault()
-                      submit()
-                    }
-                  }}
-                />
-                <div className="cb-foot">
-                  <span className="hint">{meMember.name} (으)로 작성</span>
-                  <button className="btn primary" onClick={submit}>
-                    코멘트
-                  </button>
-                </div>
-              </div>
+                  <div className="comment-box">
+                    <Avatar who={meMember} size="md" />
+                    <div className="grow">
+                      <textarea
+                        value={comment}
+                        placeholder="코멘트 추가…  (⌘/Ctrl + Enter)"
+                        onChange={(e) => setComment(e.target.value)}
+                        onKeyDown={(e) => {
+                          if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                            e.preventDefault()
+                            submit()
+                          }
+                        }}
+                      />
+                      <div className="cb-foot">
+                        <span className="hint">{meMember.name} (으)로 작성</span>
+                        <button className="btn primary" onClick={submit}>
+                          코멘트
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-          </div>
+          )}
+        </div>
+
+        <div className="modal-foot">
+          {!isCreate && onDelete && (
+            <button className="btn danger" onClick={onDelete}>
+              <Svg name="trash" />
+              삭제
+            </button>
+          )}
+          <div className="spacer" style={{ flex: 1 }} />
+          <button className="btn" onClick={onCancel}>
+            {isCreate ? '취소' : '닫기'}
+          </button>
+          {isCreate && (
+            <button className="btn primary" disabled={!canCreate} onClick={onPrimary}>
+              생성
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -273,13 +321,13 @@ function ActivityItem({ a, members }: { a: Activity; members: Member[] }) {
       <div className="act-item" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
         <Avatar who={a.who} size="sm" />
         <div className="bubble" style={{ flex: 1, minWidth: 0 }}>
-          <div className="fi-line" style={{ fontSize: 12 }}>
+          <div className="fi-line" style={{ fontSize: 13 }}>
             <b>{a.who?.name}</b>{' '}
             <span className="fi-time" style={{ color: 'var(--text-muted)' }}>
               · {relTime(a.ts)}
             </span>
           </div>
-          <div className="fi-body" style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>
+          <div className="fi-body" style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>
             {a.text}
           </div>
         </div>
@@ -309,7 +357,7 @@ function ActivityItem({ a, members }: { a: Activity; members: Member[] }) {
   return (
     <div
       className="ev-chip"
-      style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: 'var(--text-subtle)' }}
+      style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13, color: 'var(--text-subtle)' }}
     >
       <span className="ev-icon" style={{ opacity: 0.7 }}>
         <Svg name={EV_ICON[a.type] || 'ev_edit'} />

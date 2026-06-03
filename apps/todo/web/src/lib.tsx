@@ -66,6 +66,10 @@ export const ICONS: Record<string, string> = {
   ev_flag: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M4 13V3M4 3.5h7l-1.4 2.2L11 8H4"/></svg>',
   ev_cal: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><rect x="3" y="4" width="10" height="9" rx="1.5"/><path d="M3 6.6h10" stroke-linecap="round"/></svg>',
   ev_edit: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"><path d="M10.5 3.5l2 2L6 12l-2.6.6L4 10z"/></svg>',
+  // 지라 "Task" 이슈타입 — 파란 둥근사각 + 흰 체크 (테마 무관 고정색)
+  task: '<svg viewBox="0 0 16 16"><rect width="16" height="16" rx="3" fill="#4BADE8"/><path d="M4.4 8.2l2.3 2.3 4.5-4.8" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  check: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.4l3 3 6-7"/></svg>',
+  gear: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="8" cy="8" r="2.1"/><path d="M8 1.6v1.7M8 12.7v1.7M14.4 8h-1.7M3.3 8H1.6M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2M12.5 12.5l-1.2-1.2M4.7 4.7 3.5 3.5" stroke-linecap="round"/></svg>',
 }
 
 export function Svg({ name, className }: { name: string; className?: string }) {
@@ -121,6 +125,14 @@ export function Due({ due, muted }: { due: string | null; muted?: boolean }) {
 export const memberById = (members: Member[], id: string | null) =>
   members.find((m) => m.id === id) || null
 
+// 프로젝트(에픽)별 색 — 키 해시로 ADS 톤 팔레트에서 고정 배정. .epic-tag 의 --tag 로 주입.
+const PROJECT_HUES = ['#6554C0', '#00A3BF', '#0065FF', '#36B37E', '#FF8B00', '#E5493A', '#CD519D', '#5243AA']
+export function projectTone(key: string): string {
+  let h = 0
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0
+  return PROJECT_HUES[h % PROJECT_HUES.length]
+}
+
 export function createdTs(t: Card): number {
   const c = (t.activity || []).find((a) => a.type === 'created')
   return c ? new Date(c.ts).getTime() : 0
@@ -129,6 +141,53 @@ export function createdTs(t: Card): number {
 export function dueInDays(due: string | null): number | null {
   if (!due) return null
   return Math.round((new Date(due + 'T00:00:00').getTime() - TODAY.getTime()) / 86400000)
+}
+
+// ---- 달력·날짜 헬퍼 ----
+export const WEEKDAYS_KO = ['일', '월', '화', '수', '목', '금', '토']
+export const todayISO = () => toISODate(new Date())
+export function toISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+export function addDays(iso: string, n: number): string {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + n)
+  return toISODate(d)
+}
+export function weekdayKo(iso: string): string {
+  return WEEKDAYS_KO[new Date(iso + 'T00:00:00').getDay()]
+}
+export function fmtDateKo(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${WEEKDAYS_KO[d.getDay()]})`
+}
+// 'YYYY-MM' 헬퍼
+export const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number)
+  const d = new Date(y, m - 1 + n, 1)
+  return monthKey(d)
+}
+export function monthLabelKo(month: string): string {
+  const [y, m] = month.split('-').map(Number)
+  return `${y}년 ${m}월`
+}
+/** 달력 그리드용: 해당 월을 포함하는 일요일~토요일 6주(42칸) 날짜 ISO 배열 */
+export function monthGrid(month: string): string[] {
+  const [y, m] = month.split('-').map(Number)
+  const first = new Date(y, m - 1, 1)
+  const start = new Date(first)
+  start.setDate(1 - first.getDay()) // 그 주 일요일로
+  const out: string[] = []
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    out.push(toISODate(d))
+  }
+  return out
 }
 
 export function sortTasks(arr: Card[], mode: string): Card[] {
