@@ -161,37 +161,9 @@ services:
       start_period: 10s
     networks: [appnet]
 
-  todo:
-    build: ./apps/todo
-    container_name: jdp-todo
-    restart: unless-stopped
-    logging: *default-logging
-    env_file: [.env]
-    environment:
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_NAME=app
-      - DB_USER=postgres
-      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
-      - TODO_PROJECTS_FILE=/data/projects.json
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'
-          memory: 256M
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    volumes:
-      # 프로젝트 카테고리 목록 (gen_projects.py + cron 갱신). 파일 하나만 ro, 홈 미노출
-      - /home/junho/.config/todo/projects.json:/data/projects.json:ro
-    networks: [appnet]
+  # todo(성북반상회)는 별도 레포로 분리됨 → github.com/6-6ho/seongbuk-board
+  #   /home/junho/seongbuk-board/docker-compose.laptop.yml 가 jdp_appnet 에 편승해 기동.
+  #   postgres(스키마 todo)·tunnel(todo.6-6ho.com → todo:8000) 은 여기 그대로 사용.
 
   # === External Access ===
   cloudflared:
