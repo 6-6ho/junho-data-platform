@@ -240,6 +240,24 @@ services:
       start_period: 10s
     networks: [appnet]
 
+  # === Hub — 6-6ho.com 랜딩 ===
+  hub:
+    build: ./apps/hub
+    container_name: jdp-hub
+    restart: unless-stopped
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 48M
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "http://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [appnet]
+
   # === External Access ===
   cloudflared:
     image: cloudflare/cloudflared:latest
