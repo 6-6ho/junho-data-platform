@@ -7,7 +7,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from . import config, fetcher, queries, summarizer
+from . import config, fetcher, queries, summarizer, telegram
 
 log = logging.getLogger(__name__)
 KST = timezone(timedelta(hours=9))
@@ -52,7 +52,7 @@ async def _track_github() -> list[dict]:
     return items
 
 
-async def run_brief() -> dict:
+async def run_brief(notify: bool = True) -> dict:
     now = datetime.now(KST)
     run_date = now.date()
     yesterday = run_date - timedelta(days=1)
@@ -75,8 +75,18 @@ async def run_brief() -> dict:
     status = "ok" if (geeknews_items or github_items) else "failed"
     error = " | ".join(errors) or None
     await queries.save_brief(run_date, yesterday, geeknews_items, github_items, status, error)
-    log.info("brief %s: geeknews=%d github=%d status=%s",
-             run_date, len(geeknews_items), len(github_items), status)
+
+    sent = False
+    if notify and status == "ok" and telegram.enabled():
+        sent = await telegram.send_brief({
+            "run_date": run_date.isoformat(),
+            "geeknews_date": yesterday.isoformat(),
+            "geeknews": geeknews_items,
+            "github": github_items,
+        })
+
+    log.info("brief %s: geeknews=%d github=%d status=%s telegram=%s",
+             run_date, len(geeknews_items), len(github_items), status, sent)
     return {
         "run_date": run_date.isoformat(),
         "geeknews_date": yesterday.isoformat(),
@@ -84,4 +94,5 @@ async def run_brief() -> dict:
         "github": len(github_items),
         "status": status,
         "error": error,
+        "telegram": sent,
     }

@@ -19,6 +19,10 @@ DAILY_MINUTE_KST = int(os.getenv("DAILY_MINUTE_KST", "30"))
 TOP_N = int(os.getenv("TOP_N", "5"))
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
+# 텔레그램 발송 (둘 다 있으면 매일 브리핑을 챗으로도 전송)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
 # 소스
 GEEKNEWS_BASE = "https://news.hada.io"
 GITHUB_TRENDING_URL = os.getenv(

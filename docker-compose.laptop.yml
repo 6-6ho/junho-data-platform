@@ -183,6 +183,8 @@ services:
       - DAILY_HOUR_KST=6
       - DAILY_MINUTE_KST=30
       - ADMIN_TOKEN=${MORNING_ADMIN_TOKEN:-}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
     deploy:
       resources:
         limits:
