@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>🌅 Morning Brief</title>
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface2:#1d2129; --border:#262b35;
+    --text:#e6e8ec; --muted:#8b93a3; --subtle:#aeb6c4;
+    --accent:#6ea8fe; --geek:#f5a623; --gh:#7ee2b8; --warn:#f2706e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:'Pretendard',-apple-system,'Segoe UI',Roboto,sans-serif;
+    line-height:1.6;font-size:15px;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:32px 18px 80px}
+  header h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:28px}
+  .sub b{color:var(--subtle);font-weight:600}
+  h2.sec{font-size:15px;letter-spacing:.02em;margin:34px 0 14px;
+    padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;gap:8px;align-items:center}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:16px 18px;margin-bottom:12px}
+  .card .top{display:flex;gap:10px;align-items:baseline}
+  .rank{font-weight:700;color:var(--muted);font-size:14px;flex:0 0 auto;min-width:18px}
+  .title{font-weight:600;font-size:16px;letter-spacing:-.01em}
+  .title a{color:var(--text);text-decoration:none}
+  .title a:hover{color:var(--accent);text-decoration:underline}
+  .meta{color:var(--muted);font-size:12.5px;margin:5px 0 0 28px;display:flex;gap:12px;flex-wrap:wrap}
+  .meta .gpts{color:var(--geek)} .meta .ghs{color:var(--gh)}
+  .summary{color:var(--subtle);font-size:14px;margin:9px 0 0 28px;white-space:pre-wrap}
+  .links{margin:8px 0 0 28px;font-size:12.5px}
+  .links a{color:var(--accent);text-decoration:none;margin-right:14px}
+  .links a:hover{text-decoration:underline}
+  .empty{background:var(--surface);border:1px dashed var(--border);border-radius:12px;
+    padding:28px;text-align:center;color:var(--muted)}
+  .warn{background:rgba(242,112,110,.1);border:1px solid rgba(242,112,110,.35);
+    color:#ffd0cf;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:20px}
+  .hist{margin-top:40px;font-size:13px}
+  .hist .label{color:var(--muted);margin-bottom:8px}
+  .hist a{display:inline-block;color:var(--subtle);text-decoration:none;
+    background:var(--surface2);border:1px solid var(--border);border-radius:7px;
+    padding:3px 9px;margin:0 6px 6px 0;font-variant-numeric:tabular-nums}
+  .hist a:hover{border-color:var(--accent);color:var(--accent)}
+  footer{margin-top:40px;color:var(--muted);font-size:12px;border-top:1px solid var(--border);padding-top:14px}
+  .lang{font-size:11px;color:var(--muted);border:1px solid var(--border);border-radius:5px;padding:0 6px;margin-left:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+{% if not has_key %}
+  <div class="warn">⚠️ <b>GEMINI_API_KEY</b> 미설정 — 요약 없이 메타/링크만 나옵니다. .env에 키 추가 후 재배포하세요.</div>
+{% endif %}
+
+{% if not brief %}
+  <header><h1>🌅 Morning Brief</h1></header>
+  <div class="sub">매일 <b>{{ '%02d:%02d'|format(hh, mm) }} KST</b> 자동 생성</div>
+  <div class="empty">아직 생성된 브리핑이 없어요.<br>다음 {{ '%02d:%02d'|format(hh, mm) }} KST 에 첫 브리핑이 생성됩니다.</div>
+{% else %}
+  <header><h1>🌅 Morning Brief {{ brief.run_date }}</h1></header>
+  <div class="sub">
+    GeekNews <b>{{ brief.geeknews_date }}</b>자 · GitHub Trending <b>오늘</b>자
+    {% if brief.status != 'ok' %} · <span style="color:var(--warn)">status: {{ brief.status }}</span>{% endif %}
+  </div>
+
+  <h2 class="sec">📰 GeekNews 어제자 Top {{ brief.geeknews|length }}</h2>
+  {% if brief.geeknews %}
+    {% for it in brief.geeknews %}
+    <div class="card">
+      <div class="top">
+        <span class="rank">{{ it.rank }}.</span>
+        <span class="title"><a href="{{ it.url }}" target="_blank" rel="noopener">{{ it.title }}</a></span>
+      </div>
+      <div class="meta"><span class="gpts">👍 {{ it.points }}</span><span>💬 {{ it.comments }}</span></div>
+      {% if it.summary %}<div class="summary">{{ it.summary }}</div>{% endif %}
+      <div class="links">
+        <a href="{{ it.url }}" target="_blank" rel="noopener">원문 ↗</a>
+        <a href="{{ it.topic_url }}" target="_blank" rel="noopener">GeekNews 토론 ↗</a>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">어제자 GeekNews 글이 없습니다.{% if brief.error and 'geeknews' in brief.error %}<br><small>{{ brief.error }}</small>{% endif %}</div>
+  {% endif %}
+
+  <h2 class="sec">🐙 GitHub Trending (Python, today) Top {{ brief.github|length }}</h2>
+  {% if brief.github %}
+    {% for it in brief.github %}
+    <div class="card">
+      <div class="top">
+        <span class="rank">{{ it.rank }}.</span>
+        <span class="title"><a href="{{ it.url }}" target="_blank" rel="noopener">{{ it.repo }}</a>
+          <span class="ghs" style="font-size:13px;font-weight:600">⭐ +{{ it.stars_today }}</span>
+          {% if it.language %}<span class="lang">{{ it.language }}</span>{% endif %}
+        </span>
+      </div>
+      {% if it.summary %}<div class="summary">{{ it.summary }}</div>{% endif %}
+      <div class="links"><a href="{{ it.url }}" target="_blank" rel="noopener">레포 ↗</a></div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="empty">GitHub Trending 수집 실패.{% if brief.error and 'github' in brief.error %}<br><small>{{ brief.error }}</small>{% endif %}</div>
+  {% endif %}
+
+  <footer>생성: {{ brief.generated_at }} · 매일 {{ '%02d:%02d'|format(hh, mm) }} KST</footer>
+{% endif %}
+
+{% if dates %}
+  <div class="hist">
+    <div class="label">지난 브리핑</div>
+    {% for d in dates %}<a href="/d/{{ d }}">{{ d }}</a>{% endfor %}
+  </div>
+{% endif %}
+</div>
+</body>
+</html>
