@@ -34,9 +34,29 @@ HTTP_UA = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
-# 콘텐츠 아이디어 합성 대상 — 우리 앱 도메인
+# 참고용 우리 앱 (인사이트 합성 시 참고만, 주 타겟은 20-30대 여성)
 APPS = [
     "사주댕냥 (반려동물 사주·운세)",
     "첫이름 (아기 작명)",
     "로또풀이 (로또 번호 추천)",
+]
+
+# 네이버 데이터랩 (검색어 트렌드) — 20-30대 여성 관심사 추이
+NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
+NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
+NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
+DATALAB_GENDER = os.getenv("DATALAB_GENDER", "f")   # f=여성
+DATALAB_AGES = ["3", "4", "5", "6"]                  # 19~39세
+# 추적 관심사 (요청당 5개 제한 → 배치). 대표 키워드 묶음.
+INTEREST_GROUPS = [
+    {"groupName": "운세·타로", "keywords": ["운세", "타로", "사주"]},
+    {"groupName": "다이어트", "keywords": ["다이어트", "운동"]},
+    {"groupName": "뷰티", "keywords": ["화장품", "뷰티"]},
+    {"groupName": "여행", "keywords": ["여행", "호텔"]},
+    {"groupName": "연애·MBTI", "keywords": ["연애", "MBTI"]},
+    {"groupName": "패션", "keywords": ["패션", "원피스"]},
+    {"groupName": "재테크", "keywords": ["재테크", "적금"]},
+    {"groupName": "자기계발", "keywords": ["자기계발", "독서"]},
+    {"groupName": "결혼·육아", "keywords": ["결혼", "육아"]},
+    {"groupName": "맛집·카페", "keywords": ["맛집", "카페"]},
 ]

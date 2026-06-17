@@ -21,12 +21,26 @@ def _esc(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+def _dl_arrow(d: dict) -> str:
+    return {"up": "▲", "down": "▼"}.get(d.get("dir"), "→")
+
+
 def build_messages(brief: dict) -> list[str]:
-    head = f"📈 <b>Marketing Brief {brief['run_date']}</b>"
+    head = f"📈 <b>Marketing Brief {brief['run_date']}</b>  <i>20-30대 여성 타겟</i>"
     blocks: list[str] = []
 
+    if brief.get("ideas"):
+        blocks.append("💡 <b>오늘의 마케팅 인사이트</b>\n" + _esc(brief["ideas"]))
+
+    nv = brief.get("naver") or []
+    if nv:
+        lines = ["📊 <b>20-30대 여성 관심사 추이</b> <i>(최근 vs 과거)</i>"]
+        for d in nv:
+            lines.append(f"{_dl_arrow(d)} {_esc(d['name'])} {'+' if d['pct']>=0 else ''}{d['pct']}%")
+        blocks.append("\n".join(lines))
+
     tr = brief.get("trends") or []
-    lines = ["🔥 <b>오늘 한국 검색 트렌드</b>"]
+    lines = ["🔥 <b>오늘 한국 실시간 검색</b>"]
     for t in tr:
         traf = f" <i>({_esc(t['traffic'])})</i>" if t.get("traffic") else ""
         lines.append(f"• {_esc(t['title'])}{traf}")

@@ -53,22 +53,27 @@ async def _generate(client: httpx.AsyncClient, prompt: str, max_tokens: int) -> 
     return ""
 
 
-async def content_ideas(client: httpx.AsyncClient, trends: list, products: list,
-                        hn: list, apps: list[str]) -> str:
+async def marketing_insights(client: httpx.AsyncClient, trends: list, products: list,
+                             hn: list, datalab: list, apps: list[str]) -> str:
     trend_lines = "\n".join(f"- {t['title']} ({t.get('traffic','')})" for t in trends[:8])
+    dl_lines = "\n".join(
+        f"- {d['name']}: {'+' if d['pct'] >= 0 else ''}{d['pct']}% ({d['dir']})" for d in datalab
+    ) or "(데이터 없음)"
     ph_lines = "\n".join(f"- {p['name']}: {p.get('tagline','')}" for p in products[:6])
     hn_lines = "\n".join(f"- {h['title']}" for h in hn[:6])
-    app_lines = "\n".join(f"- {a}" for a in apps)
+    app_lines = ", ".join(apps)
     prompt = (
-        "너는 한국 소비자 앱의 SNS 마케팅 담당이다. 오늘의 트렌드를 우리 앱과 엮어 "
-        "바로 써먹을 콘텐츠 아이디어를 만든다.\n\n"
-        f"[오늘 한국 검색 트렌드]\n{trend_lines}\n\n"
+        "너는 20-30대 여성을 주 타겟으로 하는 한국 앱들의 마케팅 전략가다. "
+        "오늘의 신호들을 보고 '지금 바로 써먹을 마케팅 인사이트'를 뽑아라.\n\n"
+        f"[실시간 한국 검색 트렌드]\n{trend_lines}\n\n"
+        f"[20-30대 여성 관심사 검색 추이(네이버 데이터랩, 최근 vs 과거)]\n{dl_lines}\n\n"
         f"[오늘 뜨는 글로벌 프로덕트(Product Hunt)]\n{ph_lines}\n\n"
         f"[글로벌 테크 화제(Hacker News)]\n{hn_lines}\n\n"
-        f"[우리 앱]\n{app_lines}\n\n"
-        "위 트렌드 중 우리 앱과 자연스럽게 엮을 수 있는 걸 골라, 인스타/숏폼/블로그용 "
-        "콘텐츠 아이디어 4개를 제안해줘. 뻔한 건 빼고 후킹되게. 각 아이디어는 정확히 한 줄:\n"
-        "• [앱이름] 활용 트렌드 → 콘텐츠 각도(후킹 포인트)\n"
-        "다른 말 없이 4줄만 출력."
+        f"[참고 — 우리 앱]\n{app_lines}\n\n"
+        "20-30대 여성 마케팅 관점에서 인사이트 5개를 뽑아줘. 검색 추이가 오르는/내리는 신호와 "
+        "실시간 트렌드를 엮어, 무엇을 언제 어떤 각도로 밀면 좋을지 구체적으로. 우리 앱과 엮이면 "
+        "엮되 거기 갇히지 말 것. 뻔한 말·일반론 금지. 각 인사이트는 한 줄:\n"
+        "• [포착한 신호] → [마케팅 시사점 / 콘텐츠·채널 각도]\n"
+        "다른 말 없이 5줄만 출력."
     )
-    return await _generate(client, prompt, 700)
+    return await _generate(client, prompt, 900)

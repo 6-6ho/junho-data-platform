@@ -32,11 +32,13 @@ CREATE TABLE IF NOT EXISTS marketing.daily (
     trends         JSONB NOT NULL DEFAULT '[]'::jsonb,
     producthunt    JSONB NOT NULL DEFAULT '[]'::jsonb,
     hackernews     JSONB NOT NULL DEFAULT '[]'::jsonb,
+    naver          JSONB NOT NULL DEFAULT '[]'::jsonb,
     ideas          TEXT,
     status         TEXT,
     error          TEXT,
     generated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE marketing.daily ADD COLUMN IF NOT EXISTS naver JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 CREATE INDEX IF NOT EXISTS marketing_daily_date_idx ON marketing.daily (run_date DESC);
 """

@@ -7,6 +7,7 @@ from __future__ import annotations
 import html
 import logging
 import re
+from datetime import date, timedelta
 
 import httpx
 
@@ -88,6 +89,45 @@ async def fetch_producthunt() -> list[dict]:
 
 
 # ---------------------- Hacker News ----------------------
+
+async def fetch_datalab() -> list[dict]:
+    """네이버 데이터랩 — 20-30대 여성의 관심사별 검색 추이. 키워드그룹 5개씩 배치.
+    각 키워드의 최근(완성된 주) vs 과거 비교로 상승/하락 %. 진행중 마지막 주는 제외."""
+    if not (config.NAVER_CLIENT_ID and config.NAVER_CLIENT_SECRET):
+        return []
+    end = date.today()
+    start = end - timedelta(days=120)
+    headers = {
+        "X-Naver-Client-Id": config.NAVER_CLIENT_ID,
+        "X-Naver-Client-Secret": config.NAVER_CLIENT_SECRET,
+        "Content-Type": "application/json",
+    }
+    groups = config.INTEREST_GROUPS
+    out: list[dict] = []
+    async with _client() as c:
+        for i in range(0, len(groups), 5):
+            body = {
+                "startDate": start.isoformat(), "endDate": end.isoformat(),
+                "timeUnit": "week", "gender": config.DATALAB_GENDER,
+                "ages": config.DATALAB_AGES, "keywordGroups": groups[i:i + 5],
+            }
+            r = await c.post(config.NAVER_DATALAB_URL, headers=headers, json=body)
+            r.raise_for_status()
+            for res in r.json().get("results", []):
+                series = [d["ratio"] for d in res.get("data", [])][:-1]  # 진행중 주 제외
+                if len(series) < 6:
+                    continue
+                recent = sum(series[-3:]) / 3
+                earlier = sum(series[:3]) / 3
+                pct = round((recent - earlier) / earlier * 100) if earlier else 0
+                out.append({
+                    "name": res["title"],
+                    "pct": pct,
+                    "dir": "up" if pct > 12 else ("down" if pct < -12 else "flat"),
+                })
+    out.sort(key=lambda x: x["pct"], reverse=True)  # 뜨는 것 먼저
+    return out
+
 
 async def fetch_hackernews() -> list[dict]:
     async with _client() as c:

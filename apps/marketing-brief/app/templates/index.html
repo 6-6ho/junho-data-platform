@@ -80,6 +80,13 @@
 
   .ideas{background:var(--idea-bg);border:1px solid color-mix(in srgb,var(--idea) 30%,transparent);
     border-radius:14px;padding:16px 18px;white-space:pre-wrap;font-size:15px;line-height:1.7;color:var(--text)}
+  .sec.dl .dot{background:var(--link)}
+  .dlwrap{display:flex;flex-wrap:wrap;gap:8px}
+  .dlchip{font-size:13.5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;
+    padding:5px 12px;color:var(--subtle);box-shadow:var(--shadow)}
+  .dlchip b{font-variant-numeric:tabular-nums;margin-left:2px}
+  .dlchip.up{color:var(--idea);border-color:color-mix(in srgb,var(--idea) 35%,var(--border))}
+  .dlchip.down{color:var(--trend);border-color:color-mix(in srgb,var(--trend) 35%,var(--border))}
 
   .empty{background:var(--raised);border:1px dashed var(--border2);border-radius:13px;
     padding:24px 18px;text-align:center;color:var(--muted);font-size:14px}
@@ -112,11 +119,20 @@
   <div class="empty">아직 생성된 브리핑이 없어요.<br>다음 {{ '%02d:%02d'|format(hh, mm) }} KST 에 첫 브리핑이 만들어집니다.</div>
 {% else %}
   <div class="hero"><h1>{{ brief.run_date }}</h1>
-    <div class="when">한국 검색 트렌드 · Product Hunt · Hacker News · 콘텐츠 아이디어{% if brief.status != 'ok' %} · <span style="color:var(--warn)">{{ brief.status }}</span>{% endif %}</div></div>
+    <div class="when">20-30대 여성 타겟 · 검색 트렌드 · 관심사 추이 · Product Hunt · Hacker News{% if brief.status != 'ok' %} · <span style="color:var(--warn)">{{ brief.status }}</span>{% endif %}</div></div>
 
   {% if brief.ideas %}
-  <div class="sec idea"><span class="dot"></span><h2>오늘의 콘텐츠 아이디어</h2></div>
+  <div class="sec idea"><span class="dot"></span><h2>오늘의 마케팅 인사이트</h2></div>
   <div class="ideas">{{ brief.ideas }}</div>
+  {% endif %}
+
+  {% if brief.naver %}
+  <div class="sec dl"><span class="dot"></span><h2>20-30대 여성 관심사 추이</h2><span class="cnt">최근 vs 과거</span></div>
+  <div class="dlwrap">
+    {% for d in brief.naver %}
+    <span class="dlchip {{ d.dir }}">{{ d.name }} <b>{% if d.pct >= 0 %}+{% endif %}{{ d.pct }}%</b></span>
+    {% endfor %}
+  </div>
   {% endif %}
 
   <div class="sec trend"><span class="dot"></span><h2>오늘 한국 검색 트렌드</h2><span class="cnt">{{ brief.trends|length }}</span></div>

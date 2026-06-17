@@ -35,30 +35,40 @@ async def run_brief(notify: bool = True) -> dict:
         log.exception("hackernews failed")
         errors.append(f"hackernews: {e}")
 
+    naver: list[dict] = []
+    try:
+        naver = await fetcher.fetch_datalab()
+    except Exception as e:  # noqa: BLE001
+        log.exception("datalab failed")
+        errors.append(f"datalab: {e}")
+
     ideas = ""
-    if trends or products or hn:
+    if trends or products or hn or naver:
         try:
             async with fetcher._client() as client:
-                ideas = await summarizer.content_ideas(client, trends, products, hn, config.APPS)
+                ideas = await summarizer.marketing_insights(
+                    client, trends, products, hn, naver, config.APPS)
         except Exception as e:  # noqa: BLE001
-            log.exception("ideas failed")
-            errors.append(f"ideas: {e}")
+            log.exception("insights failed")
+            errors.append(f"insights: {e}")
 
-    status = "ok" if (trends or products or hn) else "failed"
+    status = "ok" if (trends or products or hn or naver) else "failed"
     error = " | ".join(errors) or None
-    await queries.save_brief(run_date, trends, products, hn, ideas, status, error)
+    await queries.save_brief(run_date, trends, products, hn, naver, ideas, status, error)
 
     sent = False
     if notify and status == "ok" and telegram.enabled():
         sent = await telegram.send_brief({
             "run_date": run_date.isoformat(),
-            "trends": trends, "producthunt": products, "hackernews": hn, "ideas": ideas,
+            "trends": trends, "producthunt": products, "hackernews": hn,
+            "naver": naver, "ideas": ideas,
         })
 
-    log.info("marketing brief %s: trends=%d ph=%d hn=%d ideas=%s telegram=%s status=%s",
-             run_date, len(trends), len(products), len(hn), bool(ideas), sent, status)
+    log.info("marketing brief %s: trends=%d ph=%d hn=%d naver=%d ideas=%s telegram=%s status=%s",
+             run_date, len(trends), len(products), len(hn), len(naver), bool(ideas), sent, status)
     return {
         "run_date": run_date.isoformat(),
         "trends": len(trends), "producthunt": len(products), "hackernews": len(hn),
-        "ideas": bool(ideas), "status": status, "error": error, "telegram": sent,
+        "naver": len(naver), "ideas": bool(ideas),
+        "status": status, "error": error, "telegram": sent,
     }
