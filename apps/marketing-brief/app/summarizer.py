@@ -56,24 +56,28 @@ async def _generate(client: httpx.AsyncClient, prompt: str, max_tokens: int) -> 
 async def marketing_insights(client: httpx.AsyncClient, trends: list, products: list,
                              hn: list, datalab: list, apps: list[str]) -> str:
     trend_lines = "\n".join(f"- {t['title']} ({t.get('traffic','')})" for t in trends[:8])
-    dl_lines = "\n".join(
-        f"- {d['name']}: {'+' if d['pct'] >= 0 else ''}{d['pct']}% ({d['dir']})" for d in datalab
-    ) or "(데이터 없음)"
+    dl_lines = ""
+    for seg in datalab:
+        top = ", ".join(
+            f"{x['name']}{'+' if x['pct'] >= 0 else ''}{x['pct']}%" for x in seg["items"][:5]
+        )
+        dl_lines += f"- [{seg['segment']}] {top}\n"
+    dl_lines = dl_lines or "(데이터 없음)"
     ph_lines = "\n".join(f"- {p['name']}: {p.get('tagline','')}" for p in products[:6])
     hn_lines = "\n".join(f"- {h['title']}" for h in hn[:6])
     app_lines = ", ".join(apps)
     prompt = (
-        "너는 20-30대 여성을 주 타겟으로 하는 한국 앱들의 마케팅 전략가다. "
-        "오늘의 신호들을 보고 '지금 바로 써먹을 마케팅 인사이트'를 뽑아라.\n\n"
+        "너는 한국 앱들의 마케팅 전략가다. 타겟은 '돈을 많이 쓰는 세대'(30-50대, "
+        "남녀 다양하게 — 20대 남성은 제외). 오늘의 신호로 '지금 바로 써먹을 마케팅 인사이트'를 뽑아라.\n\n"
         f"[실시간 한국 검색 트렌드]\n{trend_lines}\n\n"
-        f"[20-30대 여성 관심사 검색 추이(네이버 데이터랩, 최근 vs 과거)]\n{dl_lines}\n\n"
+        f"[세그먼트별 관심사 검색 추이(네이버 데이터랩, 최근 vs 과거 %)]\n{dl_lines}\n"
         f"[오늘 뜨는 글로벌 프로덕트(Product Hunt)]\n{ph_lines}\n\n"
         f"[글로벌 테크 화제(Hacker News)]\n{hn_lines}\n\n"
         f"[참고 — 우리 앱]\n{app_lines}\n\n"
-        "20-30대 여성 마케팅 관점에서 인사이트 5개를 뽑아줘. 검색 추이가 오르는/내리는 신호와 "
-        "실시간 트렌드를 엮어, 무엇을 언제 어떤 각도로 밀면 좋을지 구체적으로. 우리 앱과 엮이면 "
-        "엮되 거기 갇히지 말 것. 뻔한 말·일반론 금지. 각 인사이트는 한 줄:\n"
-        "• [포착한 신호] → [마케팅 시사점 / 콘텐츠·채널 각도]\n"
+        "인사이트 5개를 뽑아줘. 세그먼트마다 소비 동기·관심사가 다르니, 어느 세대/성별에게 "
+        "무엇을 어떤 각도로 밀면 좋을지 구체적으로. 검색 추이(상승/하락)와 실시간 트렌드를 엮을 것. "
+        "우리 앱과 엮이면 엮되 거기 갇히지 말 것. 뻔한 말·일반론 금지. 각 인사이트는 한 줄:\n"
+        "• [타겟 세그먼트] [포착한 신호] → [마케팅 시사점 / 콘텐츠·채널 각도]\n"
         "다른 말 없이 5줄만 출력."
     )
-    return await _generate(client, prompt, 900)
+    return await _generate(client, prompt, 1000)

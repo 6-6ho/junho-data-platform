@@ -5,103 +5,77 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <meta name="color-scheme" content="light dark">
-<title>📈 Marketing Brief{% if brief %} {{ brief.run_date }}{% endif %}</title>
+<title>Marketing Brief{% if brief %} · {{ brief.run_date }}{% endif %}</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📈</text></svg>">
 <style>
   :root{
-    --bg:#f6f7f9; --surface:#ffffff; --raised:#fbfcfd; --border:#e6e8ec; --border2:#d7dae0;
-    --text:#1a1f29; --subtle:#465064; --muted:#8a93a3;
-    --link:#1d6fe0; --trend:#e5493a; --trend-bg:#fdecea; --ph:#8b5cf6; --ph-bg:#f1ecfd;
-    --hn:#d97706; --hn-bg:#fff4e3; --idea:#0f9d63; --idea-bg:#e4f7ee;
-    --warn:#c0362c; --warn-bg:#fdecea; --chip:#f0f2f5;
-    --shadow:0 1px 2px rgba(20,28,45,.06),0 1px 3px rgba(20,28,45,.05);
-    --shadow-h:0 4px 16px -6px rgba(20,28,45,.18);
+    --bg:#fbfaf7; --surface:#ffffff; --ink:#1b1a17; --ink2:#403d37; --muted:#8c867a;
+    --line:#e9e4da; --line2:#dcd5c8; --accent:#1d4ed8; --kicker:#9a8f7d;
+    --up:#0f7a4d; --up-bd:#bfe3cf; --down:#b3261e; --down-bd:#eccac7;
   }
   @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#0f1115; --surface:#171a21; --raised:#1c2029; --border:#262b35; --border2:#333a47;
-      --text:#e7e9ee; --subtle:#aab2c0; --muted:#7b8493;
-      --link:#6ea8fe; --trend:#f2706e; --trend-bg:#2a1716; --ph:#a78bfa; --ph-bg:#1e1830;
-      --hn:#f5b53d; --hn-bg:#2a2113; --idea:#62d6a0; --idea-bg:#10261c;
-      --warn:#f2706e; --warn-bg:#2a1716; --chip:#222631;
-      --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-h:0 6px 22px -8px rgba(0,0,0,.6);
-    }
+    :root{ --bg:#101218; --surface:#181b22; --ink:#e9ebf0; --ink2:#c2c6d0; --muted:#888fa0;
+      --line:#23262f; --line2:#333744; --accent:#6c9bff; --kicker:#888fa0;
+      --up:#5fcf97; --up-bd:#234b38; --down:#e2655c; --down-bd:#4a2b28; }
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);
+  body{margin:0;background:var(--bg);color:var(--ink);
     font-family:'Pretendard',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
-  .bar{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:12px;
-    padding:11px 18px;background:color-mix(in srgb,var(--surface) 86%,transparent);
-    backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--border)}
-  .brand{font-size:16px;font-weight:600;letter-spacing:-.01em;white-space:nowrap}
-  .brand .em{font-weight:800}
-  .bar .spacer{flex:1}
-  .datesel{font:inherit;font-size:13.5px;color:var(--text);background:var(--raised);
-    border:1px solid var(--border2);border-radius:9px;padding:6px 30px 6px 11px;cursor:pointer;appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 4l3 3 3-3' fill='none' stroke='%238a93a3' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 10px center}
-  .wrap{max-width:720px;margin:0 auto;padding:22px 18px 90px}
-  .hero h1{font-size:23px;font-weight:800;letter-spacing:-.02em;margin:6px 0 4px}
-  .hero .when{color:var(--muted);font-size:13.5px}
-  .warn{display:flex;gap:9px;background:var(--warn-bg);border:1px solid color-mix(in srgb,var(--warn) 30%,transparent);
-    color:var(--warn);border-radius:11px;padding:11px 14px;font-size:13.5px;margin:18px 0 6px}
-  .sec{margin:30px 0 13px;display:flex;align-items:center;gap:9px}
-  .sec .dot{width:9px;height:9px;border-radius:3px;flex:0 0 auto}
-  .sec h2{font-size:15px;font-weight:700;margin:0}
-  .sec .cnt{font-size:12px;font-weight:600;color:var(--muted);background:var(--chip);border-radius:20px;padding:1px 9px}
-  .sec.trend .dot{background:var(--trend)} .sec.ph .dot{background:var(--ph)}
-  .sec.hn .dot{background:var(--hn)} .sec.idea .dot{background:var(--idea)}
-
-  /* trend list */
-  .trends{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:6px 4px;box-shadow:var(--shadow)}
-  .trow{display:flex;gap:11px;align-items:baseline;padding:9px 14px;border-bottom:1px solid var(--border)}
-  .trow:last-child{border-bottom:0}
-  .trow .tn{flex:0 0 auto;color:var(--muted);font-weight:800;font-size:13px;min-width:16px;font-variant-numeric:tabular-nums}
-  .trow .tt{font-weight:650;font-size:15.5px}
-  .trow .traf{font-size:12px;color:var(--trend);background:var(--trend-bg);border-radius:20px;padding:1px 8px;font-weight:600;white-space:nowrap}
-  .trow .news{margin-top:3px;font-size:12.5px}
+    font-size:17px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .serif{font-family:Georgia,'Times New Roman',serif}
+  .tabs{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:4px;
+    padding:0 18px;height:46px;background:color-mix(in srgb,var(--bg) 86%,transparent);
+    backdrop-filter:saturate(1.3) blur(9px);border-bottom:1px solid var(--line)}
+  .tab{font-size:14px;font-weight:600;color:var(--muted);text-decoration:none;padding:6px 13px;border-radius:8px}
+  .tab.active{color:var(--ink);background:var(--surface);box-shadow:inset 0 0 0 1px var(--line2)}
+  .tab:hover{color:var(--ink)}
+  .tabsp{flex:1}
+  .datesel{font:inherit;font-size:13px;color:var(--ink2);background:var(--surface);border:1px solid var(--line2);
+    border-radius:8px;padding:5px 28px 5px 10px;cursor:pointer;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 4l3 3 3-3' fill='none' stroke='%238c867a' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 9px center}
+  .paper{max-width:660px;margin:0 auto;padding:30px 22px 100px}
+  .masthead{text-align:center;padding:10px 0 20px;border-bottom:2px solid var(--ink);margin-bottom:8px}
+  .kicker{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--kicker);font-weight:700}
+  .title{font-family:Georgia,serif;font-weight:700;font-size:46px;letter-spacing:-.015em;margin:9px 0 8px;line-height:.98}
+  .dateline{font-size:13.5px;color:var(--muted);font-style:italic}
+  .sec{display:flex;align-items:center;gap:13px;margin:36px 0 6px}
+  .sec h2{font-size:12.5px;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin:0;white-space:nowrap;color:var(--accent)}
+  .sec::after{content:"";flex:1;height:1px;background:var(--line2)}
+  .lead{font-size:16px;line-height:1.85;color:var(--ink);white-space:pre-wrap;
+    border-left:3px solid var(--accent);padding:6px 0 6px 18px;margin:14px 0 2px}
+  .seg{margin:16px 0}
+  .seg .sname{font-size:13px;font-weight:800;color:var(--ink2);margin-bottom:8px;letter-spacing:.02em}
+  .chips{display:flex;flex-wrap:wrap;gap:7px}
+  .chip{font-size:13px;border:1px solid var(--line2);border-radius:7px;padding:3px 10px;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .chip.up{color:var(--up);border-color:var(--up-bd)}
+  .chip.down{color:var(--down);border-color:var(--down-bd)}
+  .entry{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .num{font-family:Georgia,serif;font-size:21px;font-weight:700;color:var(--accent);line-height:1.15;flex:0 0 auto;min-width:26px}
+  .ebody{flex:1;min-width:0}
+  .etitle{font-size:18.5px;font-weight:700;line-height:1.34;letter-spacing:-.01em}
+  .etitle a{text-decoration:none}
+  .etitle a:hover{text-decoration:underline;text-decoration-color:var(--accent);text-underline-offset:2px}
+  .emeta{font-size:12px;color:var(--muted);margin-top:4px;letter-spacing:.03em;font-variant-numeric:tabular-nums}
+  .esum{font-size:15px;color:var(--ink2);margin-top:7px;line-height:1.55}
+  .trow{display:flex;gap:12px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line)}
+  .trow .tn{font-family:Georgia,serif;color:var(--accent);font-weight:700;min-width:22px}
+  .trow .tt{font-weight:600;font-size:16px}
+  .trow .traf{font-size:12px;color:var(--muted);white-space:nowrap}
+  .trow .news{font-size:12.5px;margin-top:2px}
   .trow .news a{color:var(--muted);text-decoration:none;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .trow .news a:hover{color:var(--link)}
-  .tbody{flex:1;min-width:0}
-
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-    padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow);transition:box-shadow .15s,transform .15s,border-color .15s}
-  .card:hover{box-shadow:var(--shadow-h);border-color:var(--border2);transform:translateY(-1px)}
-  .card .head{display:flex;gap:10px;align-items:baseline}
-  .rank{flex:0 0 auto;font-weight:800;font-size:14px;color:var(--muted);min-width:16px;font-variant-numeric:tabular-nums}
-  .ttl{font-size:16px;font-weight:650;line-height:1.4}
-  .ttl a{color:var(--text);text-decoration:none}
-  .ttl a:hover{color:var(--link)}
-  .tag{color:var(--subtle);font-size:14px;margin:6px 0 0 26px}
-  .chips{margin:6px 0 0 26px}
-  .chip{font-size:12px;font-weight:600;color:var(--hn);background:var(--hn-bg);border-radius:20px;padding:2px 10px}
-
-  .ideas{background:var(--idea-bg);border:1px solid color-mix(in srgb,var(--idea) 30%,transparent);
-    border-radius:14px;padding:16px 18px;white-space:pre-wrap;font-size:15px;line-height:1.7;color:var(--text)}
-  .sec.dl .dot{background:var(--link)}
-  .dlwrap{display:flex;flex-wrap:wrap;gap:8px}
-  .dlchip{font-size:13.5px;background:var(--surface);border:1px solid var(--border);border-radius:20px;
-    padding:5px 12px;color:var(--subtle);box-shadow:var(--shadow)}
-  .dlchip b{font-variant-numeric:tabular-nums;margin-left:2px}
-  .dlchip.up{color:var(--idea);border-color:color-mix(in srgb,var(--idea) 35%,var(--border))}
-  .dlchip.down{color:var(--trend);border-color:color-mix(in srgb,var(--trend) 35%,var(--border))}
-
-  .empty{background:var(--raised);border:1px dashed var(--border2);border-radius:13px;
-    padding:24px 18px;text-align:center;color:var(--muted);font-size:14px}
-  .empty small{display:block;margin-top:8px;font-size:12px;word-break:break-all}
-  footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--border);color:var(--muted);font-size:12.5px;display:flex;gap:6px 14px;flex-wrap:wrap}
-  @media (max-width:560px){
-    body{font-size:15.5px} .wrap{padding:18px 14px 80px} .hero h1{font-size:20px}
-    .tag,.chips{margin-left:0;margin-top:6px}
-  }
+  .tb{flex:1;min-width:0}
+  .empty{color:var(--muted);font-size:14.5px;padding:20px 0;text-align:center;font-style:italic}
+  .warn{font-size:13px;color:var(--accent);border:1px solid var(--line2);background:color-mix(in srgb,var(--accent) 7%,transparent);border-radius:9px;padding:10px 13px;margin:18px 0}
+  footer{margin-top:42px;padding-top:18px;border-top:2px solid var(--ink);text-align:center;font-size:12px;color:var(--muted)}
+  @media (max-width:560px){ body{font-size:16px} .title{font-size:34px} .paper{padding:24px 16px 80px}
+    .num{font-size:18px;min-width:20px} .entry{gap:12px} }
 </style>
 </head>
 <body>
-<div class="bar">
-  <span class="brand">📈 Marketing <span class="em">Brief</span></span>
-  <span class="spacer"></span>
+<div class="tabs">
+  <a class="tab" href="https://morning.6-6ho.com/">기술</a>
+  <a class="tab active" href="https://marketing.6-6ho.com/">마케팅</a>
+  <span class="tabsp"></span>
   {% if dates %}
   <select class="datesel" aria-label="지난 브리핑" onchange="if(this.value)location.href='/d/'+this.value">
     {% for d in dates %}<option value="{{ d }}"{{ ' selected' if brief and d == brief.run_date else '' }}>{{ d }}</option>{% endfor %}
@@ -109,71 +83,70 @@
   {% endif %}
 </div>
 
-<div class="wrap">
-{% if not has_key %}
-  <div class="warn">⚠️ <span><b>GEMINI_API_KEY</b> 미설정 — 콘텐츠 아이디어가 비어있습니다.</span></div>
-{% endif %}
+<div class="paper">
+  <header class="masthead">
+    <div class="kicker">매일 {{ '%02d:%02d'|format(hh, mm) }} KST · 돈 쓰는 세대 타겟</div>
+    <div class="title serif">Marketing Brief</div>
+    <div class="dateline">{% if brief %}{{ brief.run_date }} · 인사이트 · 세그먼트 추이 · 트렌드{% else %}곧 첫 호 발행{% endif %}</div>
+  </header>
+
+{% if not has_key %}<div class="warn"><b>GEMINI_API_KEY</b> 미설정 — 인사이트가 비어있습니다.</div>{% endif %}
 
 {% if not brief %}
-  <div class="hero"><h1>📈 Marketing Brief</h1><div class="when">매일 {{ '%02d:%02d'|format(hh, mm) }} KST 자동 생성</div></div>
-  <div class="empty">아직 생성된 브리핑이 없어요.<br>다음 {{ '%02d:%02d'|format(hh, mm) }} KST 에 첫 브리핑이 만들어집니다.</div>
+  <div class="empty">아직 발행된 브리핑이 없어요. 다음 {{ '%02d:%02d'|format(hh, mm) }} KST 에 첫 호가 나옵니다.</div>
 {% else %}
-  <div class="hero"><h1>{{ brief.run_date }}</h1>
-    <div class="when">20-30대 여성 타겟 · 검색 트렌드 · 관심사 추이 · Product Hunt · Hacker News{% if brief.status != 'ok' %} · <span style="color:var(--warn)">{{ brief.status }}</span>{% endif %}</div></div>
-
   {% if brief.ideas %}
-  <div class="sec idea"><span class="dot"></span><h2>오늘의 마케팅 인사이트</h2></div>
-  <div class="ideas">{{ brief.ideas }}</div>
+  <div class="sec"><h2>오늘의 마케팅 인사이트</h2></div>
+  <div class="lead">{{ brief.ideas }}</div>
   {% endif %}
 
   {% if brief.naver %}
-  <div class="sec dl"><span class="dot"></span><h2>20-30대 여성 관심사 추이</h2><span class="cnt">최근 vs 과거</span></div>
-  <div class="dlwrap">
-    {% for d in brief.naver %}
-    <span class="dlchip {{ d.dir }}">{{ d.name }} <b>{% if d.pct >= 0 %}+{% endif %}{{ d.pct }}%</b></span>
-    {% endfor %}
+  <div class="sec"><h2>세그먼트별 관심사 추이</h2></div>
+  {% for seg in brief.naver %}
+  <div class="seg">
+    <div class="sname">{{ seg.segment }}</div>
+    <div class="chips">
+      {% for x in seg['items'] if x.dir != 'flat' %}<span class="chip {{ x.dir }}">{{ x.name }} {% if x.pct >= 0 %}+{% endif %}{{ x.pct }}%</span>{% endfor %}
+    </div>
   </div>
+  {% endfor %}
   {% endif %}
 
-  <div class="sec trend"><span class="dot"></span><h2>오늘 한국 검색 트렌드</h2><span class="cnt">{{ brief.trends|length }}</span></div>
-  {% if brief.trends %}
-  <div class="trends">
-    {% for t in brief.trends %}
-    <div class="trow">
-      <span class="tn">{{ loop.index }}</span>
-      <div class="tbody">
-        <span class="tt">{{ t.title }}</span>
-        {% if t.news %}<div class="news">{% for n in t.news %}<a href="{{ n.url }}" target="_blank" rel="noopener">└ {{ n.title }}</a>{% endfor %}</div>{% endif %}
-      </div>
-      {% if t.traffic %}<span class="traf">{{ t.traffic }}</span>{% endif %}
+  <div class="sec"><h2>오늘 한국 실시간 검색</h2></div>
+  {% if brief.trends %}{% for t in brief.trends %}
+  <div class="trow">
+    <span class="tn serif">{{ loop.index }}</span>
+    <div class="tb">
+      <span class="tt">{{ t.title }}</span>
+      {% if t.news %}<div class="news">{% for n in t.news %}<a href="{{ n.url }}" target="_blank" rel="noopener">{{ n.title }}</a>{% endfor %}</div>{% endif %}
     </div>
-    {% endfor %}
+    {% if t.traffic %}<span class="traf">{{ t.traffic }}</span>{% endif %}
   </div>
-  {% else %}<div class="empty">검색 트렌드 수집 실패</div>{% endif %}
+  {% endfor %}{% else %}<div class="empty">검색 트렌드 수집 실패</div>{% endif %}
 
-  <div class="sec ph"><span class="dot"></span><h2>오늘 뜨는 프로덕트 · Product Hunt</h2><span class="cnt">{{ brief.producthunt|length }}</span></div>
-  {% if brief.producthunt %}
-    {% for p in brief.producthunt %}
-    <article class="card">
-      <div class="head"><span class="rank">{{ p.rank }}</span>
-        <h3 class="ttl" style="margin:0"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.name }}</a></h3></div>
-      {% if p.tagline %}<div class="tag">{{ p.tagline }}</div>{% endif %}
-    </article>
-    {% endfor %}
-  {% else %}<div class="empty">Product Hunt 수집 실패</div>{% endif %}
+  <div class="sec"><h2>Product Hunt · 오늘</h2></div>
+  {% if brief.producthunt %}{% for p in brief.producthunt %}
+  <div class="entry">
+    <div class="num serif">{{ '%02d'|format(p.rank) }}</div>
+    <div class="ebody">
+      <div class="etitle"><a href="{{ p.url }}" target="_blank" rel="noopener">{{ p.name }}</a></div>
+      {% if p.tagline %}<div class="esum">{{ p.tagline }}</div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}{% else %}<div class="empty">수집 실패</div>{% endif %}
 
-  <div class="sec hn"><span class="dot"></span><h2>글로벌 화제 · Hacker News</h2><span class="cnt">{{ brief.hackernews|length }}</span></div>
-  {% if brief.hackernews %}
-    {% for h in brief.hackernews %}
-    <article class="card">
-      <div class="head"><span class="rank">{{ h.rank }}</span>
-        <h3 class="ttl" style="margin:0"><a href="{{ h.url }}" target="_blank" rel="noopener">{{ h.title }}</a></h3></div>
-      <div class="chips"><span class="chip">▲ {{ h.points }} · 💬 {{ h.comments }}</span></div>
-    </article>
-    {% endfor %}
-  {% else %}<div class="empty">Hacker News 수집 실패</div>{% endif %}
+  <div class="sec"><h2>Hacker News</h2></div>
+  {% if brief.hackernews %}{% for h in brief.hackernews %}
+  <div class="entry">
+    <div class="num serif">{{ '%02d'|format(h.rank) }}</div>
+    <div class="ebody">
+      <div class="etitle"><a href="{{ h.url }}" target="_blank" rel="noopener">{{ h.title }}</a></div>
+      <div class="emeta">▲ {{ h.points }} · 💬 {{ h.comments }}</div>
+    </div>
+  </div>
+  {% endfor %}{% else %}<div class="empty">수집 실패</div>{% endif %}
 
-  <footer><span>생성 {{ brief.generated_at }}</span><span>매일 {{ '%02d:%02d'|format(hh, mm) }} KST 자동</span>{% if brief.error %}<span style="color:var(--warn)">{{ brief.error }}</span>{% endif %}</footer>
+  <footer>생성 {{ brief.generated_at }} · 매일 {{ '%02d:%02d'|format(hh, mm) }} KST</footer>
 {% endif %}
 </div>
 </body>

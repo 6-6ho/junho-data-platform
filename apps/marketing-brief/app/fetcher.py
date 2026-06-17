@@ -90,42 +90,56 @@ async def fetch_producthunt() -> list[dict]:
 
 # ---------------------- Hacker News ----------------------
 
+async def _datalab_segment(c: httpx.AsyncClient, headers: dict, seg: dict,
+                           start: str, end: str) -> list[dict]:
+    groups = config.INTEREST_GROUPS
+    items: list[dict] = []
+    for i in range(0, len(groups), 5):
+        body = {
+            "startDate": start, "endDate": end, "timeUnit": "week",
+            "ages": seg["ages"], "keywordGroups": groups[i:i + 5],
+        }
+        if seg.get("gender"):
+            body["gender"] = seg["gender"]
+        r = await c.post(config.NAVER_DATALAB_URL, headers=headers, json=body)
+        r.raise_for_status()
+        for res in r.json().get("results", []):
+            series = [d["ratio"] for d in res.get("data", [])][:-1]  # 진행중 주 제외
+            if len(series) < 6:
+                continue
+            recent = sum(series[-3:]) / 3
+            earlier = sum(series[:3]) / 3
+            pct = round((recent - earlier) / earlier * 100) if earlier else 0
+            items.append({
+                "name": res["title"], "pct": pct,
+                "dir": "up" if pct > 12 else ("down" if pct < -12 else "flat"),
+            })
+    items.sort(key=lambda x: x["pct"], reverse=True)
+    return items
+
+
 async def fetch_datalab() -> list[dict]:
-    """네이버 데이터랩 — 20-30대 여성의 관심사별 검색 추이. 키워드그룹 5개씩 배치.
-    각 키워드의 최근(완성된 주) vs 과거 비교로 상승/하락 %. 진행중 마지막 주는 제외."""
+    """네이버 데이터랩 — '돈 쓰는 세대' 여러 세그먼트별 관심사 검색 추이.
+    각 키워드 최근(완성 주) vs 과거 비교로 상승/하락 %. 반환: [{segment, items[]}]."""
     if not (config.NAVER_CLIENT_ID and config.NAVER_CLIENT_SECRET):
         return []
-    end = date.today()
-    start = end - timedelta(days=120)
+    end = date.today().isoformat()
+    start = (date.today() - timedelta(days=120)).isoformat()
     headers = {
         "X-Naver-Client-Id": config.NAVER_CLIENT_ID,
         "X-Naver-Client-Secret": config.NAVER_CLIENT_SECRET,
         "Content-Type": "application/json",
     }
-    groups = config.INTEREST_GROUPS
     out: list[dict] = []
     async with _client() as c:
-        for i in range(0, len(groups), 5):
-            body = {
-                "startDate": start.isoformat(), "endDate": end.isoformat(),
-                "timeUnit": "week", "gender": config.DATALAB_GENDER,
-                "ages": config.DATALAB_AGES, "keywordGroups": groups[i:i + 5],
-            }
-            r = await c.post(config.NAVER_DATALAB_URL, headers=headers, json=body)
-            r.raise_for_status()
-            for res in r.json().get("results", []):
-                series = [d["ratio"] for d in res.get("data", [])][:-1]  # 진행중 주 제외
-                if len(series) < 6:
-                    continue
-                recent = sum(series[-3:]) / 3
-                earlier = sum(series[:3]) / 3
-                pct = round((recent - earlier) / earlier * 100) if earlier else 0
-                out.append({
-                    "name": res["title"],
-                    "pct": pct,
-                    "dir": "up" if pct > 12 else ("down" if pct < -12 else "flat"),
-                })
-    out.sort(key=lambda x: x["pct"], reverse=True)  # 뜨는 것 먼저
+        for seg in config.SEGMENTS:
+            try:
+                items = await _datalab_segment(c, headers, seg, start, end)
+            except Exception as e:  # noqa: BLE001
+                log.warning("datalab segment %s failed: %s", seg["label"], e)
+                items = []
+            if items:
+                out.append({"segment": seg["label"], "items": items})
     return out
 
 

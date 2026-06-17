@@ -26,7 +26,7 @@ def _dl_arrow(d: dict) -> str:
 
 
 def build_messages(brief: dict) -> list[str]:
-    head = f"📈 <b>Marketing Brief {brief['run_date']}</b>  <i>20-30대 여성 타겟</i>"
+    head = f"📈 <b>Marketing Brief {brief['run_date']}</b>  <i>돈 쓰는 세대 타겟</i>"
     blocks: list[str] = []
 
     if brief.get("ideas"):
@@ -34,9 +34,13 @@ def build_messages(brief: dict) -> list[str]:
 
     nv = brief.get("naver") or []
     if nv:
-        lines = ["📊 <b>20-30대 여성 관심사 추이</b> <i>(최근 vs 과거)</i>"]
-        for d in nv:
-            lines.append(f"{_dl_arrow(d)} {_esc(d['name'])} {'+' if d['pct']>=0 else ''}{d['pct']}%")
+        lines = ["📊 <b>세그먼트별 관심사 추이</b> <i>(최근 vs 과거)</i>"]
+        for seg in nv:
+            ups = [x for x in seg.get("items", []) if x["dir"] == "up"][:3]
+            downs = [x for x in seg.get("items", []) if x["dir"] == "down"][-2:]
+            tops = ups + downs
+            chips = "  ".join(f"{_dl_arrow(x)}{_esc(x['name'])} {'+' if x['pct']>=0 else ''}{x['pct']}%" for x in tops)
+            lines.append(f"<b>{_esc(seg['segment'])}</b>\n{chips}")
         blocks.append("\n".join(lines))
 
     tr = brief.get("trends") or []

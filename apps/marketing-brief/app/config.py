@@ -45,8 +45,13 @@ APPS = [
 NAVER_CLIENT_ID = os.getenv("NAVER_CLIENT_ID", "")
 NAVER_CLIENT_SECRET = os.getenv("NAVER_CLIENT_SECRET", "")
 NAVER_DATALAB_URL = "https://openapi.naver.com/v1/datalab/search"
-DATALAB_GENDER = os.getenv("DATALAB_GENDER", "f")   # f=여성
-DATALAB_AGES = ["3", "4", "5", "6"]                  # 19~39세
+# 돈 많이 쓰는 세대를 다양하게 — 세그먼트별 관심사 추이 (20대 남성 제외).
+# ages 코드: 5=30~34 6=35~39 7=40~44 8=45~49 9=50~54 10=55~59. gender ""=전체
+SEGMENTS = [
+    {"label": "30·40대 여성", "gender": "f", "ages": ["5", "6", "7", "8"]},
+    {"label": "30·40대 남성", "gender": "m", "ages": ["5", "6", "7", "8"]},
+    {"label": "40·50대", "gender": "", "ages": ["7", "8", "9", "10"]},
+]
 # 추적 관심사 (요청당 5개 제한 → 배치). 대표 키워드 묶음.
 INTEREST_GROUPS = [
     {"groupName": "운세·타로", "keywords": ["운세", "타로", "사주"]},
