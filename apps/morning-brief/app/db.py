@@ -22,18 +22,26 @@ async def close_pool() -> None:
 SCHEMA_DDL = """
 CREATE SCHEMA IF NOT EXISTS brief;
 
--- 일별 모닝 브리핑. run_date(KST 오늘) 기준 한 행.
---   geeknews: 어제자 GeekNews Top N (요약 포함) JSONB 배열
---   github:   오늘자 GitHub Trending(Python) Top N JSONB 배열
 CREATE TABLE IF NOT EXISTS brief.daily (
     run_date       DATE PRIMARY KEY,
     geeknews_date  DATE,
     geeknews       JSONB NOT NULL DEFAULT '[]'::jsonb,
     github         JSONB NOT NULL DEFAULT '[]'::jsonb,
+    reads          JSONB NOT NULL DEFAULT '[]'::jsonb,
+    trends         JSONB NOT NULL DEFAULT '[]'::jsonb,
+    producthunt    JSONB NOT NULL DEFAULT '[]'::jsonb,
+    naver          JSONB NOT NULL DEFAULT '[]'::jsonb,
+    ideas          TEXT,
     status         TEXT,
     error          TEXT,
     generated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+-- 기존 테이블 보강 (통합으로 컬럼 추가)
+ALTER TABLE brief.daily ADD COLUMN IF NOT EXISTS reads       JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE brief.daily ADD COLUMN IF NOT EXISTS trends      JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE brief.daily ADD COLUMN IF NOT EXISTS producthunt JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE brief.daily ADD COLUMN IF NOT EXISTS naver       JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE brief.daily ADD COLUMN IF NOT EXISTS ideas       TEXT;
 
 CREATE INDEX IF NOT EXISTS brief_daily_date_idx ON brief.daily (run_date DESC);
 """
