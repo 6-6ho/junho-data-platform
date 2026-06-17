@@ -10,7 +10,7 @@ DSN = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # Gemini (요약 엔진)
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # 매일 생성 시각 (KST)
 DAILY_HOUR_KST = int(os.getenv("DAILY_HOUR_KST", "6"))

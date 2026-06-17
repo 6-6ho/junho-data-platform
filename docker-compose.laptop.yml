@@ -179,7 +179,7 @@ services:
       - DB_USER=postgres
       - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
       - DAILY_HOUR_KST=6
       - DAILY_MINUTE_KST=30
       - ADMIN_TOKEN=${MORNING_ADMIN_TOKEN:-}
