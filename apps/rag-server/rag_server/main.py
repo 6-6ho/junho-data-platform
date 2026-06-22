@@ -24,6 +24,8 @@ from rag_server.mcp_tools import (
 )
 from rag_server.personal_auth import PersonalAuthProvider
 from rag_server.schema import ensure_schema
+from rag_server.db import query_one
+from starlette.concurrency import run_in_threadpool
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,7 +66,13 @@ mcp = FastMCP(
 # --- public healthcheck (no OAuth) for docker + tunnel probes ---
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request: Request) -> JSONResponse:
-    """Liveness + readiness probe. Intentionally returns zero sensitive info."""
+    """Liveness + readiness. Pings DB so a dropped postgres connection surfaces as
+    unhealthy → autoheal restarts the container (fresh connection)."""
+    try:
+        await run_in_threadpool(query_one, "SELECT 1")
+    except Exception as e:  # noqa: BLE001
+        logger.warning("health: DB check failed: %s", e)
+        return JSONResponse({"status": "db_error", "service": "rag-server"}, status_code=503)
     return JSONResponse({"status": "ok", "service": "rag-server"})
 
 

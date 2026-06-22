@@ -50,6 +50,7 @@ services:
   rag-server:
     build: ./apps/rag-server
     container_name: jdp-rag
+    labels: ["autoheal=true"]
     restart: unless-stopped
     logging: *default-logging
     env_file: [.env]
@@ -100,6 +101,7 @@ services:
   rag-worker:
     build: ./apps/rag-server
     container_name: jdp-rag-worker
+    labels: ["autoheal=true"]
     restart: unless-stopped
     logging: *default-logging
     env_file: [.env]
@@ -127,6 +129,12 @@ services:
       postgres:
         condition: service_healthy
     command: ["python", "/app/scripts/reembed_worker_daemon.py"]
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import os,psycopg2; psycopg2.connect(host=os.environ['DB_HOST'],port=int(os.environ.get('DB_PORT','5432')),dbname=os.environ['DB_NAME'],user=os.environ['DB_USER'],password=os.environ['DB_PASSWORD'],connect_timeout=5).cursor().execute('SELECT 1')"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
     networks: [appnet]
 
   # === Realestate Monitor — 성북구 일별 신규 매물 (6-6ho.com 메인) ===
@@ -220,6 +228,19 @@ services:
       timeout: 5s
       retries: 3
     networks: [appnet]
+
+  # === Autoheal — unhealthy 컨테이너 자동 재시작 (docker.sock 감시) ===
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: jdp-autoheal
+    restart: unless-stopped
+    logging: *default-logging
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=15
+      - AUTOHEAL_START_PERIOD=30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   # === External Access ===
   cloudflared:
