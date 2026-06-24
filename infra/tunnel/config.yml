@@ -1,25 +1,32 @@
 tunnel: 05b88928-b53c-4ed6-aa52-6f1e0895f59d
 credentials-file: /etc/cloudflared/credentials.json
-
 ingress:
-  - hostname: 6-6ho.com
-    service: http://frontend:80
-  - hostname: www.6-6ho.com
-    service: http://frontend:80
-  - hostname: trade.6-6ho.com
-    service: http://frontend:80
-  - hostname: shop.6-6ho.com
-    service: http://shop-analytics:80
-  - hostname: admin.6-6ho.com
-    service: http://shop-admin:80
-  - hostname: analytics.6-6ho.com
-    service: http://shop-analytics:80
-  - hostname: airflow.6-6ho.com
-    service: http://airflow:8080
-  - hostname: docs.6-6ho.com
-    service: http://frontend:80
-  - hostname: monitor.6-6ho.com
-    service: http://grafana:3000
-  - hostname: code.6-6ho.com
-    service: http://192.168.219.108:8443
-  - service: http_status:404
+- hostname: 6-6ho.com
+  service: http://hub:80
+- hostname: www.6-6ho.com
+  service: http://hub:80
+- hostname: rag.6-6ho.com
+  service: http://rag-server:8000
+- hostname: harness-mcp.6-6ho.com
+  service: http://harness-mcp:8000
+- hostname: baenae.6-6ho.com
+  service: http://baenae:3000
+- hostname: lotto.6-6ho.com
+  service: http://lotto-web:80
+- hostname: saju-daengnyang.6-6ho.com
+  service: http://saju-daengnyang:3000
+- hostname: saju.6-6ho.com
+  service: http://saju-daengnyang:3000
+- hostname: todo.6-6ho.com
+  service: http://todo:8000
+- hostname: saju2.6-6ho.com
+  service: http://saju-daengnyang:3000
+- hostname: morning.6-6ho.com
+  service: http://morning-brief:8000
+- hostname: realestate.6-6ho.com
+  service: http://realestate-monitor:8000
+- hostname: saju-daeng.com
+  service: http://saju-daengnyang:3000
+- hostname: www.saju-daeng.com
+  service: http://saju-daengnyang:3000
+- service: http_status:404
