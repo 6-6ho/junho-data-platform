@@ -29,4 +29,6 @@ ingress:
   service: http://saju-daengnyang:3000
 - hostname: www.saju-daeng.com
   service: http://saju-daengnyang:3000
+- hostname: collect.6-6ho.com
+  service: http://collector:8000
 - service: http_status:404

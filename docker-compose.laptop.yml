@@ -229,6 +229,37 @@ services:
       retries: 3
     networks: [appnet]
 
+  # === Analytics Collector — 전 앱 공용 이벤트 수집 (collect.6-6ho.com) ===
+  collector:
+    build: ./apps/collector
+    container_name: jdp-collector
+    labels: ["autoheal=true"]
+    restart: unless-stopped
+    logging: *default-logging
+    env_file: [.env]
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=app
+      - DB_USER=postgres
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - DISCORD_WEBHOOK_URL=${ANALYTICS_DISCORD_WEBHOOK_URL:-}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 192M
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    networks: [appnet]
+
   # === Autoheal — unhealthy 컨테이너 자동 재시작 (docker.sock 감시) ===
   autoheal:
     image: willfarrell/autoheal:latest
